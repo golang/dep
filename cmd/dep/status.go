@@ -6,22 +6,26 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 	"text/tabwriter"
+	"text/template"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
 	"github.com/pkg/errors"
 )
+
+const availableTemplateVariables = "ProjectRoot, Constraint, Version, Revision, Latest, and PackageCount."
 
 const statusShortHelp = `Report the status of the project's dependencies`
 const statusLongHelp = `
@@ -34,7 +38,41 @@ With no arguments, print the status of each dependency of the project.
   LATEST      Latest VCS revision available
   PKGS USED   Number of packages from this project that are actually used
 
+You may use the -f flag to create a custom format for the output of the
+dep status command. The available fields you can utilize are as follows:
+` + availableTemplateVariables + `
+
 Status returns exit code zero if all dependencies are in a "good state".
+`
+
+const statusExamples = `
+dep status
+
+	Displays a table of the various dependencies in the project along with
+	their properties such as the constraints they are bound by and the 
+	revision they are at.
+
+dep status -f='{{if eq .Constraint "master"}}{{.ProjectRoot}} {{end}}'
+
+	Displays the list of package names constrained on the master branch.
+	The -f flag allows you to use Go templates along with it's various 
+	constructs for formating the output data. Available flags are as follows:
+	` + availableTemplateVariables + `
+
+dep status -json
+
+	Displays the dependency information in JSON format as a list of 
+	project objects. Each project object contains keys which correspond
+	to the table column names from the standard 'dep status' command.
+
+Linux:   dep status -dot | dot -T png | display
+MacOS:   dep status -dot | dot -T png | open -f -a /Applications/Preview.app
+Windows: dep status -dot | dot -T png -o status.png; start status.png
+
+	Generates a visual representation of the dependency tree using GraphViz.
+	(Note: in order for this example to work you must first have graphviz
+	installed on your system)
+
 `
 
 const (
@@ -56,6 +94,7 @@ func (cmd *statusCommand) LongHelp() string  { return statusLongHelp }
 func (cmd *statusCommand) Hidden() bool      { return false }
 
 func (cmd *statusCommand) Register(fs *flag.FlagSet) {
+	fs.BoolVar(&cmd.examples, "examples", false, "print detailed usage examples")
 	fs.BoolVar(&cmd.json, "json", false, "output in JSON format")
 	fs.StringVar(&cmd.template, "f", "", "output in text/template format")
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
@@ -64,6 +103,7 @@ func (cmd *statusCommand) Register(fs *flag.FlagSet) {
 }
 
 type statusCommand struct {
+	examples bool
 	json     bool
 	template string
 	output   string
@@ -79,6 +119,13 @@ type outputter interface {
 	MissingHeader() error
 	MissingLine(*MissingStatus) error
 	MissingFooter() error
+}
+
+// Only a subset of the outputters should be able to output old statuses.
+type oldOutputter interface {
+	OldHeader() error
+	OldLine(*OldStatus) error
+	OldFooter() error
 }
 
 type tableOutput struct{ w *tabwriter.Writer }
@@ -123,10 +170,31 @@ func (out *tableOutput) MissingFooter() error {
 	return out.w.Flush()
 }
 
+func (out *tableOutput) OldHeader() error {
+	_, err := fmt.Fprintf(out.w, "PROJECT\tCONSTRAINT\tREVISION\tLATEST\n")
+	return err
+}
+
+func (out *tableOutput) OldLine(os *OldStatus) error {
+	_, err := fmt.Fprintf(out.w,
+		"%s\t%s\t%s\t%s\t\n",
+		os.ProjectRoot,
+		os.getConsolidatedConstraint(),
+		formatVersion(os.Revision),
+		os.getConsolidatedLatest(shortRev),
+	)
+	return err
+}
+
+func (out *tableOutput) OldFooter() error {
+	return out.w.Flush()
+}
+
 type jsonOutput struct {
 	w       io.Writer
 	basic   []*rawStatus
 	missing []*MissingStatus
+	old     []*rawOldStatus
 }
 
 func (out *jsonOutput) BasicHeader() error {
@@ -155,6 +223,20 @@ func (out *jsonOutput) MissingLine(ms *MissingStatus) error {
 
 func (out *jsonOutput) MissingFooter() error {
 	return json.NewEncoder(out.w).Encode(out.missing)
+}
+
+func (out *jsonOutput) OldHeader() error {
+	out.old = []*rawOldStatus{}
+	return nil
+}
+
+func (out *jsonOutput) OldLine(os *OldStatus) error {
+	out.old = append(out.old, os.marshalJSON())
+	return nil
+}
+
+func (out *jsonOutput) OldFooter() error {
+	return json.NewEncoder(out.w).Encode(out.old)
 }
 
 type dotOutput struct {
@@ -198,19 +280,36 @@ type templateOutput struct {
 
 func (out *templateOutput) BasicHeader() error { return nil }
 func (out *templateOutput) BasicFooter() error { return nil }
-
 func (out *templateOutput) BasicLine(bs *BasicStatus) error {
-	return out.tmpl.Execute(out.w, bs)
+	data := rawStatus{
+		ProjectRoot:  bs.ProjectRoot,
+		Constraint:   bs.getConsolidatedConstraint(),
+		Version:      bs.getConsolidatedVersion(),
+		Revision:     bs.Revision.String(),
+		Latest:       bs.getConsolidatedLatest(shortRev),
+		PackageCount: bs.PackageCount,
+	}
+	return out.tmpl.Execute(out.w, data)
+}
+
+func (out *templateOutput) OldHeader() error { return nil }
+func (out *templateOutput) OldFooter() error { return nil }
+func (out *templateOutput) OldLine(os *OldStatus) error {
+	return out.tmpl.Execute(out.w, os)
 }
 
 func (out *templateOutput) MissingHeader() error { return nil }
 func (out *templateOutput) MissingFooter() error { return nil }
-
 func (out *templateOutput) MissingLine(ms *MissingStatus) error {
 	return out.tmpl.Execute(out.w, ms)
 }
 
 func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
+	if cmd.examples {
+		ctx.Err.Println(strings.TrimSpace(statusExamples))
+		return nil
+	}
+
 	if err := cmd.validateFlags(); err != nil {
 		return err
 	}
@@ -235,8 +334,6 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	var out outputter
 	switch {
 	case cmd.missing:
-		return errors.Errorf("not implemented")
-	case cmd.old:
 		return errors.Errorf("not implemented")
 	case cmd.json:
 		out = &jsonOutput{
@@ -266,6 +363,15 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 	// Check if the lock file exists.
 	if p.Lock == nil {
 		return errors.Errorf("no Gopkg.lock found. Run `dep ensure` to generate lock file")
+	}
+
+	if cmd.old {
+		if _, ok := out.(oldOutputter); !ok {
+			return errors.Errorf("invalid output format used")
+		}
+		err = cmd.runOld(ctx, out.(oldOutputter), p, sm)
+		ctx.Out.Print(buf.String())
+		return err
 	}
 
 	hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
@@ -331,6 +437,140 @@ func (cmd *statusCommand) validateFlags() error {
 		// be apparent to the users.
 		return errors.Wrapf(errors.New("cannot pass multiple operating mode flags"), "%v", opModes)
 	}
+
+	return nil
+}
+
+// OldStatus contains information about all the out of date packages in a project.
+type OldStatus struct {
+	ProjectRoot string
+	Constraint  gps.Constraint
+	Revision    gps.Revision
+	Latest      gps.Version
+}
+
+type rawOldStatus struct {
+	ProjectRoot, Constraint, Revision, Latest string
+}
+
+func (os OldStatus) getConsolidatedConstraint() string {
+	var constraint string
+	if os.Constraint != nil {
+		if v, ok := os.Constraint.(gps.Version); ok {
+			constraint = formatVersion(v)
+		} else {
+			constraint = os.Constraint.String()
+		}
+	}
+	return constraint
+}
+
+func (os OldStatus) getConsolidatedLatest(revSize uint8) string {
+	latest := ""
+	if os.Latest != nil {
+		switch revSize {
+		case shortRev:
+			latest = formatVersion(os.Latest)
+		case longRev:
+			latest = os.Latest.String()
+		}
+	}
+	return latest
+}
+
+func (os OldStatus) marshalJSON() *rawOldStatus {
+	return &rawOldStatus{
+		ProjectRoot: os.ProjectRoot,
+		Constraint:  os.getConsolidatedConstraint(),
+		Revision:    string(os.Revision),
+		Latest:      os.getConsolidatedLatest(longRev),
+	}
+}
+
+func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project, sm gps.SourceManager) error {
+	// While the network churns on ListVersions() requests, statically analyze
+	// code from the current project.
+	ptree, err := p.ParseRootPackageTree()
+	if err != nil {
+		return err
+	}
+
+	// Set up a solver in order to check the InputHash.
+	params := gps.SolveParameters{
+		ProjectAnalyzer: dep.Analyzer{},
+		RootDir:         p.AbsRoot,
+		RootPackageTree: ptree,
+		Manifest:        p.Manifest,
+		// Locks aren't a part of the input hash check, so we can omit it.
+	}
+
+	logger := ctx.Err
+	if ctx.Verbose {
+		params.TraceLogger = ctx.Err
+	} else {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+
+	// Check update for all the projects.
+	params.ChangeAll = true
+
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "fastpath solver prepare")
+	}
+
+	logger.Println("Solving dependency graph to determine which dependencies can be updated.")
+	solution, err := solver.Solve(context.TODO())
+	if err != nil {
+		return errors.Wrap(err, "runOld")
+	}
+
+	var oldStatuses []OldStatus
+	solutionProjects := solution.Projects()
+
+	for _, proj := range p.Lock.Projects() {
+		for _, sProj := range solutionProjects {
+			// Look for the same project in solution and lock.
+			if sProj.Ident().ProjectRoot != proj.Ident().ProjectRoot {
+				continue
+			}
+
+			// If revisions are not the same then it is old and we should display it.
+			latestRev, _, _ := gps.VersionComponentStrings(sProj.Version())
+			atRev, _, _ := gps.VersionComponentStrings(proj.Version())
+			if atRev == latestRev {
+				continue
+			}
+
+			var constraint gps.Constraint
+			// Getting Constraint.
+			if pp, has := p.Manifest.Ovr[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+				// manifest has override for project.
+				constraint = pp.Constraint
+			} else if pp, has := p.Manifest.Constraints[proj.Ident().ProjectRoot]; has && pp.Constraint != nil {
+				// manifest has normal constraint.
+				constraint = pp.Constraint
+			} else {
+				// No constraint exists. No need to worry about displaying it.
+				continue
+			}
+
+			// Generate the old status data and append it.
+			os := OldStatus{
+				ProjectRoot: proj.Ident().String(),
+				Revision:    gps.Revision(atRev),
+				Latest:      gps.Revision(latestRev),
+				Constraint:  constraint,
+			}
+			oldStatuses = append(oldStatuses, os)
+		}
+	}
+
+	out.OldHeader()
+	for _, ostat := range oldStatuses {
+		out.OldLine(&ostat)
+	}
+	out.OldFooter()
 
 	return nil
 }

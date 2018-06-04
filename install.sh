@@ -23,14 +23,15 @@ downloadJSON() {
     url="$2"
 
     echo "Fetching $url.."
-    if type curl > /dev/null; then
+    if test -x "$(command -v curl)"; then
         response=$(curl -s -L -w 'HTTPSTATUS:%{http_code}' -H 'Accept: application/json' "$url")
         body=$(echo "$response" | sed -e 's/HTTPSTATUS\:.*//g')
         code=$(echo "$response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-    elif type wget > /dev/null; then
+    elif test -x "$(command -v wget)"; then
         temp=$(mktemp)
-        body=$(wget -q --header='Accept: application/json' -O - --server-response --content-on-error "$url" 2> "$temp")
-        code=$(awk '/^  HTTP/{print $2}' < "$temp")
+        body=$(wget -q --header='Accept: application/json' -O - --server-response "$url" 2> "$temp")
+        code=$(awk '/^  HTTP/{print $2}' < "$temp" | tail -1)
+        rm "$temp"
     else
         echo "Neither curl nor wget was available to perform http requests."
         exit 1
@@ -48,10 +49,10 @@ downloadFile() {
     destination="$2"
 
     echo "Fetching $url.."
-    if type curl > /dev/null; then
+    if test -x "$(command -v curl)"; then
         code=$(curl -s -w '%{http_code}' -L "$url" -o "$destination")
-    elif type wget > /dev/null; then
-        code=$(wget -q -O "$destination" --server-response "$url" 2>&1 | awk '/^  HTTP/{print $2}')
+    elif test -x "$(command -v wget)"; then
+        code=$(wget -q -O "$destination" --server-response "$url" 2>&1 | awk '/^  HTTP/{print $2}' | tail -1)
     else
         echo "Neither curl nor wget was available to perform http requests."
         exit 1
@@ -64,12 +65,13 @@ downloadFile() {
 }
 
 findGoBinDirectory() {
-    if [ -z "$GOPATH" ]; then
-        echo "Installation requires \$GOPATH to be set for your Golang environment."
+    EFFECTIVE_GOPATH=$(go env GOPATH)
+    if [ -z "$EFFECTIVE_GOPATH" ]; then
+        echo "Installation could not determine your \$GOPATH."
         exit 1
     fi
     if [ -z "$GOBIN" ]; then
-        GOBIN="$GOPATH/bin"
+        GOBIN=$(echo "${EFFECTIVE_GOPATH%%:*}/bin" | sed s#//*#/#g)
     fi
     if [ ! -d "$GOBIN" ]; then
         echo "Installation requires your GOBIN directory $GOBIN to exist. Please create it."
@@ -146,5 +148,11 @@ downloadFile "$BINARY_URL" "$DOWNLOAD_FILE"
 echo "Setting executable permissions."
 chmod +x "$DOWNLOAD_FILE"
 
-echo "Moving executable to $INSTALL_DIRECTORY/dep"
-mv "$DOWNLOAD_FILE" "$INSTALL_DIRECTORY/dep"
+INSTALL_NAME="dep"
+
+if [ "$OS" = "windows" ]; then
+    INSTALL_NAME="$INSTALL_NAME.exe"
+fi
+
+echo "Moving executable to $INSTALL_DIRECTORY/$INSTALL_NAME"
+mv "$DOWNLOAD_FILE" "$INSTALL_DIRECTORY/$INSTALL_NAME"

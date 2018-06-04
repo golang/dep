@@ -1,0 +1,1 @@
+Have two transient dependencies have different versions of the same repo. Resolving should fail.

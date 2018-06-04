@@ -10,15 +10,16 @@ Keep an eye on the [Roadmap](https://github.com/golang/dep/wiki/Roadmap) for a s
 
 Please check the existing issues and [FAQ](docs/FAQ.md) to see if your feedback has already been reported.
 
+General questions should go to the [golang-nuts mailing list](https://groups.google.com/group/golang-nuts) or the [Gophers Slack #vendor channel](https://gophers.slack.com/messages/C0M5YP9LN/) instead of the issue tracker.
+The gophers there will answer or ask you to file an issue if you've tripped over a bug.
+For an invite to the Slack channel, [fill out this form](https://invite.slack.golangbridge.org/).
+
 When [filing an issue](https://github.com/golang/dep/issues/new), make sure to answer these five questions:
 
 1. What version of Go (`go version`) and `dep` (`git describe --tags`) are you using??
 3. What `dep` command did you run?
 4. What did you expect to see?
 5. What did you see instead?
-
-General questions should go to the [golang-nuts mailing list](https://groups.google.com/group/golang-nuts) instead of the issue tracker.
-The gophers there will answer or ask you to file an issue if you've tripped over a bug.
 
 ## Contributing code
 
@@ -79,7 +80,7 @@ again.
 
 ### General guidelines
 
-* _Be kind, respectful, and inclusive_. Really live [that CoC](https://github.com/golang/dep/blob/master/CODE_OF_CONDUCT.md). We've developed a reputation as one of the most welcoming and supportive project environments in the Go community, and we want to keep that up!
+* _Be kind, respectful, and inclusive_. Really live that [CoC](https://github.com/golang/dep/blob/master/CODE_OF_CONDUCT.md). We've developed a reputation as one of the most welcoming and supportive project environments in the Go community, and we want to keep that up!
 * The lines of responsibility between maintainership areas can be fuzzy. Get to know your fellow maintainers - it's important to work _with_ them when an issue falls in this grey area.
 * Remember, the long-term goal of `dep` is to disappear into the `go` toolchain. That's going to be a challenging process, no matter what. Minimizing that eventual difficulty should be a guiding light for all your decisions today.
   * Try to match the toolchain's assumptions as closely as possible ([example](https://github.com/golang/dep/issues/564#issuecomment-300994599)), and avoid introducing new rules the toolchain would later have to incorporate.

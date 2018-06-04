@@ -9,7 +9,7 @@ Dep is a tool you'll use regularly in the course of normal Go development. Regul
 * `dep ensure` is the primary workhorse command, and is the only command that changes disk state.
 * `dep status` reports on the state of your project, and the visible universe of Go software projects.
 
-This guide primarily centers on  `dep ensure`, as that's the command you run to effect changes on your project. The [Models and Mechanisms](ensure-mechanics.md) reference document details how the things work under the hood, and is worth reading if you're encountering a confusing `dep ensure` behavior (or just curious!).
+This guide primarily centers on `dep ensure`, as that's the command you run to effect changes on your project. The [Models and Mechanisms](ensure-mechanics.md) reference document details how the things work under the hood, and is worth reading if you're encountering a confusing `dep ensure` behavior (or just curious!).
 
 ## Basics
 
@@ -19,21 +19,20 @@ Dep's main command is `dep ensure`. The verb is "ensure" to imply that the actio
 
 > Hey dep, please make sure that [my project](glossary.md#current-project) is [in sync](glossary.md#sync): that [`Gopkg.lock`](Gopkg.lock.md) satisfies all the imports in my project, and all the rules in[ `Gopkg.toml`](Gopkg.toml.md), and that `vendor/` contains exactly what `Gopkg.lock` says it should."
 
-As the narrative indicates, `dep ensure` is a holistic operation; rather than offering a series of commands that you run in succession to incrementally achieve some final state, each run of `dep ensure` delivers a safe, complete, and reproducible set of dependencies with respect to the current state of your project. You might imagine repeated runs of `dep ensure` as being a bit like a frog, hopping from one lilypad to the next.
+As the narrative indicates, `dep ensure` is a holistic operation; rather than offering a series of commands that you run in succession to incrementally achieve some final state, each run of `dep ensure` delivers a safe, complete, and reproducible set of dependencies with respect to the current state of your project. You might imagine repeated runs of `dep ensure` as being a bit like a frog, hopping from one lily pad to the next.
 
- `dep ensure` also guarantees that, barring `kill -9`, power failure, or a critical bug, its disk writes are all-or-nothing: on any given run, either nothing changes (and you get an error), or you're on the nearest safe lilypad. This makes `dep ensure` fine to run at most any time.
-
+`dep ensure` also guarantees that, barring `kill -9`, power failure, or a critical bug, its disk writes are all-or-nothing: on any given run, either nothing changes (and you get an error), or you're on the nearest safe lily pad. This makes `dep ensure` fine to run at most any time.
 
 ## Using `dep ensure`
 
 There are four times when you'll run `dep ensure`:
 
-- To add a new dependency
-- To update an existing dependency
-- To catch up after importing a package for the first time in your project, or removing the last import of a package in your project
-- To catch up to a change to a rule in `Gopkg.toml`
+* To add a new dependency
+* To update an existing dependency
+* To catch up after importing a package for the first time in your project, or removing the last import of a package in your project
+* To catch up to a change to a rule in `Gopkg.toml`
 
-There's also an implicit fifth time: when you're not sure if one of the above has happened. Running `dep ensure` without any additional flags will get your project back in sync - a known good state. As such, it's generally safe to defensively run `dep ensure`  as a way of simply making sure that your project is in that state.
+There's also an implicit fifth time: when you're not sure if one of the above has happened. Running `dep ensure` without any additional flags will get your project back in sync - a known good state. As such, it's generally safe to defensively run `dep ensure` as a way of simply making sure that your project is in that state.
 
 Let's explore each of these moments. To play along, you'll need to `cd` into a project that's already been set up by `dep init`. If you haven't done that yet, check out the guides for [new projects](new-project.md) and [migrations](migrating.md).
 
@@ -62,7 +61,7 @@ $ dep ensure -add github.com/pkg/errors github.com/foo/bar
 
 Dep works this way because it considers the import statements it discovers through static analysis of your project's code to be the canonical indicator of what dependencies must be present. That choice does add some pain at this moment, but it reduces friction and automates cleanup elsewhere. Tradeoffs!
 
-Of course, given this model, you don't _have to_ use `dep ensure -add` to add new dependencies - you can also just add an appropriate `import` statement in your code, then run `dep ensure`. However, this approach doesn't always play nicely with  [`goimports`](https://godoc.org/golang.org/x/tools/cmd/goimports), and also won't append a `[[constraint]]` into `Gopkg.toml`. Still, it can be useful at times, often for rapid iteration and off-the-cuff experimenting.
+Of course, given this model, you don't _have to_ use `dep ensure -add` to add new dependencies - you can also just add an appropriate `import` statement in your code, then run `dep ensure`. However, this approach doesn't always play nicely with [`goimports`](https://godoc.org/golang.org/x/tools/cmd/goimports), and also won't append a `[[constraint]]` into `Gopkg.toml`. Still, it can be useful at times, often for rapid iteration and off-the-cuff experimenting.
 
 The [ensure mechanics section on `-add`](ensure-mechanics.md#add) has a more thorough exploration, including some ways that `dep ensure -add`'s behavior subtly varies depending on the state of your project.
 
@@ -88,10 +87,10 @@ As noted in [the section on adding dependencies](#adding-a-new-dependency), dep 
 
 It's only "might," though, because most of the time, adding or removing imports doesn't matter to dep. Only if one of the following has occurred will a `dep ensure` be necessary to bring the project back in sync:
 
-1. You've added the first `import` of a package, but already `import` other packages from that project.
-2. You've removed the last `import` of a package, but still `import` other packages from that project.
-3. You've added the first `import` of any package within a particular project. (Note: this is the [alternate adding approach](#adding-a-new-dependency))
-4. You've removed the last `import` of a package from within a particular project.
+1.  You've added the first `import` of a package, but already `import` other packages from that project.
+2.  You've removed the last `import` of a package, but still `import` other packages from that project.
+3.  You've added the first `import` of any package within a particular project. (Note: this is the [alternate adding approach](#adding-a-new-dependency))
+4.  You've removed the last `import` of a package from within a particular project.
 
 In short, dep is concerned with the set of unique import paths across your entire project, and only cares when you make a change that adds or removes an import path from that set.
 
@@ -101,7 +100,7 @@ Only if it is the first/last import of a project being added/removed - cases 3 a
 
 ### Rule changes in `Gopkg.toml`
 
-`Gopkg.toml` files contain five basic types of rules. The  [`Gopkg.toml` docs](Gopkg.toml.md) explain them in detail, but here's an overview:
+`Gopkg.toml` files contain five basic types of rules. The [`Gopkg.toml` docs](Gopkg.toml.md) explain them in detail, but here's an overview:
 
 * `required`, which are mostly equivalent to `import` statements in `.go` files, except that it's OK to list a `main` package here
 * `ignored`, which causes dep to black hole an import path (and any imports it uniquely introduces)
@@ -122,7 +121,8 @@ $ sudo apt-get install graphviz
 $ dep status -dot | dot -T png | display
 ```
 
-### MacOS
+### macOS
+
 ```
 $ brew install graphviz
 $ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
@@ -141,13 +141,12 @@ $ dep status -dot | dot -T png | open -f -a /Applications/Preview.app
 
 Here are the key takeaways from this guide:
 
-- `dep ensure -update` is the preferred way to update dependencies, though it's less effective for projects that don't publish semver releases.
-- `dep ensure -add` is usually the easiest way to introduce new dependencies, though it's not the only one. To add more than one at a time, you'll need to use multiple arguments, not multiple invocations - and make sure to add real `import` statements for the projects after the command completes!
-- If you ever make a manual change in `Gopkg.toml`, it's best to run `dep ensure` to make sure everything's in sync.
-- `dep ensure` is almost never the wrong thing to run; if you're not sure what's going on, running it will bring you back to safety ("the nearest lilypad"), or fail informatively.
+* `dep ensure -update` is the preferred way to update dependencies, though it's less effective for projects that don't publish semver releases.
+* `dep ensure -add` is usually the easiest way to introduce new dependencies, though it's not the only one. To add more than one at a time, you'll need to use multiple arguments, not multiple invocations - and make sure to add real `import` statements for the projects after the command completes!
+* If you ever make a manual change in `Gopkg.toml`, it's best to run `dep ensure` to make sure everything's in sync.
+* `dep ensure` is almost never the wrong thing to run; if you're not sure what's going on, running it will bring you back to safety ("the nearest lilypad"), or fail informatively.
 
 Also, a couple other miscellaneous tidbits:
 
-- As in the Go toolchain generally, avoid symlinks within your own project. dep tolerates a bit of this, but like the Go toolchain itself, is generally not terribly supportive of symlinks.
-- Never directly edit anything in `vendor/`; dep will unconditionally overwrite such changes. If you need to modify a dependency, fork it and do it properly.
-
+* As in the Go toolchain generally, avoid symlinks within your own project. dep tolerates a bit of this, but like the Go toolchain itself, is generally not terribly supportive of symlinks.
+* Never directly edit anything in `vendor/`; dep will unconditionally overwrite such changes. If you need to modify a dependency, fork it and do it properly.

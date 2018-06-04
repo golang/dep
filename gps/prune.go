@@ -245,7 +245,7 @@ func collectUnusedPackagesFiles(fsState filesystemState, unusedPackages map[stri
 	files := make([]string, 0, len(unusedPackages))
 
 	for _, path := range fsState.files {
-		// Keep perserved files.
+		// Keep preserved files.
 		if isPreservedFile(filepath.Base(path)) {
 			continue
 		}
@@ -295,7 +295,7 @@ func pruneNonGoFiles(fsState filesystemState) error {
 			continue
 		}
 
-		// Ignore perserved files.
+		// Ignore preserved files.
 		if isPreservedFile(filepath.Base(path)) {
 			continue
 		}

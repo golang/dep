@@ -11,9 +11,9 @@ $ dep init
 
 For many projects, this will just work. `dep init` will make educated guesses about what versions to use for your dependencies, generate sane `Gopkg.toml`, `Gopkg.lock`, and `vendor/`, and if your tests pass and builds work, then you're probably done. (If so, congratulations! You should check out [Daily Dep](daily-dep.md) next.)
 
-The migration process is still difficult for some projects. If you're trying dep for the first time, this can be particularly frustrating, as you're trying to simultaneously learn how to use dep, and how your project *should* be managed in dep. The good news is,  `dep init` is usually the big difficulty hump; once you're over it, things get much easier.
+The migration process is still difficult for some projects. If you're trying dep for the first time, this can be particularly frustrating, as you're trying to simultaneously learn how to use dep, and how your project _should_ be managed in dep. The good news is, `dep init` is usually the big difficulty hump; once you're over it, things get much easier.
 
-The goal of this guide is to provide enough information for you to reason about what's happening during `dep init`, so that you can at least understand what class of problems you're encountering, and what steps you might take to address them. To that end, we'll start with an overview of what  `dep init` is doing. 
+The goal of this guide is to provide enough information for you to reason about what's happening during `dep init`, so that you can at least understand what class of problems you're encountering, and what steps you might take to address them. To that end, we'll start with an overview of what `dep init` is doing.
 
 > Note: the first run of `dep init` can take quite a long time, as dep is creating fresh clones of all your dependencies into a special location, `$GOPATH/pkg/dep/sources/`. This is necessary for dep's normal operations, and is largely a one-time cost.
 
@@ -21,10 +21,10 @@ The goal of this guide is to provide enough information for you to reason about 
 
 When migrating existing projects, the primary goal of `dep init` is to automate as much of the work of creating a `Gopkg.toml` as possible. This is necessarily a heuristic goal, as dep may not have a 1:1 correspondence for everything you may have done before. As such, it's important to only expect that `dep init`'s automated migrations are operating on a best-effort basis.
 
-The behavior of  `dep init` varies depending on what's in your existing codebase, and the flags that are passed to it. However, it always proceeds in two phases:
+The behavior of `dep init` varies depending on what's in your existing codebase, and the flags that are passed to it. However, it always proceeds in two phases:
 
-1. *Inference phase:* Infer, from various sources, rules and hints about which versions of dependencies to use.
-2. *Solving phase:* Work out a solution that is acceptable under dep's model, while incorporating the above inferences as much as possible.
+1.  _Inference phase:_ Infer, from various sources, rules and hints about which versions of dependencies to use.
+2.  _Solving phase:_ Work out a solution that is acceptable under dep's model, while incorporating the above inferences as much as possible.
 
 ### The Inference Phase
 
@@ -35,9 +35,9 @@ The inference phase is where `dep init`'s behavior varies. By default, `dep init
 
 There are three circumstances that can lead dep not to make any tool-based inferences:
 
-- Your project doesn't use a package management tool
-- dep doesn't yet support the tool you use yet
-- You tell it not to, by running `dep init -skip-tools`
+* Your project doesn't use a package management tool
+* dep doesn't yet support the tool you use yet
+* You tell it not to, by running `dep init -skip-tools`
 
 After tool-based inference is complete, dep will normally proceed to the solving phase. However, if the user passes the `-gopath` flag, dep will first try to fill in any holes in the inferences drawn from tool metadata by checking the current project's containing GOPATH. Only hints are gleaned from GOPATH, and they will never supersede inferences from tool metadata. If you want to put GOPATH fully in charge, pass both flags: `dep init -skip-tools -gopath`.
 
@@ -45,7 +45,7 @@ Once dep has compiled its set of inferences, it proceeds to solving.
 
 ### The Solving Phase
 
-Once the inference phase is completed, the set of rules and hints dep has assembled will be passed to its [solver](solver.md) to work out a transitively complete depgraph, which will ultimately be recorded as the `Gopkg.lock`. This is the same solving process used by `dep ensure`, and completing it successfully means that dep has found a combination of dependency versions that respects all inferred rules, and as many inferred hints as possible. If solving succeeds, then the hard work is done; most of what remains is writing out `Gopkg.toml`, `Gopkg.lock`, and `vendor/`. 
+Once the inference phase is completed, the set of rules and hints dep has assembled will be passed to its [solver](the-solver.md) to work out a transitively complete depgraph, which will ultimately be recorded as the `Gopkg.lock`. This is the same solving process used by `dep ensure`, and completing it successfully means that dep has found a combination of dependency versions that respects all inferred rules, and as many inferred hints as possible. If solving succeeds, then the hard work is done; most of what remains is writing out `Gopkg.toml`, `Gopkg.lock`, and `vendor/`.
 
 The solver returns a solution, which itself is just [a representation](https://godoc.org/github.com/golang/dep/gps#Solution) of [the data stored in a `Gopkg.lock`](https://godoc.org/github.com/golang/dep#Lock): a transitively-complete, reproducible snapshot of the entire dependency graph. Writing out the `Gopkg.lock` from a solution is little more than a copy-and-encode operation, and writing `vendor/` is a matter of placing each project listed in the solution into its appropriate place, at the designated revision. This is exactly the same as `dep ensure`'s behavior.
 
@@ -65,12 +65,12 @@ While dep contributors have invested enormous effort into creating automated mig
 
 Because these are deep assumptions, their symptoms can be varied and surprising. Keeping these assumptions in mind could save you some hair-pulling later on.
 
-- dep does not allow nested `vendor/` directories; it flattens all dependencies to the topmost `vendor/` directory, at the root of your project. This is foundational to dep's model, and cannot be disabled.
-- dep wholly controls `vendor`, and will blow away any manual changes or additions made to it that deviate from the version of an upstream source dep selects.
-- dep requires that all packages from a given project/repository be at the same version.
-- dep generally does not care about what's on your GOPATH; it deals exclusively with projects sourced from remote network locations. (Hint inference is the only exception to this; once solving begins, GOPATH - and any custom changes you've made to code therein - is ignored.)
-- dep generally prefers semantic versioning-tagged releases to branches (when not given any additional rules). This is a significant shift from the "default branch" model of `go get` and some other tools. It can result in dep making surprising choices for dependencies for which it could not infer a rule.
-- dep assumes that all generated code exists, and has been committed to the source.
+* dep does not allow nested `vendor/` directories; it flattens all dependencies to the topmost `vendor/` directory, at the root of your project. This is foundational to dep's model, and cannot be disabled.
+* dep wholly controls `vendor`, and will blow away any manual changes or additions made to it that deviate from the version of an upstream source dep selects.
+* dep requires that all packages from a given project/repository be at the same version.
+* dep generally does not care about what's on your GOPATH; it deals exclusively with projects sourced from remote network locations. (Hint inference is the only exception to this; once solving begins, GOPATH - and any custom changes you've made to code therein - is ignored.)
+* dep generally prefers semantic versioning-tagged releases to branches (when not given any additional rules). This is a significant shift from the "default branch" model of `go get` and some other tools. It can result in dep making surprising choices for dependencies for which it could not infer a rule.
+* dep assumes that all generated code exists, and has been committed to the source.
 
 A small number of projects that have reported being unable, thus far, to find a reasonable way of adapting to these requirements. If you can't figure out how to make your project fit, please file an issue - while dep necessarily cannot accommodate every single existing approach, it is dep's goal is define rules to which all Go projects can reasonably adapt.
 
@@ -86,7 +86,7 @@ In the meantime, if the particular errors you are encountering do entail `Gopkg.
 
 ### Soft failures
 
-Soft failures are cases where `dep init` appears to exit cleanly, but a subsequent `go build` or `go test` fails. Dep's soft failures are usually more drastically than subtly wrong - e.g., an explosion of type errors when you try to build, because a wildly incorrect version for some dependency got selected. 
+Soft failures are cases where `dep init` appears to exit cleanly, but a subsequent `go build` or `go test` fails. Dep's soft failures are usually more drastically than subtly wrong - e.g., an explosion of type errors when you try to build, because a wildly incorrect version for some dependency got selected.
 
 If you do encounter problems like this, `dep status` is your first diagnostic step; it will report what versions were selected for all your dependencies. It may be clear which dependencies are a problem simply from your building or testing error messages. If not, compare the `dep status` list against the versions recorded by your previous tool to find the differences.
 

@@ -1,0 +1,6 @@
+{
+  "commands": [
+    ["init", "-no-examples", "-v"]
+  ],
+  "error-expected": "No versions of github.com/ChinmayR/deptestglideB met constraints"
+}

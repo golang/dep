@@ -1,0 +1,12 @@
+
+[[constraint]]
+  name = "github.com/ChinmayR/deptestglideA"
+  version = "0.4.0"
+
+[[constraint]]
+  name = "github.com/ChinmayR/deptestglideB"
+  version = "0.4.0"
+
+[prune]
+  go-tests = true
+  unused-packages = true

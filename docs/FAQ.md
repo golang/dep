@@ -5,20 +5,24 @@ title: FAQ
 The FAQ predated the introduction of the rest of the documentation. If something in here conflicts with other guides or reference documents, it's probably here that it's wrong - please file a PR!
 
 ## Concepts
+
 * [Does `dep` replace `go get`?](#does-dep-replace-go-get)
 * [Why is it `dep ensure` instead of `dep install`?](#why-is-it-dep-ensure-instead-of-dep-install)
 * [What is a direct or transitive dependency?](#what-is-a-direct-or-transitive-dependency)
 
 ## Configuration
+
 * [What is the difference between Gopkg.toml (the "manifest") and Gopkg.lock (the "lock")?](#what-is-the-difference-between-gopkgtoml-the-manifest-and-gopkglock-the-lock)
 * [How do I constrain a transitive dependency's version?](#how-do-i-constrain-a-transitive-dependency-s-version)
-* [How do I change the version of a dependecy?](#how-do-i-change-the-version-of-a-dependecy)
+* [How do I change the version of a dependency?](#how-do-i-change-the-version-of-a-dependency)
 * [Can I put the manifest and lock in the vendor directory?](#can-i-put-the-manifest-and-lock-in-the-vendor-directory)
 * [How do I get `dep` to authenticate to a `git` repo?](#how-do-i-get-dep-to-authenticate-to-a-git-repo)
-* [How do I get `dep` to consume private `git` repos using a Github Token?](#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token)
+* [How do I get `dep` to consume private `git` repos using a GitHub Token?](#how-do-i-get-dep-to-consume-private-git-repos-using-a-github-token)
 
 ## Behavior
+
 * [How does `dep` decide what version of a dependency to use?](#how-does-dep-decide-what-version-of-a-dependency-to-use)
+* [What is the default `dep ensure -update` behavior for dependencies that are imported but not included as a `[[Constraint]]` in `Gopkg.toml`?](#what-is-the-default-dep-ensure--update-behavior-for-dependencies-that-are-imported-but-not-included-as-a-constraint-in-gopkgtoml)
 * [What external tools are supported?](#what-external-tools-are-supported)
 * [Why is `dep` ignoring a version constraint in the manifest?](#why-is-dep-ignoring-a-version-constraint-in-the-manifest)
 * [Why did `dep` use a different revision for package X instead of the revision in the lock file?](#why-did-dep-use-a-different-revision-for-package-x-instead-of-the-revision-in-the-lock-file)
@@ -27,10 +31,11 @@ The FAQ predated the introduction of the rest of the documentation. If something
 * [Does `dep` support relative imports?](#does-dep-support-relative-imports)
 * [How do I make `dep` resolve dependencies from my `GOPATH`?](#how-do-i-make-dep-resolve-dependencies-from-my-gopath)
 * [Will `dep` let me use git submodules to store dependencies in `vendor`?](#will-dep-let-me-use-git-submodules-to-store-dependencies-in-vendor)
+* [How does `dep` work without changing my packages imports?](#how-does-dep-work-without-changing-my-packages-imports)
 
 ## Best Practices
+
 * [Should I commit my vendor directory?](#should-i-commit-my-vendor-directory)
-* [How do I test changes to a dependency?](#how-do-i-test-changes-to-a-dependency)
 * [How do I roll releases that `dep` will be able to use?](#how-do-i-roll-releases-that-dep-will-be-able-to-use)
 * [What semver version should I use?](#what-semver-version-should-i-use)
 * [Is it OK to make backwards-incompatible changes now?](#is-it-ok-to-make-backwards-incompatible-changes-now)
@@ -40,11 +45,13 @@ The FAQ predated the introduction of the rest of the documentation. If something
 * [How do I use `dep` in CI?](#how-do-i-use-dep-in-ci)
 
 ## Concepts
+
 ### Does `dep` replace `go get`?
 
 No. `dep` and `go get` serve mostly different purposes.
 
 Here are some suggestions for when you could use `dep` or `go get`:
+
 > I would say that dep doesn't replace go get, but they both can do similar things. Here's how I use them:
 >
 > `go get`: I want to download the source code for a go project so that I can work on it myself, or to install a tool. This clones the repo under GOPATH for all to use.
@@ -69,10 +76,12 @@ Here are some suggestions for when you could use `dep` or `go get`:
 > [@sdboyer in #371](https://github.com/golang/dep/issues/371#issuecomment-293246832)
 
 ### What is a direct or transitive dependency?
+
 * Direct dependencies are dependencies that are imported directly by your project: they appear in at least one import statement from your project.
 * Transitive dependencies are the dependencies of your dependencies. Necessary to compile but are not directly used by your code.
 
 ## Configuration
+
 ### What is the difference between `Gopkg.toml` (the "manifest") and `Gopkg.lock` (the "lock")?
 
 > The manifest describes user intent, and the lock describes computed outputs. There's flexibility in manifests that isn't present in locks..., as the "branch": "master" constraint will match whatever revision master HAPPENS to be at right now, whereas the lock is nailed down to a specific revision.
@@ -82,6 +91,7 @@ Here are some suggestions for when you could use `dep` or `go get`:
 > [@sdboyer in #281](https://github.com/golang/dep/issues/281#issuecomment-284118314)
 
 ## <a id="how-do-i-constrain-a-transitive-dependency-s-version"></a>How do I constrain a transitive dependency's version?
+
 First, if you're wondering about this because you're trying to keep the version
 of the transitive dependency from changing, then you're working against `dep`'s
 design. The lock file, `Gopkg.lock`, will keep the selected version of the
@@ -91,25 +101,25 @@ impossible to find a solution without changing that version.
 If that isn't your use case and you still need to constrain a transitive
 dependency, you have a couple of options:
 
-1. Make the transitive dependency a direct one, either with a dummy import or an entry in the `required` list in `Gopkg.toml`.
-2. Use an override.
+1.  Make the transitive dependency a direct one, either with a dummy import or an entry in the `required` list in `Gopkg.toml`.
+2.  Use an override.
 
 Overrides are a sledgehammer, and should only be used as a last resort. While
 constraints and overrides are declared in the same way in `Gopkg.toml`, they
 behave differently:
 
 * Constraints:
-   1. Can be declared by any project's manifest, yours or a dependency
-   2. Apply only to direct dependencies of the project declaring the constraint
-   3. Must not conflict with the `constraint` entries declared in any other project's manifest
+  1.  Can be declared by any project's manifest, yours or a dependency
+  2.  Apply only to direct dependencies of the project declaring the constraint
+  3.  Must not conflict with the `constraint` entries declared in any other project's manifest
 * Overrides:
-   1. Are only utilized from the current/your project's manifest
-   2. Apply globally, to direct and transitive dependencies
-   3. Supersede constraints declared in all manifests, yours or a dependency's
+  1.  Are only utilized from the current/your project's manifest
+  2.  Apply globally, to direct and transitive dependencies
+  3.  Supersede constraints declared in all manifests, yours or a dependency's
 
 Overrides are also discussed with some visuals in [the gps docs](https://github.com/sdboyer/gps/wiki/gps-for-Implementors#overrides).
 
-## How do I change the version of a dependecy
+## How do I change the version of a dependency
 
 If you want to:
 
@@ -118,13 +128,15 @@ If you want to:
 
 for one or more dependencies, do the following:
 
-1. Manually edit your `Gopkg.toml`.
-1. Run
+1.  Manually edit your `Gopkg.toml`.
+1.  Run
 
     ```sh
     $ dep ensure
     ```
+
 ## Can I put the manifest and lock in the vendor directory?
+
 No.
 
 > Placing these files inside `vendor/` would concretely bind us to `vendor/` in the long term.
@@ -140,7 +152,7 @@ authenticated repository.
 
 First, configure `git` to use the credentials option for the specific repository.
 
-For example, if you use gitlab, and you wish to access `https://gitlab.example.com/example/package.git`,
+For example, if you use GitLab, and you wish to access `https://gitlab.example.com/example/package.git`,
 then you would want to use the following configuration:
 
 ```
@@ -176,12 +188,13 @@ After configuring `git`, you may need to use `git` manually once to have it stor
 credentials. Once you've checked out the repo manually, it will then use the stored
 credentials. This at least appears to be the behavior for the osxkeychain provider.
 
-### How do I get dep to consume private git repos using a Github Token?
+### How do I get dep to consume private git repos using a GitHub Token?
 
-Another alternative to make `dep` work with private repos is to use a [Personal Github
+Another alternative to make `dep` work with private repos is to use a [Personal GitHub
 Token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/)
 and configure it inside the [`.netrc` file](https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html)
 as the following example:
+
 ```
 machine github.com
     login [YOUR_GITHUB_USERNAME]
@@ -191,6 +204,7 @@ machine github.com
 Once you have set that up, dep will automatically use that Token to authenticate to the repositories.
 
 ## Behavior
+
 ### How does `dep` decide what version of a dependency to use?
 
 The full algorithm is complex, but the most important thing to understand is
@@ -198,26 +212,26 @@ that `dep` tries versions in a [certain
 order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade),
 checking to see a version is acceptable according to specified constraints.
 
-- All semver versions come first, and sort mostly according to the semver 2.0
+* All semver versions come first, and sort mostly according to the semver 2.0
   spec, with one exception:
-  - Semver versions with a prerelease are sorted after *all* non-prerelease
+  * Semver versions with a prerelease are sorted after _all_ non-prerelease
     semver. Within this subset they are sorted first by their numerical
     component, then lexicographically by their prerelease version.
-- The default branch(es) are next; the semantics of what "default branch" means
+* The default branch(es) are next; the semantics of what "default branch" means
   are specific to the underlying source type, but this is generally what you'd
   get from a `go get`.
-- All other branches come next, sorted lexicographically.
-- All non-semver versions (tags) are next, sorted lexicographically.
-- Revisions, if any, are last, sorted lexicographically. Revisions do not
+* All other branches come next, sorted lexicographically.
+* All non-semver versions (tags) are next, sorted lexicographically.
+* Revisions, if any, are last, sorted lexicographically. Revisions do not
   typically appear in version lists, so the only invariant we maintain is
   determinism - deeper semantics, like chronology or topology, do not matter.
 
 So, given a slice of the following versions:
 
-- Branch: `master` `devel`
-- Semver tags: `v1.0.0` `v1.1.0` `v1.1.0-alpha1`
-- Non-semver tags: `footag`
-- Revision: `f6e74e8d`
+* Branch: `master` `devel`
+* Semver tags: `v1.0.0` `v1.1.0` `v1.1.0-alpha1`
+* Non-semver tags: `footag`
+* Revision: `f6e74e8d`
 
 Sorting for upgrade will result in the following slice:
 
@@ -229,7 +243,11 @@ trying to figure out why `dep` is doing what it does, understanding that its
 basic action is to attempt versions in this order should help you to reason
 about what's going on.
 
+## What is the default `dep ensure -update` behavior for dependencies that are imported but not included as a `[[Constraint]]` in `Gopkg.toml`?
+`dep` updates the dependency to the latest semver tag. If there are no semver tags, `dep` uses the tip of master.
+
 ## What external tools are supported?
+
 During `dep init` configuration from other dependency managers is detected
 and imported, unless `-skip-tools` is specified.
 
@@ -239,10 +257,12 @@ See [#186](https://github.com/golang/dep/issues/186#issuecomment-306363441) for
 how to add support for another tool.
 
 ## Why is `dep` ignoring a version constraint in the manifest?
+
 Only your project's directly imported dependencies are affected by a `constraint` entry
 in the manifest. Transitive dependencies are unaffected. See [How do I constrain a transitive dependency's version](#how-do-i-constrain-a-transitive-dependency-s-version)?
 
 ## Why did `dep` use a different revision for package X instead of the revision in the lock file?
+
 Sometimes the revision specified in the lock file is no longer valid. There are a few
 ways this can occur:
 
@@ -279,9 +299,9 @@ only paid once per changeset.
 
 The other part is the work of retrieving information about dependencies. There are three parts to this:
 
-1. Getting an up-to-date list of versions from the upstream source
-2. Reading the `Gopkg.toml` for a particular version out of the local cache
-3. Parsing the tree of packages for import statements at a particular version
+1.  Getting an up-to-date list of versions from the upstream source
+2.  Reading the `Gopkg.toml` for a particular version out of the local cache
+3.  Parsing the tree of packages for import statements at a particular version
 
 The first requires one or more network calls; the second two usually mean
 something like a `git checkout`, and the third is a filesystem walk, plus
@@ -298,23 +318,23 @@ There's another major performance issue that's much harder - the process of pick
 
 ## How does `dep` handle symbolic links?
 
-> because we're not crazy people who delight in inviting chaos into our lives, we need to work within one `GOPATH` at a time.
-> -[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
+> because we're not crazy people who delight in inviting chaos into our lives, we need to work within one `GOPATH` at a time. -[@sdboyer in #247](https://github.com/golang/dep/pull/247#issuecomment-284181879)
 
 Out of convenience, one might create a symlink to a directory within their `GOPATH/src`, e.g. `ln -s ~/go/src/github.com/user/awesome-project ~/Code/awesome-project`.
 
 When `dep` is invoked with a project root that is a symlink, it will be resolved according to the following rules:
 
-- If the symlink is outside `GOPATH` and links to a directory within a `GOPATH`, or vice versa, then `dep` will choose whichever path is within `GOPATH`.
-- If the symlink is within a `GOPATH` and the resolved path is within a *different* `GOPATH`, then an error is thrown.
-- If both the symlink and the resolved path are in the same `GOPATH`, then an error is thrown.
-- If neither the symlink nor the resolved path are in a `GOPATH`, then an error is thrown.
+* If the symlink is outside `GOPATH` and links to a directory within a `GOPATH`, or vice versa, then `dep` will choose whichever path is within `GOPATH`.
+* If the symlink is within a `GOPATH` and the resolved path is within a _different_ `GOPATH`, then an error is thrown.
+* If both the symlink and the resolved path are in the same `GOPATH`, then an error is thrown.
+* If neither the symlink nor the resolved path are in a `GOPATH`, then an error is thrown.
 
 This is the only symbolic link support that `dep` really intends to provide. In keeping with the general practices of the `go` tool, `dep` tends to either ignore symlinks (when walking) or copy the symlink itself, depending on the filesystem operation being performed.
 
 ## Does `dep` support relative imports?
 
 No.
+
 > dep simply doesn't allow relative imports. this is one of the few places where we restrict a case that the toolchain itself allows. we disallow them only because:
 >
 > * the toolchain already frowns heavily on them<br>
@@ -348,54 +368,29 @@ The reasons why git submodules will not be a part of dep are best expressed as a
 * Incorporating submodules in a way that is at all visible to the user (and why else would you do it?) makes dep's workflows both more complicated and less predictable: _sometimes_ submodule-related actions are expected; _sometimes_ submodule-derived workflows are sufficient.
 * Nesting one repository within another implies that changes could, potentially, be made directly in that subrepository. This is directly contrary to dep's foundational principle that `vendor` is dead code, and directly modifying anything in there is an error.
 
+## How does `dep` work without changing my packages imports?
+
+`dep` doesn't require imports (or the `$GOPATH`) to be updated because [go has native support for a vendor directory since version 1.5](https://golang.org/cmd/go/#hdr-Vendor_Directories). You do not need to update import paths to be relative. For instance, `import github.com/user/awesome-project` will be found in the project's `/vendor/github.com/user/awesome-project` before looking to `$GOPATH/src/github.com/user/awesome-project`.
+
 ## Best Practices
+
 ### Should I commit my vendor directory?
 
 It's up to you:
 
 **Pros**
 
-- It's the only way to get truly reproducible builds, as it guards against upstream renames,
+* It's the only way to get truly reproducible builds, as it guards against upstream renames,
   deletes and commit history overwrites.
-- You don't need an extra `dep ensure` step to sync `vendor/` with Gopkg.lock after most operations,
+* You don't need an extra `dep ensure` step to sync `vendor/` with `Gopkg.lock` after most operations,
   such as `go get`, cloning, getting latest, merging, etc.
 
 **Cons**
 
-- Your repo will be bigger, potentially a lot bigger,
+* Your repo will be bigger, potentially a lot bigger,
   though [`prune`](Gopkg.toml.md#prune) can help minimize this problem.
-- PR diffs will include changes for files under `vendor/` when Gopkg.lock is modified,
-  however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on Github.
-
-## How do I test changes to a dependency? 
-
-Making changes in your `vendor/` directory directly is not recommended, as dep
-will overwrite any changes. Instead:
-
-1. Delete the dependency from the `vendor/` directory.
-
-    ```sh
-    rm -rf vendor/<dependency>
-    ```
-
-1. Add that dependency to your `GOPATH`, if it isn't already.
-
-    ```sh
-    $ go get <dependency>
-    ```
-
-1. Modify the dependency in `$GOPATH/src/<dependency>`.
-1. Test, build, etc.
-
-Don't run `dep ensure` until you're done. `dep ensure` will reinstall the
-dependency into `vendor/` based on your manifest, as if you were installing from
-scratch.
-
-This solution works for short-term use, but for something long-term, take a look
-at [virtualgo](https://github.com/GetStream/vg).
-
-To test out code that has been pushed as a new version, or to a branch or fork,
-see [changing dependencies](#how-do-i-change-change-the-version-of-a-dependecy).
+* PR diffs will include changes for files under `vendor/` when `Gopkg.lock` is modified,
+  however files in `vendor/` are [hidden by default](https://github.com/github/linguist/blob/v5.2.0/lib/linguist/generated.rb#L328) on GitHub.
 
 ## How do I roll releases that `dep` will be able to use?
 
@@ -472,7 +467,7 @@ Add a constraint to `Gopkg.toml` that specifies `branch: "master"` (or whichever
 `dep ensure -vendor-only` creates the vendor folder from a valid `Gopkg.toml` and `Gopkg.lock` without checking for Go code.
 This is especially useful for builds inside docker utilizing cache layers.
 
-Sample dockerfile:
+Sample Dockerfile:
 
 ```Dockerfile
 FROM golang:1.9 AS builder
@@ -527,7 +522,7 @@ Caching can also be enabled but there are a couple of caveats you should be awar
 >
 > [@carolynvs in #1293](https://github.com/golang/dep/pull/1293#issuecomment-342969292)
 
-If you are sure you want to enable caching on travis, it can be done by adding `$GOPATH/pkg/dep`, the default location for `dep` cache, to the cached directories:
+If you are sure you want to enable caching on Travis, it can be done by adding `$GOPATH/pkg/dep`, the default location for `dep` cache, to the cached directories:
 
 ```yml
 # ...

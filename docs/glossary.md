@@ -59,17 +59,17 @@ Deduction is the process of determining the subset of an import path that corres
 
 A project's direct dependencies are those that it _imports_ from one or more of its packages, or includes in its [`required`](Gopkg.toml.md#required) list in `Gopkg.toml`.
 
- If each letter in `A -> B -> C -> D` represents a distinct project containing only a single package, and `->` indicates an import statement, then `B` is  `A`'s direct dependency, whereas `C` and `D` are [transitive dependencies](#transitive-dependency) of `A`.
+If each letter in `A -> B -> C -> D` represents a distinct project containing only a single package, and `->` indicates an import statement, then `B` is `A`'s direct dependency, whereas `C` and `D` are [transitive dependencies](#transitive-dependency) of `A`.
 
 Dep only incorporates the `required` rules from the [current project's](#current-project) `Gopkg.toml`. Therefore, if `=>` represents `required` rather than a standard import, and `A -> B => C`, then `C` is a direct dependency of `B` _only_ when `B` is the current project. Because the `B`-to-`C` link does not exist when `A` is the current project, then `C` won't actually be in the graph at all.
 
 ### External Import
 
-An `import` statement that points to a package in a project other than the one in which it originates. For example, an `import` in package `github.com/foo/bar` will be considered an external import if it points to anything _other_ than stdlib or  `github.com/foo/bar/*`.
+An `import` statement that points to a package in a project other than the one in which it originates. For example, an `import` in package `github.com/foo/bar` will be considered an external import if it points to anything _other_ than stdlib or `github.com/foo/bar/*`.
 
 ### GPS
 
-Stands for "Go packaging solver", it is [a subtree of library-style packages within dep](https://godoc.org/github.com/golang/dep/gps), and is the engine around which dep is built. Most commonly referred to as "gps." 
+Stands for "Go packaging solver", it is [a subtree of library-style packages within dep](https://godoc.org/github.com/golang/dep/gps), and is the engine around which dep is built. Most commonly referred to as "gps."
 
 ### Local cache
 
@@ -95,7 +95,7 @@ Variously referenced as "HTTP metadata service", "`go-get` HTTP metadata service
 
 ### Override
 
-An override is a [`[[override]]`](Gopkg.toml.md#override) stanza in `Gopkg.toml`. 
+An override is a [`[[override]]`](Gopkg.toml.md#override) stanza in `Gopkg.toml`.
 
 ### Project
 
@@ -108,7 +108,7 @@ The root import path for a project. A project root is defined as:
 * For the current project, the location of the `Gopkg.toml` file defines the project root
 * For dependencies, the root of the network [source](#source) (VCS repository) is treated as the project root
 
-These are generally one and the same, though not always. When using dep inside a monorepo, multiple `Gopkg.toml` files may exist at subpaths for discrete projects, designating each of those import paths as Project Roots. This works fine when working directly on those projects. If, however, any project not in the repository seeks to import the monorepo, dep will treat the monorepo's as one big Project, with the root directory being the Project Root; it will disregard any and all  `Gopkg.toml` files in subdirectories.
+These are generally one and the same, though not always. When using dep inside a monorepo, multiple `Gopkg.toml` files may exist at subpaths for discrete projects, designating each of those import paths as Project Roots. This works fine when working directly on those projects. If, however, any project not in the repository seeks to import the monorepo, dep will treat the monorepo's as one big Project, with the root directory being the Project Root; it will disregard any and all `Gopkg.toml` files in subdirectories.
 
 This may also be referred to as the "import root" or "root import path."
 
@@ -118,7 +118,7 @@ This may also be referred to as the "import root" or "root import path."
 
 ### Source
 
-The remote entities that hold versioned code. Sources are specifically the entity containing the code, not any particular version of thecode itself.
+The remote entities that hold versioned code. Sources are specifically the entity containing the code, not any particular version of the code itself.
 
 "Source" is used in lieu of "VCS" because Go package management tools will soon learn to use more than just VCS systems.
 
@@ -134,6 +134,6 @@ This concept is explored in detail on [the ensure mechanics reference page](ensu
 
 ### Transitive Dependency
 
-A project's transitive dependencies are those dependencies that it does not import itself, but are imported by one of its dependencies. 
+A project's transitive dependencies are those dependencies that it does not import itself, but are imported by one of its dependencies.
 
-If each letter in `A -> B -> C -> D` represents a distinct project containing only a single package, and `->` indicates an import statement, then  `C` and `D` are  `A`'s transitive dependencies, whereas `B` is a [direct dependency](#transitive-dependency) of `A`.
+If each letter in `A -> B -> C -> D` represents a distinct project containing only a single package, and `->` indicates an import statement, then `C` and `D` are `A`'s transitive dependencies, whereas `B` is a [direct dependency](#transitive-dependency) of `A`.

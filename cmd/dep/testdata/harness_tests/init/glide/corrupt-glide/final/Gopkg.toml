@@ -1,0 +1,8 @@
+
+[[constraint]]
+  name = "github.com/ChinmayR/deptestglideA"
+  version = "0.3.0"
+
+[prune]
+  go-tests = true
+  unused-packages = true

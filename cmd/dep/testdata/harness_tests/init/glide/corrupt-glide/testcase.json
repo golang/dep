@@ -1,0 +1,10 @@
+{
+  "commands": [
+    ["init", "-no-examples", "-v"]
+  ],
+  "vendor-final": [
+    "github.com/ChinmayR/deptestglideA",
+    "github.com/ChinmayR/deptestglideB",
+    "github.com/ChinmayR/deptestglideC"
+  ]
+}

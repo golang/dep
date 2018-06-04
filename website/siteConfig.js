@@ -23,10 +23,10 @@ const siteConfig = {
     secondaryColor: '#243f75',
     primaryColor: '#375eab',
   },
-  //algolia: {
-    //apiKey: "f2e26cf744b3d81c7e57499075753104",
-    //indexName: "dep-docs"
-  //},
+  algolia: {
+    apiKey: "0b4cdbc6bb41efe17ed7176afcb23441",
+    indexName: "golang_dep"
+  },
   // This copyright info is used in /core/Footer.js and blog rss/atom feeds.
   copyright:
     'Copyright © ' +

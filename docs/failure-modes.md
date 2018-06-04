@@ -26,14 +26,13 @@ dep talks to the network at several different points. These vary somewhat depend
 * Updating a local cache (in git terms, `git fetch`) with the latest changes from an upstream source.
 * Writing out code trees under `vendor` is typically done from the local cache, but under some circumstances a tarball may be fetched on-the-fly from a remote source.
 
-
 Network failures that you actually may observe are biased towards the earlier items in the list, simply because those operations tend to happen first: you generally don't see update failures as much as version-listing failures, because they usually have the same underlying cause (source host is down, network partition, etc.), but the version-list request happens first on most paths.
 
 #### Persistent network failures
 
 Although most network failures are ephemeral, there are three well-defined cases where they're more permanent:
 
-* **The network on which the source resides is permanently unreachable from the user's location:** in practice, this generally means one of two things: you've forgotten to log into your company VPN, or you're behind [the GFW](https://en.wikipedia.org/wiki/Great_Firewall). In the latter case, setting the *de facto* standard HTTP proxy environment variables that [`http.ProxyFromEnvironment()`](https://golang.org/pkg/net/http/#ProxyFromEnvironment) respects will cause dep's `go-get` HTTP metadata requests, as well as git, bzr, and hg subcommands, to utilize the proxy.
+* **The network on which the source resides is permanently unreachable from the user's location:** in practice, this generally means one of two things: you've forgotten to log into your company VPN, or you're behind [the GFW](https://en.wikipedia.org/wiki/Great_Firewall). In the latter case, setting the _de facto_ standard HTTP proxy environment variables that [`http.ProxyFromEnvironment()`](https://golang.org/pkg/net/http/#ProxyFromEnvironment) respects will cause dep's `go-get` HTTP metadata requests, as well as git, bzr, and hg subcommands, to utilize the proxy.
 
   * Remediation is also exactly the same when the custom `go-get` HTTP metadata service for a source is similarly unreachable. The failure messages, however, will look like [deduction failures](#deduction-failures).
 
@@ -79,11 +78,11 @@ There are no known cases where, in the course of normal operations, dep can irre
 
 Dep may encounter errors while attempting to write out the `vendor` directory itself (any such errors will result in a full rollback; causing no changes to be made to disk). To help pinpoint where the problem may be, know that this is the flow for populating `vendor`:
 
-1. Allocate a new temporary directory within the system temporary directory.
-2. Rename the existing `vendor` directory to `vendor.orig`. Do this within the current project's root directory if possible; if not, rename and move it to the tempdir.
-3. Create a new `vendor` directory within the tempdir and concurrently populate it with all the projects named in `Gopkg.lock`.
-4. Move the new `vendor` directory into place in the current project's root directory.
-5. Delete the old `vendor` directory.
+1.  Allocate a new temporary directory within the system temporary directory.
+2.  Rename the existing `vendor` directory to `vendor.orig`. Do this within the current project's root directory if possible; if not, rename and move it to the tempdir.
+3.  Create a new `vendor` directory within the tempdir and concurrently populate it with all the projects named in `Gopkg.lock`.
+4.  Move the new `vendor` directory into place in the current project's root directory.
+5.  Delete the old `vendor` directory.
 
 Note: this flow will become more targeted after [vendor verification]() allows dep to identify and target the subset of projects currently in `vendor` that need to be changed.
 
@@ -94,7 +93,7 @@ Known problems in this category include:
 
 ## Logical failures
 
-Logical failures encompass everything that can happen within dep's logical problem-solving domain - after 
+Logical failures encompass everything that can happen within dep's logical problem-solving domain - after
 
 Some of these failures can be as straightforward as typos, and are just as easily resolved. Others, unfortunately, may necessitate forking and modifying an upstream project - although such cases are very rare.
 
@@ -172,7 +171,7 @@ When `dep ensure` or `dep init` exit with an error message looking something lik
 $ dep init
 init failed: unable to solve the dependency graph: Solving failure: No versions of github.com/foo/bar met constraints:
 	v1.0.1: Could not introduce github.com/foo/bar@v1.13.1, as its subpackage github.com/foo/bar/foo is missing. (Package is required by (root).)
-	v1.0.0: Could not introduce github.com/foo/bar@v1.13.0, as... 
+	v1.0.0: Could not introduce github.com/foo/bar@v1.13.0, as...
 	v0.1.0: (another error)
 	master: (another error)
 ```
@@ -185,20 +184,18 @@ These rules, and specific remediations for failing to meet them, are described i
 
 * **`[[constraint]]` conflicts:** when projects in the dependency graph disagree on what [versions](Gopkg.toml.md#version-rules) are acceptable for a project, or where to [source](Gopkg.toml.md#source) it from.
   * Remediation will usually be either changing a `[[constraint]]` or adding an `[[override]]`, but genuine conflicts may require forking and hacking code.
-* **Package validity failure:** when an imported package is quite obviously not capable of being built. 
+* **Package validity failure:** when an imported package is quite obviously not capable of being built.
   * There usually isn't much remediation here beyond "stop importing that," as it indicates something broken at a particular version.
 * **Import comment failure:** when the import path used to address a package differs from the [import comment](https://golang.org/cmd/go/#hdr-Import_path_checking) the package uses to specify how it should be imported.
   * Remediation is to use the specified import path, instead of whichever one you used.
 * **Case-only import variation failure:** when two equal-except-for-case imports exist in the same build.
   * Remediation is to pick one case variation to use throughout your project, then manually update all projects in your depgraph to use the new casing.
 
-
 Let's break down the process of addressing a solving failure into a series of steps:
 
-1. First, look through the failed versions list for a version of the dependency that works for you (or a failure that seems fixable), then try to work that one out. Often enough, you'll see a single failure repeated across the entire version list, which makes it pretty clear what problem you need to solve.
-2. Take the remediation steps specific to that failure.
-3. Re-run the same command you ran that produced the failure. There are three possible outcomes:
-   1. Success!
-   2. Your fix was ineffective - the same failure re-occurs. Either re-examine your fix (step 2), or look for a new failure to fix (step 1).
-   3. Your fix was effective, but some new failure arose. Return to step 1 with the new failure list.
-
+1.  First, look through the failed versions list for a version of the dependency that works for you (or a failure that seems fixable), then try to work that one out. Often enough, you'll see a single failure repeated across the entire version list, which makes it pretty clear what problem you need to solve.
+2.  Take the remediation steps specific to that failure.
+3.  Re-run the same command you ran that produced the failure. There are three possible outcomes:
+    1.  Success!
+    2.  Your fix was ineffective - the same failure re-occurs. Either re-examine your fix (step 2), or look for a new failure to fix (step 1).
+    3.  Your fix was effective, but some new failure arose. Return to step 1 with the new failure list.

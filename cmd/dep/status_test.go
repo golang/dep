@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 	"text/tabwriter"
+	"text/template"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
@@ -41,21 +42,28 @@ func TestBasicLine(t *testing.T) {
 	project := dep.Project{}
 	aSemverConstraint, _ := gps.NewSemverConstraint("1.2.3")
 
+	templateString := "PR:{{.ProjectRoot}}, Const:{{.Constraint}}, Ver:{{.Version}}, Rev:{{.Revision}}, Lat:{{.Latest}}, PkgCt:{{.PackageCount}}"
+	equalityTestTemplate := `{{if eq .Constraint "1.2.3"}}Constraint is 1.2.3{{end}}|{{if eq .Version "flooboo"}}Version is flooboo{{end}}|{{if eq .Latest "unknown"}}Latest is unknown{{end}}`
+
 	tests := []struct {
-		name            string
-		status          BasicStatus
-		wantDotStatus   []string
-		wantJSONStatus  []string
-		wantTableStatus []string
+		name                 string
+		status               BasicStatus
+		wantDotStatus        []string
+		wantJSONStatus       []string
+		wantTableStatus      []string
+		wantTemplateStatus   []string
+		wantEqTemplateStatus []string
 	}{
 		{
 			name: "BasicStatus with ProjectRoot only",
 			status: BasicStatus{
 				ProjectRoot: "github.com/foo/bar",
 			},
-			wantDotStatus:   []string{`[label="github.com/foo/bar"];`},
-			wantJSONStatus:  []string{`"Version":""`, `"Revision":""`},
-			wantTableStatus: []string{`github.com/foo/bar                                         0`},
+			wantDotStatus:        []string{`[label="github.com/foo/bar"];`},
+			wantJSONStatus:       []string{`"Version":""`, `"Revision":""`},
+			wantTableStatus:      []string{`github.com/foo/bar                                         0`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Const:, Ver:, Rev:, Lat:, PkgCt:0`},
+			wantEqTemplateStatus: []string{`||`},
 		},
 		{
 			name: "BasicStatus with Revision",
@@ -63,9 +71,11 @@ func TestBasicLine(t *testing.T) {
 				ProjectRoot: "github.com/foo/bar",
 				Revision:    gps.Revision("flooboofoobooo"),
 			},
-			wantDotStatus:   []string{`[label="github.com/foo/bar\nflooboo"];`},
-			wantJSONStatus:  []string{`"Version":""`, `"Revision":"flooboofoobooo"`, `"Constraint":""`},
-			wantTableStatus: []string{`github.com/foo/bar                       flooboo           0`},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\nflooboo"];`},
+			wantJSONStatus:       []string{`"Version":""`, `"Revision":"flooboofoobooo"`, `"Constraint":""`},
+			wantTableStatus:      []string{`github.com/foo/bar                       flooboo           0`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Const:, Ver:flooboo, Rev:flooboofoobooo, Lat:, PkgCt:0`},
+			wantEqTemplateStatus: []string{`|Version is flooboo|`},
 		},
 		{
 			name: "BasicStatus with Version and Revision",
@@ -74,9 +84,11 @@ func TestBasicLine(t *testing.T) {
 				Version:     gps.NewVersion("1.0.0"),
 				Revision:    gps.Revision("flooboofoobooo"),
 			},
-			wantDotStatus:   []string{`[label="github.com/foo/bar\n1.0.0"];`},
-			wantJSONStatus:  []string{`"Version":"1.0.0"`, `"Revision":"flooboofoobooo"`, `"Constraint":""`},
-			wantTableStatus: []string{`github.com/foo/bar              1.0.0    flooboo           0`},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Version":"1.0.0"`, `"Revision":"flooboofoobooo"`, `"Constraint":""`},
+			wantTableStatus:      []string{`github.com/foo/bar              1.0.0    flooboo           0`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Const:, Ver:1.0.0, Rev:flooboofoobooo, Lat:, PkgCt:0`},
+			wantEqTemplateStatus: []string{`||`},
 		},
 		{
 			name: "BasicStatus with Constraint, Version and Revision",
@@ -86,9 +98,11 @@ func TestBasicLine(t *testing.T) {
 				Version:     gps.NewVersion("1.0.0"),
 				Revision:    gps.Revision("revxyz"),
 			},
-			wantDotStatus:   []string{`[label="github.com/foo/bar\n1.0.0"];`},
-			wantJSONStatus:  []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`},
-			wantTableStatus: []string{`github.com/foo/bar  1.2.3       1.0.0    revxyz            0`},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`},
+			wantTableStatus:      []string{`github.com/foo/bar  1.2.3       1.0.0    revxyz            0`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Const:1.2.3, Ver:1.0.0, Rev:revxyz, Lat:, PkgCt:0`},
+			wantEqTemplateStatus: []string{`Constraint is 1.2.3||`},
 		},
 		{
 			name: "BasicStatus with update error",
@@ -96,9 +110,11 @@ func TestBasicLine(t *testing.T) {
 				ProjectRoot: "github.com/foo/bar",
 				hasError:    true,
 			},
-			wantDotStatus:   []string{`[label="github.com/foo/bar"];`},
-			wantJSONStatus:  []string{`"Version":""`, `"Revision":""`, `"Latest":"unknown"`},
-			wantTableStatus: []string{`github.com/foo/bar                                 unknown  0`},
+			wantDotStatus:        []string{`[label="github.com/foo/bar"];`},
+			wantJSONStatus:       []string{`"Version":""`, `"Revision":""`, `"Latest":"unknown"`},
+			wantTableStatus:      []string{`github.com/foo/bar                                 unknown  0`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Const:, Ver:, Rev:, Lat:unknown, PkgCt:0`},
+			wantEqTemplateStatus: []string{`||Latest is unknown`},
 		},
 	}
 
@@ -147,6 +163,33 @@ func TestBasicLine(t *testing.T) {
 			for _, wantStatus := range test.wantTableStatus {
 				if ok := strings.Contains(buf.String(), wantStatus); !ok {
 					t.Errorf("Did not find expected Table status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			buf.Reset()
+			template, _ := template.New("status").Parse(templateString)
+			templateout := &templateOutput{w: &buf, tmpl: template}
+			templateout.BasicHeader()
+			templateout.BasicLine(&test.status)
+			templateout.BasicFooter()
+
+			for _, wantStatus := range test.wantTemplateStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected template status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			// The following test is to ensure that certain fields usable with string operations such as .eq
+			buf.Reset()
+			template, _ = template.New("status").Parse(equalityTestTemplate)
+			templateout = &templateOutput{w: &buf, tmpl: template}
+			templateout.BasicHeader()
+			templateout.BasicLine(&test.status)
+			templateout.BasicFooter()
+
+			for _, wantStatus := range test.wantEqTemplateStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected template status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
 				}
 			}
 		})
@@ -485,6 +528,16 @@ func TestValidateFlags(t *testing.T) {
 			name:    "multiple operating modes",
 			cmd:     statusCommand{missing: true, old: true},
 			wantErr: errors.Wrapf(errors.New("cannot pass multiple operating mode flags"), "[-old -missing]"),
+		},
+		{
+			name:    "old with -dot",
+			cmd:     statusCommand{dot: true, old: true},
+			wantErr: errors.New("-dot generates dependency graph; cannot pass other flags"),
+		},
+		{
+			name:    "old with template",
+			cmd:     statusCommand{old: true, template: "foo"},
+			wantErr: nil,
 		},
 	}
 
