@@ -64,7 +64,7 @@ func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 
 	c.GOPATHs = append(c.GOPATHs, GOPATHs...)
 
-	c.ExplicitRoot = os.Getenv("DEP_PROJECT_ROOT")
+	c.ExplicitRoot = os.Getenv("DEPPROJECTROOT")
 
 	return nil
 }
