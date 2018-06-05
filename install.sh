@@ -90,6 +90,8 @@ initArch() {
         amd64) ARCH="amd64";;
         x86_64) ARCH="amd64";;
         i386) ARCH="386";;
+        ppc64) ARCH="ppc64";;
+        ppc64le) ARCH="ppc64le";;
         *) echo "Architecture ${ARCH} is not supported by this installation script"; exit 1;;
     esac
     echo "ARCH = $ARCH"
@@ -123,7 +125,12 @@ fi
 echo "Will install into $INSTALL_DIRECTORY"
 
 # assemble expected release artifact name
-BINARY="dep-${OS}-${ARCH}"
+if [[ "${ARCH}" == "ppc64" || "${ARCH}" == "ppc64le" ]] && [[ "${OS}" != "linux" ]]; then
+    # ppc64 and ppc64le are only supported on Linux.
+    echo "${OS}-${ARCH} is not supported by this instalation script"
+else
+    BINARY="dep-${OS}-${ARCH}"
+fi
 
 # add .exe if on windows
 if [ "$OS" = "windows" ]; then
