@@ -67,14 +67,21 @@ type sourceCoordinator struct {
 	psrcmut    sync.Mutex // guards protoSrcs map
 	protoSrcs  map[string][]chan srcReturn
 	cachedir   string
+	cache      sourceCache
 	logger     *log.Logger
 }
 
-func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, logger *log.Logger) *sourceCoordinator {
+// newSourceCoordinator returns a new sourceCoordinator.
+// Passing a nil sourceCache defaults to an in-memory cache.
+func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, cache sourceCache, logger *log.Logger) *sourceCoordinator {
+	if cache == nil {
+		cache = memoryCache{}
+	}
 	return &sourceCoordinator{
 		supervisor: superv,
 		deducer:    deducer,
 		cachedir:   cachedir,
+		cache:      cache,
 		logger:     logger,
 		srcs:       make(map[string]*sourceGateway),
 		nameToURL:  make(map[string]string),
@@ -82,7 +89,11 @@ func newSourceCoordinator(superv *supervisor, deducer deducer, cachedir string, 
 	}
 }
 
-func (sc *sourceCoordinator) close() {}
+func (sc *sourceCoordinator) close() {
+	if err := sc.cache.close(); err != nil {
+		sc.logger.Println(errors.Wrap(err, "failed to close the source cache"))
+	}
+}
 
 func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id ProjectIdentifier) (*sourceGateway, error) {
 	if err := sc.supervisor.ctx.Err(); err != nil {
@@ -216,7 +227,8 @@ func (sc *sourceCoordinator) getSourceGatewayFor(ctx context.Context, id Project
 		}
 		src, err := m.try(ctx, sc.cachedir)
 		if err == nil {
-			srcGate, err = newSourceGateway(ctx, src, sc.supervisor, sc.cachedir)
+			cache := sc.cache.newSingleSourceCache(id)
+			srcGate, err = newSourceGateway(ctx, src, sc.supervisor, sc.cachedir, cache)
 			if err == nil {
 				sc.srcs[url] = srcGate
 				break
@@ -260,7 +272,7 @@ type sourceGateway struct {
 
 // newSourceGateway returns a new gateway for src. If the source exists locally,
 // the local state may be cleaned, otherwise we ping upstream.
-func newSourceGateway(ctx context.Context, src source, superv *supervisor, cachedir string) (*sourceGateway, error) {
+func newSourceGateway(ctx context.Context, src source, superv *supervisor, cachedir string, cache singleSourceCache) (*sourceGateway, error) {
 	var state sourceState
 	local := src.existsLocally(ctx)
 	if local {
@@ -276,9 +288,9 @@ func newSourceGateway(ctx context.Context, src source, superv *supervisor, cache
 		srcState: state,
 		src:      src,
 		cachedir: cachedir,
+		cache:    cache,
 		suprvsr:  superv,
 	}
-	sg.cache = sg.createSingleSourceCache()
 
 	if !local {
 		if err := sg.require(ctx, sourceExistsUpstream); err != nil {
@@ -540,14 +552,6 @@ func (sg *sourceGateway) disambiguateRevision(ctx context.Context, r Revision) (
 	}
 
 	return sg.src.disambiguateRevision(ctx, r)
-}
-
-// createSingleSourceCache creates a singleSourceCache instance for use by
-// the encapsulated source.
-func (sg *sourceGateway) createSingleSourceCache() singleSourceCache {
-	// TODO(sdboyer) when persistent caching is ready, just drop in the creation
-	// of a source-specific handle here
-	return newMemoryCache()
 }
 
 // sourceExistsUpstream verifies that the source exists upstream and that the

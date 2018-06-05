@@ -4,7 +4,8 @@ NEW FEATURES:
 
 * Add CI tests against go1.10. Drop support for go1.8. ([#1620](https://github.com/golang/dep/pull/1620))
 * Added `install.sh` script. ([#1533](https://github.com/golang/dep/pull/1533))
-* List out of date projects in dep status ([#1553](https://github.com/golang/dep/pull/1553)).
+* List out of date projects in dep status. ([#1553](https://github.com/golang/dep/pull/1553)).
+* Enabled opt-in persistent caching via $DEPCACHEAGE env var. ([#1711](https://github.com/golang/dep/pull/1711))
 
 BUG FIXES:
 

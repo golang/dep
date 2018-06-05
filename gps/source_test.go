@@ -43,7 +43,7 @@ func testSourceGateway(t *testing.T) {
 			superv := newSupervisor(ctx)
 			deducer := newDeductionCoordinator(superv)
 			logger := log.New(test.Writer{TB: t}, "", 0)
-			sc := newSourceCoordinator(superv, deducer, cachedir, logger)
+			sc := newSourceCoordinator(superv, deducer, cachedir, nil, logger)
 			defer sc.close()
 
 			id := mkPI("github.com/sdboyer/deptest")

@@ -19,41 +19,46 @@ import (
 )
 
 func Test_singleSourceCache(t *testing.T) {
-	newMem := func(*testing.T, string, string) (singleSourceCache, func() error) {
-		return newMemoryCache(), func() error { return nil }
+	newMem := func(*testing.T, string) sourceCache {
+		return memoryCache{}
 	}
 	t.Run("mem", singleSourceCacheTest{newCache: newMem}.run)
 
 	epoch := time.Now().Unix()
-	newBolt := func(t *testing.T, cachedir, root string) (singleSourceCache, func() error) {
-		pi := mkPI(root).normalize()
+	newBolt := func(t *testing.T, cachedir string) sourceCache {
 		bc, err := newBoltCache(cachedir, epoch, log.New(test.Writer{TB: t}, "", 0))
 		if err != nil {
 			t.Fatal(err)
 		}
-		return bc.newSingleSourceCache(pi), bc.close
+		return bc
 	}
 	t.Run("bolt/keepOpen", singleSourceCacheTest{newCache: newBolt}.run)
 	t.Run("bolt/reOpen", singleSourceCacheTest{newCache: newBolt, persistent: true}.run)
 
-	newMulti := func(t *testing.T, cachedir, root string) (singleSourceCache, func() error) {
-		disk, close := newBolt(t, cachedir, root)
-		return &multiCache{mem: newMemoryCache(), disk: disk}, close
+	newMulti := func(t *testing.T, cachedir string) sourceCache {
+		bc, err := newBoltCache(cachedir, epoch, log.New(test.Writer{TB: t}, "", 0))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return newMultiCache(memoryCache{}, bc)
 	}
 	t.Run("multi/keepOpen", singleSourceCacheTest{newCache: newMulti}.run)
 	t.Run("multi/reOpen", singleSourceCacheTest{persistent: true, newCache: newMulti}.run)
 
 	t.Run("multi/keepOpen/noDisk", singleSourceCacheTest{
-		newCache: func(*testing.T, string, string) (singleSourceCache, func() error) {
-			return &multiCache{mem: newMemoryCache(), disk: discardCache{}}, func() error { return nil }
+		newCache: func(*testing.T, string) sourceCache {
+			return newMultiCache(memoryCache{}, discardCache{})
 		},
 	}.run)
 
 	t.Run("multi/reOpen/noMem", singleSourceCacheTest{
 		persistent: true,
-		newCache: func(t *testing.T, cachedir, root string) (singleSourceCache, func() error) {
-			disk, close := newBolt(t, cachedir, root)
-			return &multiCache{mem: discardCache{}, disk: disk}, close
+		newCache: func(t *testing.T, cachedir string) sourceCache {
+			bc, err := newBoltCache(cachedir, epoch, log.New(test.Writer{TB: t}, "", 0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return newMultiCache(discardCache{}, bc)
 		},
 	}.run)
 }
@@ -64,7 +69,7 @@ var testAnalyzerInfo = ProjectAnalyzerInfo{
 }
 
 type singleSourceCacheTest struct {
-	newCache   func(*testing.T, string, string) (cache singleSourceCache, close func() error)
+	newCache   func(*testing.T, string) sourceCache
 	persistent bool
 }
 
@@ -72,6 +77,7 @@ type singleSourceCacheTest struct {
 // For test.persistent caches, test.newCache is periodically called mid-test to ensure persistence.
 func (test singleSourceCacheTest) run(t *testing.T) {
 	const root = "example.com/test"
+	pi := mkPI(root).normalize()
 	cpath, err := ioutil.TempDir("", "singlesourcecache")
 	if err != nil {
 		t.Fatalf("Failed to create temp cache dir: %s", err)
@@ -80,9 +86,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 	t.Run("info", func(t *testing.T) {
 		const rev Revision = "revision"
 
-		c, close := test.newCache(t, cpath, root)
+		sc := test.newCache(t, cpath)
+		c := sc.newSingleSourceCache(pi)
 		defer func() {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
 		}()
@@ -121,10 +128,11 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setManifestAndLock(rev, testAnalyzerInfo, m, l)
 
 		if test.persistent {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c, close = test.newCache(t, cpath, root)
+			sc = test.newCache(t, cpath)
+			c = sc.newSingleSourceCache(pi)
 		}
 
 		gotM, gotL, ok := c.getManifestAndLock(rev, testAnalyzerInfo)
@@ -165,10 +173,11 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setManifestAndLock(rev, testAnalyzerInfo, m, l)
 
 		if test.persistent {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c, close = test.newCache(t, cpath, root)
+			sc = test.newCache(t, cpath)
+			c = sc.newSingleSourceCache(pi)
 		}
 
 		gotM, gotL, ok = c.getManifestAndLock(rev, testAnalyzerInfo)
@@ -182,9 +191,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 	})
 
 	t.Run("pkgTree", func(t *testing.T) {
-		c, close := test.newCache(t, cpath, root)
+		sc := test.newCache(t, cpath)
+		c := sc.newSingleSourceCache(pi)
 		defer func() {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
 		}()
@@ -196,10 +206,11 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		}
 
 		if test.persistent {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c, close = test.newCache(t, cpath, root)
+			sc = test.newCache(t, cpath)
+			c = sc.newSingleSourceCache(pi)
 		}
 
 		pt := pkgtree.PackageTree{
@@ -243,10 +254,11 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setPackageTree(rev, pt)
 
 		if test.persistent {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c, close = test.newCache(t, cpath, root)
+			sc = test.newCache(t, cpath)
+			c = sc.newSingleSourceCache(pi)
 		}
 
 		got, ok := c.getPackageTree(rev, root)
@@ -256,10 +268,11 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		comparePackageTree(t, pt, got)
 
 		if test.persistent {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c, close = test.newCache(t, cpath, root)
+			sc = test.newCache(t, cpath)
+			c = sc.newSingleSourceCache(pi)
 		}
 
 		pt = pkgtree.PackageTree{
@@ -273,10 +286,11 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setPackageTree(rev, pt)
 
 		if test.persistent {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c, close = test.newCache(t, cpath, root)
+			sc = test.newCache(t, cpath)
+			c = sc.newSingleSourceCache(pi)
 		}
 
 		got, ok = c.getPackageTree(rev, root)
@@ -287,9 +301,10 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 	})
 
 	t.Run("versions", func(t *testing.T) {
-		c, close := test.newCache(t, cpath, root)
+		sc := test.newCache(t, cpath)
+		c := sc.newSingleSourceCache(pi)
 		defer func() {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
 		}()
@@ -304,10 +319,11 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 		c.setVersionMap(versions)
 
 		if test.persistent {
-			if err := close(); err != nil {
+			if err := sc.close(); err != nil {
 				t.Fatal("failed to close cache:", err)
 			}
-			c, close = test.newCache(t, cpath, root)
+			sc = test.newCache(t, cpath)
+			c = sc.newSingleSourceCache(pi)
 		}
 
 		t.Run("getAllVersions", func(t *testing.T) {
@@ -549,41 +565,52 @@ func packageOrErrEqual(a, b pkgtree.PackageOrErr) bool {
 	return true
 }
 
-// discardCache discards set values and returns nothing.
+// discardCache produces singleSourceDiscardCaches.
 type discardCache struct{}
 
-func (discardCache) setManifestAndLock(Revision, ProjectAnalyzerInfo, Manifest, Lock) {}
+func (discardCache) newSingleSourceCache(ProjectIdentifier) singleSourceCache {
+	return discard
+}
 
-func (discardCache) getManifestAndLock(Revision, ProjectAnalyzerInfo) (Manifest, Lock, bool) {
+func (discardCache) close() error { return nil }
+
+var discard singleSourceCache = singleSourceDiscardCache{}
+
+// singleSourceDiscardCache discards set values and returns nothing.
+type singleSourceDiscardCache struct{}
+
+func (singleSourceDiscardCache) setManifestAndLock(Revision, ProjectAnalyzerInfo, Manifest, Lock) {}
+
+func (singleSourceDiscardCache) getManifestAndLock(Revision, ProjectAnalyzerInfo) (Manifest, Lock, bool) {
 	return nil, nil, false
 }
 
-func (discardCache) setPackageTree(Revision, pkgtree.PackageTree) {}
+func (singleSourceDiscardCache) setPackageTree(Revision, pkgtree.PackageTree) {}
 
-func (discardCache) getPackageTree(Revision, ProjectRoot) (pkgtree.PackageTree, bool) {
+func (singleSourceDiscardCache) getPackageTree(Revision, ProjectRoot) (pkgtree.PackageTree, bool) {
 	return pkgtree.PackageTree{}, false
 }
 
-func (discardCache) markRevisionExists(r Revision) {}
+func (singleSourceDiscardCache) markRevisionExists(r Revision) {}
 
-func (discardCache) setVersionMap(versionList []PairedVersion) {}
+func (singleSourceDiscardCache) setVersionMap(versionList []PairedVersion) {}
 
-func (discardCache) getVersionsFor(Revision) ([]UnpairedVersion, bool) {
+func (singleSourceDiscardCache) getVersionsFor(Revision) ([]UnpairedVersion, bool) {
 	return nil, false
 }
 
-func (discardCache) getAllVersions() ([]PairedVersion, bool) {
+func (singleSourceDiscardCache) getAllVersions() ([]PairedVersion, bool) {
 	return nil, false
 }
 
-func (discardCache) getRevisionFor(UnpairedVersion) (Revision, bool) {
+func (singleSourceDiscardCache) getRevisionFor(UnpairedVersion) (Revision, bool) {
 	return "", false
 }
 
-func (discardCache) toRevision(v Version) (Revision, bool) {
+func (singleSourceDiscardCache) toRevision(v Version) (Revision, bool) {
 	return "", false
 }
 
-func (discardCache) toUnpaired(v Version) (UnpairedVersion, bool) {
+func (singleSourceDiscardCache) toUnpaired(v Version) (UnpairedVersion, bool) {
 	return nil, false
 }
