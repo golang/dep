@@ -35,7 +35,7 @@ func (cmd *pruneCommand) Name() string      { return "prune" }
 func (cmd *pruneCommand) Args() string      { return "" }
 func (cmd *pruneCommand) ShortHelp() string { return pruneShortHelp }
 func (cmd *pruneCommand) LongHelp() string  { return pruneLongHelp }
-func (cmd *pruneCommand) Hidden() bool      { return false }
+func (cmd *pruneCommand) Hidden() bool      { return true }
 
 func (cmd *pruneCommand) Register(fs *flag.FlagSet) {
 }
