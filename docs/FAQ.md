@@ -203,6 +203,16 @@ machine github.com
 
 Once you have set that up, dep will automatically use that Token to authenticate to the repositories.
 
+## How do I get dep to authenticate via SSH to a git repo?
+
+You can rewrite the repo url and use the git+ssh shema with follow example:
+
+```
+git config --global url."git@github.yourEnterprise.com:".insteadOf "https://github.yourEnterprise.com/"
+
+```
+
+
 ## Behavior
 
 ### How does `dep` decide what version of a dependency to use?
