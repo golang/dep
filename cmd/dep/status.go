@@ -984,9 +984,9 @@ type projectConstraint struct {
 // on a dependency and the projects that apply those constraints.
 type constraintsCollection map[string][]projectConstraint
 
-// collectConstraints collects constraints declared by all the dependencies.
-// It returns constraintsCollection and a slice of errors encountered while
-// collecting the constraints, if any.
+// collectConstraints collects constraints declared by all the dependencies and
+// constraints from the root project. It returns constraintsCollection and
+// a slice of errors encountered while collecting the constraints, if any.
 func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (constraintsCollection, []error) {
 	logger := ctx.Err
 	if !ctx.Verbose {
@@ -1065,6 +1065,29 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 		for e := range errCh {
 			errs = append(errs, e)
 			logger.Println(e.Error())
+		}
+	}
+
+	// Incorporate constraints set in the manifest of the root project.
+	if p.Manifest != nil {
+
+		// Iterate through constraints in the manifest, append if it is a
+		// direct dependency
+		for pr, pp := range p.Manifest.Constraints {
+			if _, ok := directDeps[pr]; !ok {
+				continue
+			}
+
+			// Mark constraints coming from the manifest as "root"
+			tempCC := append(
+				constraintCollection[string(pr)],
+				projectConstraint{"root", pp.Constraint},
+			)
+
+			// Sort the inner projectConstraint slice by Project string.
+			// Required for consistent returned value.
+			sort.Sort(byProject(tempCC))
+			constraintCollection[string(pr)] = tempCC
 		}
 	}
 

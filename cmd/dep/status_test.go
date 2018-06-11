@@ -351,6 +351,7 @@ func TestCollectConstraints(t *testing.T) {
 	cases := []struct {
 		name            string
 		lock            dep.Lock
+		manifest        dep.Manifest
 		wantConstraints constraintsCollection
 		wantErr         bool
 	}{
@@ -368,7 +369,7 @@ func TestCollectConstraints(t *testing.T) {
 			wantConstraints: constraintsCollection{},
 		},
 		{
-			name: "with multiple constraints",
+			name: "with multiple constraints from dependencies",
 			lock: dep.Lock{
 				P: []gps.LockedProject{
 					gps.NewLockedProject(
@@ -398,6 +399,53 @@ func TestCollectConstraints(t *testing.T) {
 				"github.com/sdboyer/deptest": []projectConstraint{
 					{"github.com/darkowlzz/deptest-project-1", ver1},
 					{"github.com/darkowlzz/deptest-project-2", ver08},
+				},
+			},
+		},
+		{
+			name: "with multiple constraints from dependencies and root project",
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-1")},
+						gps.NewVersion("v0.1.0"),
+						[]string{"."},
+					),
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-2")},
+						gps.NewBranch("master").Pair(gps.Revision("824a8d56a4c6b2f4718824a98cd6d70d3dbd4c3e")),
+						[]string{"."},
+					),
+				},
+			},
+			manifest: dep.Manifest{
+				Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
+					gps.ProjectRoot("github.com/sdboyer/deptest"): {
+						Constraint: gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f"),
+					},
+				},
+				Ovr: make(gps.ProjectConstraints),
+				PruneOptions: gps.CascadingPruneOptions{
+					DefaultOptions:    gps.PruneNestedVendorDirs,
+					PerProjectOptions: make(map[gps.ProjectRoot]gps.PruneOptionSet),
+				},
+			},
+			wantConstraints: constraintsCollection{
+				"github.com/sdboyer/deptestdos": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-2", ver2},
+				},
+				"github.com/sdboyer/dep-test": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-2", ver1},
+				},
+				"github.com/sdboyer/deptest": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-1", ver1},
+					{"github.com/darkowlzz/deptest-project-2", ver08},
+					{"root", gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")},
 				},
 			},
 		},
@@ -444,6 +492,31 @@ func TestCollectConstraints(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "skip ineffective constraint from manifest",
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+				},
+			},
+			manifest: dep.Manifest{
+				Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
+					gps.ProjectRoot("github.com/darkowlzz/deptest-project-1"): {
+						Constraint: ver1,
+					},
+				},
+				Ovr: make(gps.ProjectConstraints),
+				PruneOptions: gps.CascadingPruneOptions{
+					DefaultOptions:    gps.PruneNestedVendorDirs,
+					PerProjectOptions: make(map[gps.ProjectRoot]gps.PruneOptionSet),
+				},
+			},
+			wantConstraints: constraintsCollection{},
+		},
 	}
 
 	h := test.NewHelper(t)
@@ -474,6 +547,7 @@ func TestCollectConstraints(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			p.Lock = &c.lock
+			p.Manifest = &c.manifest
 			gotConstraints, err := collectConstraints(ctx, p, sm)
 			if len(err) > 0 && !c.wantErr {
 				t.Fatalf("unexpected errors while collecting constraints: %v", err)
