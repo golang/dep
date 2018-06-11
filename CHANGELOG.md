@@ -9,6 +9,8 @@ NEW FEATURES:
 
 BUG FIXES:
 
+* `dep` resolves private repos (including `git`) similarly to `go get` ([#1716](https://github.com/golang/dep/issues/1716))
+
 IMPROVEMENTS:
 
 * Add template operations support in dep status template output.

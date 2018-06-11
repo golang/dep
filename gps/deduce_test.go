@@ -396,85 +396,73 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 			in:   "foobar.com/baz.git",
 			root: "foobar.com/baz.git",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://foobar.com/baz.git")},
-				maybeGitSource{url: mkurl("ssh://foobar.com/baz.git")},
-				maybeGitSource{url: mkurl("git://foobar.com/baz.git")},
-				maybeGitSource{url: mkurl("http://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("https://foobar.com/baz")},
+				maybeGitSource{url: mkurl("ssh://foobar.com/baz")},
+				maybeGitSource{url: mkurl("git://foobar.com/baz")},
+				maybeGitSource{url: mkurl("http://foobar.com/baz")},
 			},
 		},
 		{
 			in:   "foobar.com/baz.git/extra/path",
 			root: "foobar.com/baz.git",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://foobar.com/baz.git")},
-				maybeGitSource{url: mkurl("ssh://foobar.com/baz.git")},
-				maybeGitSource{url: mkurl("git://foobar.com/baz.git")},
-				maybeGitSource{url: mkurl("http://foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("https://foobar.com/baz")},
+				maybeGitSource{url: mkurl("ssh://foobar.com/baz")},
+				maybeGitSource{url: mkurl("git://foobar.com/baz")},
+				maybeGitSource{url: mkurl("http://foobar.com/baz")},
 			},
 		},
 		{
 			in:   "foobar.com/baz.bzr",
 			root: "foobar.com/baz.bzr",
 			mb: maybeSources{
-				maybeBzrSource{url: mkurl("https://foobar.com/baz.bzr")},
-				maybeBzrSource{url: mkurl("bzr+ssh://foobar.com/baz.bzr")},
-				maybeBzrSource{url: mkurl("bzr://foobar.com/baz.bzr")},
-				maybeBzrSource{url: mkurl("http://foobar.com/baz.bzr")},
+				maybeBzrSource{url: mkurl("https://foobar.com/baz")},
+				maybeBzrSource{url: mkurl("bzr+ssh://foobar.com/baz")},
+				maybeBzrSource{url: mkurl("bzr://foobar.com/baz")},
+				maybeBzrSource{url: mkurl("http://foobar.com/baz")},
 			},
 		},
 		{
 			in:   "foo-bar.com/baz.hg",
 			root: "foo-bar.com/baz.hg",
 			mb: maybeSources{
-				maybeHgSource{url: mkurl("https://foo-bar.com/baz.hg")},
-				maybeHgSource{url: mkurl("ssh://foo-bar.com/baz.hg")},
-				maybeHgSource{url: mkurl("http://foo-bar.com/baz.hg")},
+				maybeHgSource{url: mkurl("https://foo-bar.com/baz")},
+				maybeHgSource{url: mkurl("ssh://foo-bar.com/baz")},
+				maybeHgSource{url: mkurl("http://foo-bar.com/baz")},
 			},
 		},
 		{
 			in:   "git@foobar.com:baz.git",
 			root: "foobar.com/baz.git",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("ssh://git@foobar.com/baz.git")},
+				maybeGitSource{url: mkurl("ssh://git@foobar.com/baz")},
 			},
 		},
 		{
 			in:   "bzr+ssh://foobar.com/baz.bzr",
 			root: "foobar.com/baz.bzr",
 			mb: maybeSources{
-				maybeBzrSource{url: mkurl("bzr+ssh://foobar.com/baz.bzr")},
+				maybeBzrSource{url: mkurl("bzr+ssh://foobar.com/baz")},
 			},
 		},
 		{
 			in:   "ssh://foobar.com/baz.bzr",
 			root: "foobar.com/baz.bzr",
 			mb: maybeSources{
-				maybeBzrSource{url: mkurl("ssh://foobar.com/baz.bzr")},
+				maybeBzrSource{url: mkurl("ssh://foobar.com/baz")},
 			},
 		},
 		{
 			in:   "https://foobar.com/baz.hg",
 			root: "foobar.com/baz.hg",
 			mb: maybeSources{
-				maybeHgSource{url: mkurl("https://foobar.com/baz.hg")},
+				maybeHgSource{url: mkurl("https://foobar.com/baz")},
 			},
 		},
 		{
 			in:     "git://foobar.com/baz.hg",
 			root:   "foobar.com/baz.hg",
 			srcerr: errors.New("git is not a valid scheme for accessing hg repositories (path foobar.com/baz.hg)"),
-		},
-		// who knows why anyone would do this, but having a second vcs ext
-		// shouldn't throw us off - only the first one counts
-		{
-			in:   "foobar.com/baz.git/quark/quizzle.bzr/quorum",
-			root: "foobar.com/baz.git",
-			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://foobar.com/baz.git")},
-				maybeGitSource{url: mkurl("ssh://foobar.com/baz.git")},
-				maybeGitSource{url: mkurl("git://foobar.com/baz.git")},
-				maybeGitSource{url: mkurl("http://foobar.com/baz.git")},
-			},
 		},
 	},
 	"vanity": {
