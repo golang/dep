@@ -1,11 +1,12 @@
 -CONSTRAINTS-
 github.com/sdboyer/deptest
 b-master
--IMPORTS/REQS-
+-IMPORTS-
 github.com/sdboyer/deptest
+-REQUIRES-
 -IGNORES-
 -OVERRIDES-
 -ANALYZER-
 dep
-1
+2
 

@@ -20,6 +20,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// SolverVersion is the current version of the solver/hashing algorithm.
+const SolverVersion = 2
+
 var rootRev = Revision("")
 
 // SolveParameters hold all arguments to a solver run.
@@ -419,7 +422,7 @@ func ValidateParams(params SolveParameters, sm SourceManager) error {
 		deducePkgsGroup.Done()
 	}
 
-	for _, ip := range rd.externalImportList(paths.IsStandardImportPath) {
+	for ip := range rd.externalImportList(paths.IsStandardImportPath) {
 		deducePkgsGroup.Add(1)
 		go deducePkg(ip, sm)
 	}
@@ -538,7 +541,7 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 					id: queue.id,
 					v:  queue.current(),
 				},
-				pl: bmi.pl,
+				bmi: bmi,
 			}
 			err = s.selectAtom(awp, false)
 			s.mtr.pop()
@@ -566,7 +569,7 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 					id: bmi.id,
 					v:  awp.a.v,
 				},
-				pl: bmi.pl,
+				bmi: bmi,
 			}
 
 			s.traceCheckPkgs(bmi)
@@ -610,7 +613,7 @@ func (s *solver) solve(ctx context.Context) (map[atom]map[string]struct{}, error
 			projs[sel.a.a] = pm
 		}
 
-		for _, path := range sel.a.pl {
+		for _, path := range sel.a.bmi.pl {
 			pm[path] = struct{}{}
 		}
 	}
@@ -644,9 +647,12 @@ func (s *solver) selectRoot() error {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 
-		s.sel.pushDep(dependency{depender: awp.a, dep: dep})
+		s.sel.pushDep(dependency{
+			depender: awp,
+			dep:      dep,
+		})
 		// Add all to unselected queue
-		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, pl: dep.pl, fromRoot: true})
+		heap.Push(s.unsel, bimodalIdentifier{id: dep.Ident, fromRequired: dep.fromRequired, pl: dep.pl, fromRoot: true})
 	}
 
 	s.traceSelectRoot(s.rd.rpt, deps)
@@ -677,7 +683,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 	// Use maps to dedupe the unique internal and external packages.
 	exmap, inmap := make(map[string]struct{}), make(map[string]struct{})
 
-	for _, pkg := range a.pl {
+	for _, pkg := range a.bmi.pl {
 		inmap[pkg] = struct{}{}
 		for _, ipkg := range rm[pkg].Internal {
 			inmap[ipkg] = struct{}{}
@@ -687,8 +693,8 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 	var pl []string
 	// If lens are the same, then the map must have the same contents as the
 	// slice; no need to build a new one.
-	if len(inmap) == len(a.pl) {
-		pl = a.pl
+	if len(inmap) == len(a.bmi.pl) {
+		pl = a.bmi.pl
 	} else {
 		pl = make([]string, 0, len(inmap))
 		for pkg := range inmap {
@@ -699,7 +705,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 
 	// Add to the list those packages that are reached by the packages
 	// explicitly listed in the atom
-	for _, pkg := range a.pl {
+	for _, pkg := range a.bmi.pl {
 		// Skip ignored packages
 		if s.rd.ir.IsIgnored(pkg) {
 			continue
@@ -710,6 +716,9 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 			// Missing package here *should* only happen if the target pkg was
 			// poisoned; check the errors map.
 			if importErr, eexists := em[pkg]; eexists {
+				if shouldIgnorePackageError(a, importErr.Err) {
+					continue
+				}
 				return nil, nil, importErr
 			}
 
@@ -722,11 +731,10 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 		}
 	}
 
-	reach := make([]string, 0, len(exmap))
+	reach := make(map[string]bool, len(exmap))
 	for pkg := range exmap {
-		reach = append(reach, pkg)
+		reach[pkg] = true
 	}
-	sort.Strings(reach)
 
 	deps := s.rd.ovr.overrideAll(m.DependencyConstraints())
 	cd, err := s.intersectConstraintsWithImports(deps, reach)
@@ -737,7 +745,7 @@ func (s *solver) getImportsAndConstraintsOf(a atomWithPackages) ([]string, []com
 // externally reached packages, and creates a []completeDep that is guaranteed
 // to include all packages named by import reach, using constraints where they
 // are available, or Any() where they are not.
-func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach []string) ([]completeDep, error) {
+func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, imports map[string]bool) ([]completeDep, error) {
 	// Create a radix tree with all the projects we know from the manifest
 	xt := radix.New()
 	for _, dep := range deps {
@@ -747,7 +755,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 	// Step through the reached packages; if they have prefix matches in
 	// the trie, assume (mostly) it's a correct correspondence.
 	dmap := make(map[ProjectRoot]completeDep)
-	for _, rp := range reach {
+	for rp, fromRequired := range imports {
 		// If it's a stdlib-shaped package, skip it.
 		if s.stdLibFn(rp) {
 			continue
@@ -767,6 +775,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 				dmap[dep.Ident.ProjectRoot] = completeDep{
 					workingConstraint: dep,
 					pl:                []string{rp},
+					fromRequired:      fromRequired,
 				}
 			}
 			continue
@@ -788,6 +797,7 @@ func (s *solver) intersectConstraintsWithImports(deps []workingConstraint, reach
 		// And also put the complete dep into the dmap
 		dmap[root] = completeDep{
 			workingConstraint: pd,
+			fromRequired:      fromRequired,
 			pl:                []string{rp},
 		}
 	}
@@ -827,7 +837,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 
 	var lockv Version
 	if len(s.rd.rlm) > 0 {
-		lockv, err = s.getLockVersionIfValid(id)
+		lockv, err = s.getLockVersionIfValid(id, bmi)
 		if err != nil {
 			// Can only get an error here if an upgrade was expressly requested on
 			// code that exists only in vendor
@@ -844,11 +854,11 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 		// TODO(sdboyer) nested loop; prime candidate for a cache somewhere
 		for _, dep := range s.sel.getDependenciesOn(bmi.id) {
 			// Skip the root, of course
-			if s.rd.isRoot(dep.depender.id.ProjectRoot) {
+			if s.rd.isRoot(dep.depender.a.id.ProjectRoot) {
 				continue
 			}
 
-			_, l, err := s.b.GetManifestAndLock(dep.depender.id, dep.depender.v, s.rd.an)
+			_, l, err := s.b.GetManifestAndLock(dep.depender.a.id, dep.depender.a.v, s.rd.an)
 			if err != nil || l == nil {
 				// err being non-nil really shouldn't be possible, but the lock
 				// being nil is quite likely
@@ -902,7 +912,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 	// TODO(sdboyer) while this does work, it bypasses the interface-implied guarantees
 	// of the version queue, and is therefore not a great strategy for API
 	// coherency. Folding this in to a formal interface would be better.
-	if tc, ok := s.sel.getConstraint(bmi.id).(Revision); ok && q.pi[0] != tc {
+	if tc, ok := s.sel.getConstraint(bmi.id, bmi).(Revision); ok && q.pi[0] != tc {
 		// We know this is the only thing that could possibly match, so put it
 		// in at the front - if it isn't there already.
 		// TODO(sdboyer) existence of the revision is guaranteed by checkRevisionExists(); restore that call.
@@ -911,7 +921,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 
 	// Having assembled the queue, search it for a valid version.
 	s.traceCheckQueue(q, bmi, false, 1)
-	return q, s.findValidVersion(q, bmi.pl)
+	return q, s.findValidVersion(q, bmi)
 }
 
 // findValidVersion walks through a versionQueue until it finds a version that
@@ -920,7 +930,7 @@ func (s *solver) createVersionQueue(bmi bimodalIdentifier) (*versionQueue, error
 // The satisfiability checks triggered from here are constrained to operate only
 // on those dependencies induced by the list of packages given in the second
 // parameter.
-func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
+func (s *solver) findValidVersion(q *versionQueue, bmi bimodalIdentifier) error {
 	if nil == q.current() {
 		// this case should not be reachable, but reflects improper solver state
 		// if it is, so panic immediately
@@ -937,7 +947,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 				id: q.id,
 				v:  cur,
 			},
-			pl: pl,
+			bmi: bmi,
 		}, false)
 		if err == nil {
 			// we have a good version, can return safely
@@ -954,7 +964,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 		}
 	}
 
-	s.fail(s.sel.getDependenciesOn(q.id)[0].depender.id)
+	s.fail(s.sel.getDependenciesOn(q.id)[0].depender.a.id)
 
 	// Return a compound error of all the new errors encountered during this
 	// attempt to find a new, valid version
@@ -973,7 +983,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 //
 // If any of these three conditions are true (or if the id cannot be found in
 // the root lock), then no atom will be returned.
-func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
+func (s *solver) getLockVersionIfValid(id ProjectIdentifier, bmi bimodalIdentifier) (Version, error) {
 	// If the project is specifically marked for changes, then don't look for a
 	// locked version.
 	if _, explicit := s.rd.chng[id.ProjectRoot]; explicit || s.rd.chngall {
@@ -1004,7 +1014,7 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 		return nil, nil
 	}
 
-	constraint := s.sel.getConstraint(id)
+	constraint := s.sel.getConstraint(id, bmi)
 	v := lp.Version()
 	if !constraint.Matches(v) {
 		var found bool
@@ -1082,7 +1092,7 @@ func (s *solver) backtrack(ctx context.Context) (bool, error) {
 					}
 					return false, err
 				}
-				s.traceBacktrack(awp.bmi(), !proj)
+				s.traceBacktrack(awp.bmi, !proj)
 			}
 		}
 
@@ -1102,7 +1112,7 @@ func (s *solver) backtrack(ctx context.Context) (bool, error) {
 				}
 				return false, err
 			}
-			s.traceBacktrack(awp.bmi(), !proj)
+			s.traceBacktrack(awp.bmi, !proj)
 		}
 
 		if !q.id.eq(awp.a.id) {
@@ -1113,8 +1123,8 @@ func (s *solver) backtrack(ctx context.Context) (bool, error) {
 		// TODO(sdboyer) is it feasible to make available the failure reason here?
 		if q.advance(nil) == nil && !q.isExhausted() {
 			// Search for another acceptable version of this failed dep in its queue
-			s.traceCheckQueue(q, awp.bmi(), true, 0)
-			if s.findValidVersion(q, awp.pl) == nil {
+			s.traceCheckQueue(q, awp.bmi, true, 0)
+			if s.findValidVersion(q, awp.bmi) == nil {
 				// Found one! Put it back on the selected queue and stop
 				// backtracking
 
@@ -1131,7 +1141,7 @@ func (s *solver) backtrack(ctx context.Context) (bool, error) {
 			}
 		}
 
-		s.traceBacktrack(awp.bmi(), false)
+		s.traceBacktrack(awp.bmi, false)
 
 		// No solution found; continue backtracking after popping the queue
 		// we just inspected off the list
@@ -1251,7 +1261,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) error {
 	s.mtr.push("select-atom")
 	s.unsel.remove(bimodalIdentifier{
 		id: a.a.id,
-		pl: a.pl,
+		pl: a.bmi.pl,
 	})
 
 	pl, deps, err := s.getImportsAndConstraintsOf(a)
@@ -1265,7 +1275,7 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) error {
 	}
 	// Assign the new internal package list into the atom, then push it onto the
 	// selection stack
-	a.pl = pl
+	a.bmi.pl = pl
 	s.sel.pushSelection(a, pkgonly)
 
 	// If this atom has a lock, pull it out so that we can potentially inject
@@ -1307,7 +1317,11 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) error {
 			go s.b.SyncSourceFor(dep.Ident)
 		}
 
-		s.sel.pushDep(dependency{depender: a.a, dep: dep})
+		s.sel.pushDep(dependency{
+			depender: a,
+			dep:      dep,
+		})
+
 		// Go through all the packages introduced on this dep, selecting only
 		// the ones where the only depper on them is what the preceding line just
 		// pushed in. Then, put those into the unselected queue.
@@ -1330,11 +1344,13 @@ func (s *solver) selectAtom(a atomWithPackages, pkgonly bool) error {
 			// alternate source, and one without. See #969.
 			id, _ := s.sel.getIdentFor(dep.Ident.ProjectRoot)
 			bmi := bimodalIdentifier{
-				id: id,
-				pl: newp,
+				id:           id,
+				pl:           newp,
+				fromRequired: dep.fromRequired,
 				// This puts in a preferred version if one's in the map, else
 				// drops in the zero value (nil)
 				prefv: lmap[dep.Ident],
+				path:  append(a.bmi.path, a.a),
 			}
 			heap.Push(s.unsel, bmi)
 		}
@@ -1350,7 +1366,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool, error) {
 	s.mtr.push("unselect")
 	defer s.mtr.pop()
 	awp, first := s.sel.popSelection()
-	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.pl})
+	heap.Push(s.unsel, bimodalIdentifier{id: awp.a.id, pl: awp.bmi.pl, fromRequired: awp.bmi.fromRequired, path: awp.bmi.path})
 
 	_, deps, err := s.getImportsAndConstraintsOf(awp)
 	if err != nil {

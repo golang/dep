@@ -1,9 +1,10 @@
 -CONSTRAINTS-
--IMPORTS/REQS-
+-IMPORTS-
+-REQUIRES-
 -IGNORES-
 github.com/sdboyer/deptest*
 -OVERRIDES-
 -ANALYZER-
 dep
-1
+2
 

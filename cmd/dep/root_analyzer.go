@@ -206,6 +206,6 @@ func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock,
 func (a *rootAnalyzer) Info() gps.ProjectAnalyzerInfo {
 	return gps.ProjectAnalyzerInfo{
 		Name:    "dep",
-		Version: 1,
+		Version: gps.SolverVersion,
 	}
 }

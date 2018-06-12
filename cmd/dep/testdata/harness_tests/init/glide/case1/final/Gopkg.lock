@@ -20,7 +20,7 @@
 
 [solve-meta]
   analyzer-name = "dep"
-  analyzer-version = 1
-  inputs-digest = "def34af0f7cd619e1601eb68bdabf399c9b36a79c2081306adefa0ced03d182b"
+  analyzer-version = 2
+  inputs-digest = "93723887fe16f0197aefe5fdfe551df94706da0459da22e61ff2c1b05041e702"
   solver-name = "gps-cdcl"
   solver-version = 1

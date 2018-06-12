@@ -50,12 +50,19 @@ type rootdata struct {
 	an ProjectAnalyzer
 }
 
-// externalImportList returns a list of the unique imports from the root data.
+// externalImportList returns a map of imports and a flag specifying if the project is from a required.
 // Ignores and requires are taken into consideration, stdlib is excluded, and
 // errors within the local set of package are not backpropagated.
-func (rd rootdata) externalImportList(stdLibFn func(string) bool) []string {
+func (rd rootdata) externalImportList(stdLibFn func(string) bool) map[string]bool {
+	// projectRoot -> fromRequired (false = import, true = required)
+	imports := map[string]bool{}
+
 	rm, _ := rd.rpt.ToReachMap(true, true, false, rd.ir)
 	reach := rm.FlattenFn(stdLibFn)
+
+	for _, r := range reach {
+		imports[r] = false
+	}
 
 	// If there are any requires, slide them into the reach list, as well.
 	if len(rd.req) > 0 {
@@ -70,13 +77,12 @@ func (rd rootdata) externalImportList(stdLibFn func(string) bool) []string {
 
 		for r := range rd.req {
 			if !skip[r] {
-				reach = append(reach, r)
+				imports[r] = true
 			}
 		}
 	}
 
-	sort.Strings(reach)
-	return reach
+	return imports
 }
 
 func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) []workingConstraint {
@@ -112,7 +118,7 @@ func (rd rootdata) getApplicableConstraints(stdLibFn func(string) bool) []workin
 
 	// Walk all dep import paths we have to consider and mark the corresponding
 	// wc entry in the trie, if any
-	for _, im := range rd.externalImportList(stdLibFn) {
+	for im := range rd.externalImportList(stdLibFn) {
 		if stdLibFn(im) {
 			continue
 		}
@@ -198,7 +204,7 @@ func (rd rootdata) rootAtom() atomWithPackages {
 	sort.Strings(list)
 
 	return atomWithPackages{
-		a:  a,
-		pl: list,
+		a:   a,
+		bmi: bimodalIdentifier{id: a.id, pl: list},
 	}
 }

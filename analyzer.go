@@ -48,6 +48,6 @@ func (a Analyzer) DeriveManifestAndLock(path string, n gps.ProjectRoot) (gps.Man
 func (a Analyzer) Info() gps.ProjectAnalyzerInfo {
 	return gps.ProjectAnalyzerInfo{
 		Name:    "dep",
-		Version: 1,
+		Version: gps.SolverVersion,
 	}
 }

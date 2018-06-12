@@ -134,7 +134,7 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 	uniq := make(map[string]int)
 	for _, p := range s.projects {
 		if p.a.a.id.eq(id) {
-			for _, pkg := range p.a.pl {
+			for _, pkg := range p.a.bmi.pl {
 				uniq[pkg] = uniq[pkg] + 1
 			}
 		}
@@ -143,10 +143,16 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 	return uniq
 }
 
-func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
+func (s *selection) getConstraint(id ProjectIdentifier, bmi bimodalIdentifier) Constraint {
 	deps, exists := s.deps[id.ProjectRoot]
 	if !exists || len(deps) == 0 {
 		return any
+	}
+
+	// Enable quick lookup of where in the depgraph a constraint was defined
+	ancestors := map[ProjectRoot]bool{}
+	for _, ancestor := range bmi.path {
+		ancestors[ancestor.id.ProjectRoot] = true
 	}
 
 	// TODO(sdboyer) recomputing this sucks and is quite wasteful. Precompute/cache it

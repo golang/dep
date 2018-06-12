@@ -177,6 +177,10 @@ type bimodalIdentifier struct {
 	prefv Version
 	// Indicates that the bmi came from the root project originally
 	fromRoot bool
+	// The path to the atom in the graph, e.g. root -> foo -> bar
+	path []atom
+	// Indicates that the bmi originated from a require, vs an import
+	fromRequired bool
 }
 
 type atom struct {
@@ -190,20 +194,8 @@ var nilpa = atom{
 }
 
 type atomWithPackages struct {
-	a  atom
-	pl []string
-}
-
-// bmi converts an atomWithPackages into a bimodalIdentifier.
-//
-// This is mostly intended for (read-only) trace use, so the package list slice
-// is not copied. It is the callers responsibility to not modify the pl slice,
-// lest that backpropagate and cause inconsistencies.
-func (awp atomWithPackages) bmi() bimodalIdentifier {
-	return bimodalIdentifier{
-		id: awp.a.id,
-		pl: awp.pl,
-	}
+	a   atom
+	bmi bimodalIdentifier
 }
 
 // completeDep (name hopefully to change) provides the whole picture of a
@@ -213,6 +205,8 @@ func (awp atomWithPackages) bmi() bimodalIdentifier {
 type completeDep struct {
 	// The base workingConstraint
 	workingConstraint
+	// Indicates that the bmi originated from a require, vs an import
+	fromRequired bool
 	// The specific packages required from the ProjectDep
 	pl []string
 }
@@ -221,6 +215,6 @@ type completeDep struct {
 // fully-realized atom as the depender (the tail/source of the edge), and a set
 // of requirements that any atom to be attached at the head/target must satisfy.
 type dependency struct {
-	depender atom
+	depender atomWithPackages
 	dep      completeDep
 }

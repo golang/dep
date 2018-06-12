@@ -29,19 +29,19 @@ func TestRootdataExternalImports(t *testing.T) {
 	}
 	rd := is.(*solver).rd
 
-	want := []string{"a", "b"}
+	want := map[string]bool{"a": false, "b": false}
 	got := rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %v\n\t(WNT): %v", got, want)
 	}
 
 	// Add a require
 	rd.req["c"] = true
 
-	want = []string{"a", "b", "c"}
+	want = map[string]bool{"a": false, "b": false, "c": true}
 	got = rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %v\n\t(WNT): %v", got, want)
 	}
 
 	// Add same path as import
@@ -49,20 +49,20 @@ func TestRootdataExternalImports(t *testing.T) {
 	poe.P.Imports = []string{"a", "b", "c"}
 	rd.rpt.Packages["root"] = poe
 
-	// should still be the same
+	want = map[string]bool{"a": false, "b": false, "c": false}
 	got = rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %v\n\t(WNT): %v", got, want)
 	}
 
 	// Add an ignore, but not on the required path (Prepare makes that
 	// combination impossible)
 
 	rd.ir = pkgtree.NewIgnoredRuleset([]string{"b"})
-	want = []string{"a", "c"}
+	want = map[string]bool{"a": false, "c": false}
 	got = rd.externalImportList(params.stdLibFn)
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		t.Errorf("Unexpected return from rootdata.externalImportList:\n\t(GOT): %v\n\t(WNT): %v", got, want)
 	}
 }
 
