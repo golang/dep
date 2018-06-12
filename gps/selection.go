@@ -4,6 +4,10 @@
 
 package gps
 
+import (
+	"fmt"
+)
+
 type selection struct {
 	// projects is a stack of the atoms that have currently been selected by the
 	// solver. It can also be thought of as the vertex set of the current
@@ -134,7 +138,7 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 	uniq := make(map[string]int)
 	for _, p := range s.projects {
 		if p.a.a.id.eq(id) {
-			for _, pkg := range p.a.pl {
+			for _, pkg := range p.a.bmi.pl {
 				uniq[pkg] = uniq[pkg] + 1
 			}
 		}
@@ -143,10 +147,16 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 	return uniq
 }
 
-func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
+func (s *selection) getConstraint(id ProjectIdentifier, bmi bimodalIdentifier) Constraint {
 	deps, exists := s.deps[id.ProjectRoot]
 	if !exists || len(deps) == 0 {
 		return any
+	}
+
+	// Enable quick lookup of where in the depgraph a constraint was defined
+	ancestors := map[ProjectRoot]bool{}
+	for _, ancestor := range bmi.path {
+		ancestors[ancestor.id.ProjectRoot] = true
 	}
 
 	// TODO(sdboyer) recomputing this sucks and is quite wasteful. Precompute/cache it
@@ -159,6 +169,19 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 	// Start with the open set
 	var ret Constraint = any
 	for _, dep := range deps {
+		if dep.dep.isTransitive {
+			// TODO(carolynvs): Remove print statements. It's just to help debug the transitive constraint prototype.
+			path := ""
+			for ancestor := range ancestors {
+				path += "/" + string(ancestor)
+			}
+			if _, isAncestor := ancestors[dep.depender.a.id.ProjectRoot]; !isAncestor {
+				fmt.Printf("*** Ignoring unreachable constraint %s on %s (path: %s) from %s ***\n", dep.dep.Constraint.String(), dep.dep.workingConstraint.Ident.ProjectRoot, path, dep.depender.a.id.ProjectRoot)
+				continue
+			}
+			fmt.Printf("*** Applying transitive constraint %s on %s (path: %s) from %s ***\n", dep.dep.Constraint.String(), dep.dep.workingConstraint.Ident.ProjectRoot, path, dep.depender.a.id.ProjectRoot)
+		}
+
 		ret = s.vu.intersect(id, ret, dep.dep.Constraint)
 	}
 

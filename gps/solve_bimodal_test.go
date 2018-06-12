@@ -132,6 +132,42 @@ var bimodalFixtures = map[string]bimodalFixture{
 			"b 1.0.0",
 		),
 	},
+	"used transitive constraint": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo 1.0.0"),
+				pkg("root", "foo"),
+			),
+			dsp(mkDepspec("foo 1.0.0", "bar 1.0.0", "baz =1.0.0"),
+				pkg("foo", "bar"),
+			),
+			dsp(mkDepspec("bar 1.0.0", "baz >=1.0.0"),
+				pkg("bar", "baz"),
+			),
+			dsp(mkDepspec("baz 1.0.1"), pkg("baz")),
+			dsp(mkDepspec("baz 1.0.0"), pkg("baz")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"bar 1.0.0",
+			"baz 1.0.0",
+		),
+	},
+	"unused transitive constraint": {
+		ds: []depspec{
+			dsp(mkDepspec("root 1.0.0", "foo 1.0.0"),
+				pkg("root", "foo", "baz"),
+			),
+			dsp(mkDepspec("foo 1.0.0", "baz =1.0.0"),
+				pkg("foo"),
+			),
+			dsp(mkDepspec("baz 1.0.1"), pkg("baz")),
+			dsp(mkDepspec("baz 1.0.0"), pkg("baz")),
+		},
+		r: mksolution(
+			"foo 1.0.0",
+			"baz 1.0.1",
+		),
+	},
 	// Constraints apply only if the project that declares them has a
 	// reachable import
 	"constraints activated by import": {
@@ -152,12 +188,12 @@ var bimodalFixtures = map[string]bimodalFixture{
 		},
 		r: mksolution(
 			"a 1.0.0",
-			"b 1.1.0",
+			"b 1.0.0", // Now that constraints can be applied transitively, the constraint from root applies
 		),
 	},
 	// Constraints apply only if the project that declares them has a
 	// reachable import - non-root
-	"constraints activated by import, transitive": {
+	"constraints activated by import, non-root": {
 		ds: []depspec{
 			dsp(mkDepspec("root 0.0.0"),
 				pkg("root", "root/foo", "b"),

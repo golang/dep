@@ -1,0 +1,9 @@
+{
+  "commands": [
+    ["ensure"]
+  ],
+  "vendor-final": [
+    "github.com/carolynvs/deptest-transcons-b",
+    "github.com/carolynvs/deptest-transcons-c"
+  ]
+}
