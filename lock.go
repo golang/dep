@@ -6,7 +6,6 @@ package dep
 
 import (
 	"bytes"
-	"encoding/hex"
 	"io"
 	"sort"
 
@@ -26,7 +25,6 @@ type Lock struct {
 
 // SolveMeta holds solver meta data.
 type SolveMeta struct {
-	InputsDigest    []byte
 	AnalyzerName    string
 	AnalyzerVersion int
 	SolverName      string
@@ -39,11 +37,11 @@ type rawLock struct {
 }
 
 type solveMeta struct {
-	InputsDigest    string `toml:"inputs-digest"`
-	AnalyzerName    string `toml:"analyzer-name"`
-	AnalyzerVersion int    `toml:"analyzer-version"`
-	SolverName      string `toml:"solver-name"`
-	SolverVersion   int    `toml:"solver-version"`
+	AnalyzerName    string   `toml:"analyzer-name"`
+	AnalyzerVersion int      `toml:"analyzer-version"`
+	SolverName      string   `toml:"solver-name"`
+	SolverVersion   int      `toml:"solver-version"`
+	InputImports    []string `toml:"input-imports"`
 }
 
 type rawLockedProject struct {
@@ -77,15 +75,11 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 		P: make([]gps.LockedProject, len(raw.Projects)),
 	}
 
-	l.SolveMeta.InputsDigest, err = hex.DecodeString(raw.SolveMeta.InputsDigest)
-	if err != nil {
-		return nil, errors.Errorf("invalid hash digest in lock's memo field")
-	}
-
 	l.SolveMeta.AnalyzerName = raw.SolveMeta.AnalyzerName
 	l.SolveMeta.AnalyzerVersion = raw.SolveMeta.AnalyzerVersion
 	l.SolveMeta.SolverName = raw.SolveMeta.SolverName
 	l.SolveMeta.SolverVersion = raw.SolveMeta.SolverVersion
+	l.SolveMeta.InputImports = raw.SolveMeta.InputImports
 
 	for i, ld := range raw.Projects {
 		r := gps.Revision(ld.Revision)
@@ -106,15 +100,17 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 			ProjectRoot: gps.ProjectRoot(ld.Name),
 			Source:      ld.Source,
 		}
-		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
+		l.P[i] = gps.NewLockedProject(id, v, ld.Packages, ld.Imports)
 	}
 
 	return l, nil
 }
 
 // InputsDigest returns the hash of inputs which produced this lock data.
+//
+// TODO(sdboyer) remove, this is now deprecated
 func (l *Lock) InputsDigest() []byte {
-	return l.SolveMeta.InputsDigest
+	return nil
 }
 
 // Projects returns the list of LockedProjects contained in the lock data.
@@ -140,7 +136,6 @@ func (l *Lock) HasProjectWithRoot(root gps.ProjectRoot) bool {
 func (l *Lock) toRaw() rawLock {
 	raw := rawLock{
 		SolveMeta: solveMeta{
-			InputsDigest:    hex.EncodeToString(l.SolveMeta.InputsDigest),
 			AnalyzerName:    l.SolveMeta.AnalyzerName,
 			AnalyzerVersion: l.SolveMeta.AnalyzerVersion,
 			SolverName:      l.SolveMeta.SolverName,
@@ -182,13 +177,12 @@ func (l *Lock) MarshalTOML() ([]byte, error) {
 // LockFromSolution converts a gps.Solution to dep's representation of a lock.
 //
 // Data is defensively copied wherever necessary to ensure the resulting *lock
-// shares no memory with the original lock.
+// shares no memory with the input solution.
 func LockFromSolution(in gps.Solution) *Lock {
-	h, p := in.InputsDigest(), in.Projects()
+	p := in.Projects()
 
 	l := &Lock{
 		SolveMeta: SolveMeta{
-			InputsDigest:    make([]byte, len(h)),
 			AnalyzerName:    in.AnalyzerName(),
 			AnalyzerVersion: in.AnalyzerVersion(),
 			SolverName:      in.SolverName(),
@@ -197,7 +191,6 @@ func LockFromSolution(in gps.Solution) *Lock {
 		P: make([]gps.LockedProject, len(p)),
 	}
 
-	copy(l.SolveMeta.InputsDigest, h)
 	copy(l.P, p)
 	return l
 }

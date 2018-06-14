@@ -233,7 +233,9 @@ func formatLockDiff(diff gps.LockDiff) (string, error) {
 type VendorBehavior int
 
 const (
-	// VendorOnChanged indicates that the vendor directory should be written when the lock is new or changed.
+	// VendorOnChanged indicates that the vendor directory should be written
+	// when the lock is new or changed, or a project in vendor differs from its
+	// intended state.
 	VendorOnChanged VendorBehavior = iota
 	// VendorAlways forces the vendor directory to always be written.
 	VendorAlways
@@ -259,14 +261,14 @@ func (sw SafeWriter) validate(root string, sm gps.SourceManager) error {
 	return nil
 }
 
-// Write saves some combination of config yaml, lock, and a vendor tree.
-// root is the absolute path of root dir in which to write.
-// sm is only required if vendor is being written.
+// Write saves some combination of manifest, lock, and a vendor tree. root is
+// the absolute path of root dir in which to write. sm is only required if
+// vendor is being written.
 //
-// It first writes to a temp dir, then moves them in place if and only if all the write
-// operations succeeded. It also does its best to roll back if any moves fail.
-// This mostly guarantees that dep cannot exit with a partial write that would
-// leave an undefined state on disk.
+// It first writes to a temp dir, then moves them in place if and only if all
+// the write operations succeeded. It also does its best to roll back if any
+// moves fail. This mostly guarantees that dep cannot exit with a partial write
+// that would leave an undefined state on disk.
 //
 // If logger is not nil, progress will be logged after each project write.
 func (sw *SafeWriter) Write(root string, sm gps.SourceManager, examples bool, logger *log.Logger) error {

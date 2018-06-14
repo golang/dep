@@ -39,15 +39,6 @@ func init() {
 		},
 	}
 	basicResult.analyzerInfo = (naiveAnalyzer{}).Info()
-
-	// Just in case something needs punishing, kubernetes offers a complex,
-	// real-world set of dependencies, and this revision is known to work.
-	/*
-		_ = atom{
-			id: pi("github.com/kubernetes/kubernetes"),
-			v:  NewVersion("1.0.0").Pair(Revision("528f879e7d3790ea4287687ef0ab3f2a01cc2718")),
-		}
-	*/
 }
 
 func testWriteDepTree(t *testing.T) {
