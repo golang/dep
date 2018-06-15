@@ -29,6 +29,7 @@ type SolveMeta struct {
 	AnalyzerVersion int
 	SolverName      string
 	SolverVersion   int
+	InputImports    []string
 }
 
 type rawLock struct {
@@ -100,7 +101,7 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 			ProjectRoot: gps.ProjectRoot(ld.Name),
 			Source:      ld.Source,
 		}
-		l.P[i] = gps.NewLockedProject(id, v, ld.Packages, ld.Imports)
+		l.P[i] = gps.NewLockedProject(id, v, ld.Packages)
 	}
 
 	return l, nil

@@ -219,6 +219,148 @@ func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (pkgtree.Packag
 	return ptree, directDeps, nil
 }
 
+type lockUnsatisfy uint8
+
+const (
+	missingFromLock lockUnsatisfy = iota
+	inAdditionToLock
+)
+
+type constraintMismatch struct {
+	c gps.Constraint
+	v gps.Version
+}
+
+type constraintMismatches map[gps.ProjectRoot]constraintMismatch
+
+type LockSatisfaction struct {
+	nolock                  bool
+	missingPkgs, excessPkgs []string
+	pkgs                    map[string]lockUnsatisfy
+	badovr, badconstraint   constraintMismatches
+}
+
+// Passed is a shortcut method to check if any problems with the evaluted lock
+// were identified.
+func (ls LockSatisfaction) Passed() bool {
+	if ls.nolock {
+		return false
+	}
+
+	if len(ls.pkgs) > 0 {
+		return false
+	}
+
+	if len(ls.badovr) > 0 {
+		return false
+	}
+
+	if len(ls.badconstraint) > 0 {
+		return false
+	}
+
+	return true
+}
+
+func (ls LockSatisfaction) MissingPackages() []string {
+	return ls.missingPkgs
+}
+
+func (ls LockSatisfaction) ExcessPackages() []string {
+	return ls.excessPkgs
+}
+
+func (ls LockSatisfaction) UnmatchedOverrides() map[gps.ProjectRoot]constraintMismatch {
+	return ls.badovr
+}
+
+func (ls LockSatisfaction) UnmatchedConstraints() map[gps.ProjectRoot]constraintMismatch {
+	return ls.badconstraint
+}
+
+// LockSatisfiesInputs determines whether the Project's lock satisfies all the
+// requirements indicated by the inputs (Manifest and RootPackageTree).
+func (p *Project) LockSatisfiesInputs(sm gps.SourceManager) (LockSatisfaction, error) {
+	if p.Lock == nil {
+		return LockSatisfaction{nolock: true}, nil
+	}
+
+	ptree, err := p.ParseRootPackageTree()
+	if err != nil {
+		return LockSatisfaction{}, err
+	}
+
+	var ig *pkgtree.IgnoredRuleset
+	var req map[string]bool
+	if p.Manifest != nil {
+		ig = p.Manifest.IgnoredPackages()
+		req = p.Manifest.RequiredPackages()
+	}
+
+	rm, _ := ptree.ToReachMap(true, true, false, ig)
+	reach := rm.FlattenFn(paths.IsStandardImportPath)
+
+	inlock := make(map[string]bool, len(p.Lock.SolveMeta.InputImports))
+	ininputs := make(map[string]bool, len(reach)+len(req))
+
+	for _, imp := range reach {
+		ininputs[imp] = true
+	}
+
+	for imp := range req {
+		ininputs[imp] = true
+	}
+
+	for _, imp := range p.Lock.SolveMeta.InputImports {
+		inlock[imp] = true
+	}
+
+	lsat := LockSatisfaction{
+		badovr:        make(constraintMismatches),
+		badconstraint: make(constraintMismatches),
+	}
+
+	for ip := range ininputs {
+		if !inlock[ip] {
+			lsat.pkgs[ip] = missingFromLock
+		} else {
+			// So we don't have to revisit it below
+			delete(inlock, ip)
+		}
+	}
+
+	for ip := range inlock {
+		if !ininputs[ip] {
+			lsat.pkgs[ip] = inAdditionToLock
+		}
+	}
+
+	ineff := make(map[string]bool)
+	for _, pr := range p.FindIneffectualConstraints(sm) {
+		ineff[string(pr)] = true
+	}
+
+	for _, lp := range p.Lock.Projects() {
+		pr := lp.Ident().ProjectRoot
+
+		if pp, has := p.Manifest.Ovr[pr]; has && !pp.Constraint.Matches(lp.Version()) {
+			lsat.badovr[pr] = constraintMismatch{
+				c: pp.Constraint,
+				v: lp.Version(),
+			}
+		}
+
+		if pp, has := p.Manifest.Constraints[pr]; has && !ineff[string(pr)] && !pp.Constraint.Matches(lp.Version()) {
+			lsat.badconstraint[pr] = constraintMismatch{
+				c: pp.Constraint,
+				v: lp.Version(),
+			}
+		}
+	}
+
+	return lsat, nil
+}
+
 // FindIneffectualConstraints looks for constraint rules expressed in the
 // manifest that will have no effect during solving, as they are specified for
 // projects that are not direct dependencies of the Project.

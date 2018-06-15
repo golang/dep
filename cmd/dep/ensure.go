@@ -256,13 +256,9 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return err
 	}
 
-	solver, err := gps.Prepare(params, sm)
-	if err != nil {
-		return errors.Wrap(err, "prepare solver")
-	}
-
-	if p.Lock != nil && bytes.Equal(p.Lock.InputsDigest(), solver.HashInputs()) {
-		// Memo matches, so there's probably nothing to do.
+	if lsat, err := p.LockSatisfiesInputs(sm); err != nil {
+		return err
+	} else if !lsat.Passes() {
 		if ctx.Verbose {
 			ctx.Out.Printf("%s was already in sync with imports and %s\n", dep.LockName, dep.ManifestName)
 		}
@@ -272,13 +268,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 			return nil
 		}
 
-		// TODO(sdboyer) The desired behavior at this point is to determine
-		// whether it's necessary to write out vendor, or if it's already
-		// consistent with the lock. However, we haven't yet determined what
-		// that "verification" is supposed to look like (#121); in the meantime,
-		// we unconditionally write out vendor/ so that `dep ensure`'s behavior
-		// is maximally compatible with what it will eventually become.
-		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways, p.Manifest.PruneOptions)
+		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorOnChanged, p.Manifest.PruneOptions)
 		if err != nil {
 			return err
 		}
@@ -292,6 +282,11 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 			logger = ctx.Err
 		}
 		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+	}
+
+	solver, err := gps.Prepare(params, sm)
+	if err != nil {
+		return errors.Wrap(err, "prepare solver")
 	}
 
 	if cmd.noVendor && cmd.dryRun {
@@ -359,15 +354,6 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	solver, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "fastpath solver prepare")
-	}
-
-	// Compare the hashes. If they're not equal, bail out and ask the user to
-	// run a straight `dep ensure` before updating. This is handholding the
-	// user a bit, but the extra effort required is minimal, and it ensures the
-	// user is isolating variables in the event of solve problems (was it the
-	// "pending" changes, or the -update that caused the problem?).
-	if !bytes.Equal(p.Lock.InputsDigest(), solver.HashInputs()) {
-		ctx.Out.Printf("Warning: %s is out of sync with %s or the project's imports.", dep.LockName, dep.ManifestName)
 	}
 
 	// When -update is specified without args, allow every dependency to change
