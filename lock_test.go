@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"encoding/hex"
 	"reflect"
 	"strings"
 	"testing"
@@ -26,7 +25,6 @@ func TestReadLock(t *testing.T) {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
 
-	b, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	want := &Lock{
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
@@ -49,7 +47,6 @@ func TestReadLock(t *testing.T) {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
 
-	b, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	want = &Lock{
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
@@ -71,7 +68,6 @@ func TestWriteLock(t *testing.T) {
 
 	golden := "lock/golden0.toml"
 	want := h.GetTestFileString(golden)
-	memo, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l := &Lock{
 		P: []gps.LockedProject{
 			gps.NewLockedProject(
@@ -99,7 +95,6 @@ func TestWriteLock(t *testing.T) {
 
 	golden = "lock/golden1.toml"
 	want = h.GetTestFileString(golden)
-	memo, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l = &Lock{
 		P: []gps.LockedProject{
 			gps.NewLockedProject(

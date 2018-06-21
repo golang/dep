@@ -308,7 +308,7 @@ func mksolution(inputs ...interface{}) map[ProjectIdentifier]LockedProject {
 			a := mkAtom(t)
 			m[a.id] = NewLockedProject(a.id, a.v, []string{"."})
 		case LockedProject:
-			m[t.pi] = t
+			m[t.Ident()] = t
 		default:
 			panic(fmt.Sprintf("unexpected input to mksolution: %T %s", in, in))
 		}

@@ -171,7 +171,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		// Dump result projects into a map for easier interrogation
 		rp := make(map[ProjectIdentifier]LockedProject)
 		for _, lp := range r.p {
-			rp[lp.pi] = lp
+			rp[lp.Ident()] = lp
 		}
 
 		fixlen, rlen := len(fix.solution()), len(rp)
@@ -192,8 +192,8 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 					t.Errorf("Expected version %q of project %q, but actual version was %q", pv(flp.Version()), ppi(id), pv(lp.Version()))
 				}
 
-				if !reflect.DeepEqual(lp.pkgs, flp.pkgs) {
-					t.Errorf("Package list was not not as expected for project %s@%s:\n\t(GOT) %s\n\t(WNT) %s", ppi(id), pv(lp.Version()), lp.pkgs, flp.pkgs)
+				if !reflect.DeepEqual(lp.Packages(), flp.Packages()) {
+					t.Errorf("Package list was not not as expected for project %s@%s:\n\t(GOT) %s\n\t(WNT) %s", ppi(id), pv(lp.Version()), lp.Packages(), flp.Packages())
 				}
 			}
 		}
@@ -201,7 +201,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 		// Now walk through remaining actual results
 		for id, lp := range rp {
 			if _, exists := fix.solution()[id]; !exists {
-				t.Errorf("Unexpected project %s@%s present in results, with pkgs:\n\t%s", ppi(id), pv(lp.Version()), lp.pkgs)
+				t.Errorf("Unexpected project %s@%s present in results, with pkgs:\n\t%s", ppi(id), pv(lp.Version()), lp.Packages())
 			}
 		}
 	}
@@ -243,7 +243,10 @@ func TestRootLockNoVersionPairMatching(t *testing.T) {
 
 	l2 := make(fixLock, 1)
 	copy(l2, fix.l)
-	l2[0].v = nil
+
+	l2lp := l2[0].(lockedProject)
+	l2lp.v = nil
+	l2[0] = l2lp
 
 	params := SolveParameters{
 		RootDir:         string(fix.ds[0].n),

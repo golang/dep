@@ -101,7 +101,7 @@ func (s *solver) traceFinish(sol solution, err error) {
 	if err == nil {
 		var pkgcount int
 		for _, lp := range sol.Projects() {
-			pkgcount += len(lp.pkgs)
+			pkgcount += len(lp.Packages())
 		}
 		s.tl.Printf("%s%s found solution with %v packages from %v projects", innerIndent, successChar, pkgcount, len(sol.Projects()))
 	} else {

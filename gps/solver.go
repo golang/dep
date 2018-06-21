@@ -1347,7 +1347,7 @@ func (s *solver) unselectLast() (atomWithPackages, bool, error) {
 
 // simple (temporary?) helper just to convert atoms into locked projects
 func pa2lp(pa atom, pkgs map[string]struct{}) LockedProject {
-	lp := LockedProject{
+	lp := lockedProject{
 		pi: pa.id,
 	}
 

@@ -74,8 +74,8 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 
 	p1, p2 := l1.Projects(), l2.Projects()
 
-	p1 = sortedLockedProjects(p1)
-	p2 = sortedLockedProjects(p2)
+	p1 = sortLockedProjects(p1)
+	p2 = sortLockedProjects(p2)
 
 	diff := LockDiff{}
 
@@ -88,12 +88,12 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 	var i2next int
 	for i1 := 0; i1 < len(p1); i1++ {
 		lp1 := p1[i1]
-		pr1 := lp1.pi.ProjectRoot
+		pr1 := lp1.Ident().ProjectRoot
 
 		var matched bool
 		for i2 := i2next; i2 < len(p2); i2++ {
 			lp2 := p2[i2]
-			pr2 := lp2.pi.ProjectRoot
+			pr2 := lp2.Ident().ProjectRoot
 
 			switch strings.Compare(string(pr1), string(pr2)) {
 			case 0: // Found a matching project
@@ -135,7 +135,7 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 }
 
 func buildLockedProjectDiff(lp LockedProject) LockedProjectDiff {
-	s2 := lp.pi.Source
+	s2 := lp.Ident().Source
 	r2, b2, v2 := VersionComponentStrings(lp.Version())
 
 	var rev, version, branch, source *StringDiff
@@ -153,7 +153,7 @@ func buildLockedProjectDiff(lp LockedProject) LockedProjectDiff {
 	}
 
 	add := LockedProjectDiff{
-		Name:     lp.pi.ProjectRoot,
+		Name:     lp.Ident().ProjectRoot,
 		Source:   source,
 		Revision: rev,
 		Version:  version,
@@ -169,10 +169,10 @@ func buildLockedProjectDiff(lp LockedProject) LockedProjectDiff {
 // DiffProjects compares two projects and identifies the differences between them.
 // Returns nil if there are no differences.
 func DiffProjects(lp1 LockedProject, lp2 LockedProject) *LockedProjectDiff {
-	diff := LockedProjectDiff{Name: lp1.pi.ProjectRoot}
+	diff := LockedProjectDiff{Name: lp1.Ident().ProjectRoot}
 
-	s1 := lp1.pi.Source
-	s2 := lp2.pi.Source
+	s1 := lp1.Ident().Source
+	s2 := lp2.Ident().Source
 	if s1 != s2 {
 		diff.Source = &StringDiff{Previous: s1, Current: s2}
 	}

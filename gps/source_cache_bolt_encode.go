@@ -240,17 +240,47 @@ func cacheGetManifest(b *bolt.Bucket) (RootManifest, error) {
 }
 
 // copyTo returns a serializable representation of lp.
-func (lp LockedProject) copyTo(msg *pb.LockedProject, c *pb.Constraint) {
+func (lp lockedProject) copyTo(msg *pb.LockedProject, c *pb.Constraint) {
 	if lp.v == nil {
 		msg.UnpairedVersion = nil
 	} else {
 		lp.v.copyTo(c)
 		msg.UnpairedVersion = c
 	}
+
 	msg.Root = string(lp.pi.ProjectRoot)
 	msg.Source = lp.pi.Source
 	msg.Revision = string(lp.r)
 	msg.Packages = lp.pkgs
+}
+
+// copyLockedProjectTo hydrates pointers to serializable representations of a
+// LockedProject with the appropriate data.
+func copyLockedProjectTo(lp LockedProject, msg *pb.LockedProject, c *pb.Constraint) {
+	if nlp, ok := lp.(lockedProject); ok {
+		nlp.copyTo(msg, c)
+		return
+	}
+
+	v := lp.Version()
+	if v == nil {
+		msg.UnpairedVersion = nil
+	} else {
+		v.copyTo(c)
+		msg.UnpairedVersion = c
+
+		switch tv := v.(type) {
+		case Revision:
+			msg.Revision = string(tv)
+		case versionPair:
+			msg.Revision = string(tv.r)
+		}
+	}
+
+	pi := lp.Ident()
+	msg.Root = string(pi.ProjectRoot)
+	msg.Source = pi.Source
+	msg.Packages = lp.Packages()
 }
 
 // lockedProjectFromCache returns a new LockedProject with fields from m.
@@ -260,10 +290,10 @@ func lockedProjectFromCache(m *pb.LockedProject) (LockedProject, error) {
 	if m.UnpairedVersion != nil {
 		uv, err = unpairedVersionFromCache(m.UnpairedVersion)
 		if err != nil {
-			return LockedProject{}, err
+			return lockedProject{}, err
 		}
 	}
-	return LockedProject{
+	return lockedProject{
 		pi: ProjectIdentifier{
 			ProjectRoot: ProjectRoot(m.Root),
 			Source:      m.Source,
@@ -293,7 +323,7 @@ func cachePutLock(b *bolt.Bucket, l Lock) error {
 		var msg pb.LockedProject
 		var cMsg pb.Constraint
 		for i, lp := range projects {
-			lp.copyTo(&msg, &cMsg)
+			copyLockedProjectTo(lp, &msg, &cMsg)
 			v, err := proto.Marshal(&msg)
 			if err != nil {
 				return err

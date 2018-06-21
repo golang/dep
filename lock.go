@@ -71,7 +71,6 @@ func readLock(r io.Reader) (*Lock, error) {
 }
 
 func fromRawLock(raw rawLock) (*Lock, error) {
-	var err error
 	l := &Lock{
 		P: make([]gps.LockedProject, len(raw.Projects)),
 	}

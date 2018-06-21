@@ -34,14 +34,14 @@ func TestLockedProjectSorting(t *testing.T) {
 
 func TestLockedProjectsEq(t *testing.T) {
 	lps := []LockedProject{
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), nil),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
-		NewLockedProject(mkPI("foo"), NewVersion("nada"), []string{"foo"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV"), nil),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV"), []string{"gps", "flugle"}),
+		NewLockedProject(mkPI("foo"), NewVersion("nada").Pair("OTHERREV"), []string{"foo"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV"), []string{"flugle", "gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV2"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0").Pair("REV"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("REV2"), []string{"gps"}),
 	}
 
 	fix := map[string]struct {
@@ -85,7 +85,7 @@ func TestLockedProjectsEq(t *testing.T) {
 
 func TestLocksAreEq(t *testing.T) {
 	gpl := NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"})
-	svpl := NewLockedProject(mkPI("github.com/Masterminds/semver"), NewVersion("v2.0.0"), []string{"semver"})
+	svpl := NewLockedProject(mkPI("github.com/Masterminds/semver"), NewVersion("v2.0.0").Pair("foo"), []string{"semver"})
 	bbbt := NewLockedProject(mkPI("github.com/beeblebrox/browntown"), NewBranch("master").Pair("63fc17eb7966a6f4cc0b742bf42731c52c4ac740"), []string{"browntown", "smoochies"})
 
 	l1 := solution{

@@ -92,7 +92,7 @@ func testWriteDepTree(t *testing.T) {
 	for _, p := range r.p {
 		go func(pi ProjectIdentifier) {
 			sm.SyncSourceFor(pi)
-		}(p.pi)
+		}(p.Ident())
 	}
 
 	// nil lock/result should err immediately

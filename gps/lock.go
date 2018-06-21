@@ -39,8 +39,7 @@ func LocksAreEq(l1, l2 Lock, checkHash bool) bool {
 		return false
 	}
 
-	p1 = sortedLockedProjects(p1)
-	p2 = sortedLockedProjects(p2)
+	p1, p2 = sortLockedProjects(p1), sortLockedProjects(p2)
 
 	for k, lp := range p1 {
 		if !lp.Eq(p2[k]) {
@@ -50,8 +49,8 @@ func LocksAreEq(l1, l2 Lock, checkHash bool) bool {
 	return true
 }
 
-// sortedLockedProjects returns a sorted copy of lps, or itself if already sorted.
-func sortedLockedProjects(lps []LockedProject) []LockedProject {
+// sortLockedProjects returns a sorted copy of lps, or itself if already sorted.
+func sortLockedProjects(lps []LockedProject) []LockedProject {
 	if len(lps) <= 1 || sort.SliceIsSorted(lps, func(i, j int) bool {
 		return lps[i].Ident().Less(lps[j].Ident())
 	}) {
@@ -69,7 +68,16 @@ func sortedLockedProjects(lps []LockedProject) []LockedProject {
 // project's name, one or both of version and underlying revision, the network
 // URI for accessing it, the path at which it should be placed within a vendor
 // directory, and the packages that are used in it.
-type LockedProject struct {
+type LockedProject interface {
+	Ident() ProjectIdentifier
+	Version() Version
+	Packages() []string
+	Eq(LockedProject) bool
+	String() string
+}
+
+// lockedProject is the default implementation of LockedProject.
+type lockedProject struct {
 	pi   ProjectIdentifier
 	v    UnpairedVersion
 	r    Revision
@@ -109,7 +117,7 @@ func NewLockedProject(id ProjectIdentifier, v Version, pkgs []string) LockedProj
 		panic("must provide a non-nil version to create a LockedProject")
 	}
 
-	lp := LockedProject{
+	lp := lockedProject{
 		pi:   id,
 		pkgs: pkgs,
 	}
@@ -134,13 +142,13 @@ func NewLockedProject(id ProjectIdentifier, v Version, pkgs []string) LockedProj
 // Ident returns the identifier describing the project. This includes both the
 // local name (the root name by which the project is referenced in import paths)
 // and the network name, where the upstream source lives.
-func (lp LockedProject) Ident() ProjectIdentifier {
+func (lp lockedProject) Ident() ProjectIdentifier {
 	return lp.pi
 }
 
 // Version assembles together whatever version and/or revision data is
 // available into a single Version.
-func (lp LockedProject) Version() Version {
+func (lp lockedProject) Version() Version {
 	if lp.r == "" {
 		return lp.v
 	}
@@ -152,35 +160,51 @@ func (lp LockedProject) Version() Version {
 	return lp.v.Pair(lp.r)
 }
 
-// Eq checks if two LockedProject instances are equal.
-func (lp LockedProject) Eq(lp2 LockedProject) bool {
-	if lp.pi != lp2.pi {
+// Eq checks if two LockedProject instances are equal. The implementation
+// assumes both Packages lists are already sorted lexicographically.
+func (lp lockedProject) Eq(lp2 LockedProject) bool {
+	if lp.pi != lp2.Ident() {
 		return false
 	}
 
-	if lp.r != lp2.r {
-		return false
-	}
-
-	if len(lp.pkgs) != len(lp2.pkgs) {
-		return false
-	}
-
-	for k, v := range lp.pkgs {
-		if lp2.pkgs[k] != v {
+	var uv UnpairedVersion
+	switch tv := lp2.Version().(type) {
+	case Revision:
+		if lp.r != tv {
 			return false
 		}
+	case versionPair:
+		if lp.r != tv.r {
+			return false
+		}
+		uv = tv.v
+	case branchVersion, semVersion, plainVersion:
+		// For now, we're going to say that revisions must be present in order
+		// to indicate equality. We may need to change this later, as it may be
+		// more appropriate to enforce elsewhere.
+		return false
 	}
 
 	v1n := lp.v == nil
-	v2n := lp2.v == nil
+	v2n := uv == nil
 
 	if v1n != v2n {
 		return false
 	}
 
-	if !v1n && !lp.v.Matches(lp2.v) {
+	if !v1n && !lp.v.Matches(uv) {
 		return false
+	}
+
+	opkgs := lp2.Packages()
+	if len(lp.pkgs) != len(opkgs) {
+		return false
+	}
+
+	for k, v := range lp.pkgs {
+		if opkgs[k] != v {
+			return false
+		}
 	}
 
 	return true
@@ -195,11 +219,11 @@ func (lp LockedProject) Eq(lp2 LockedProject) bool {
 //    safe to remove - it could contain C files, or other assets, that can't be
 //    safely removed.
 //  * The slice is not a copy. If you need to modify it, copy it first.
-func (lp LockedProject) Packages() []string {
+func (lp lockedProject) Packages() []string {
 	return lp.pkgs
 }
 
-func (lp LockedProject) String() string {
+func (lp lockedProject) String() string {
 	return fmt.Sprintf("%s@%s with packages: %v",
 		lp.Ident(), lp.Version(), lp.pkgs)
 }

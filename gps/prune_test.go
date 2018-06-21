@@ -111,7 +111,7 @@ func TestPruneProject(t *testing.T) {
 	h.TempDir(pr)
 
 	baseDir := h.Path(".")
-	lp := LockedProject{
+	lp := lockedProject{
 		pi: ProjectIdentifier{
 			ProjectRoot: ProjectRoot(pr),
 		},
@@ -143,7 +143,7 @@ func TestPruneUnusedPackages(t *testing.T) {
 	}{
 		{
 			"one-package",
-			LockedProject{
+			lockedProject{
 				pi: pi,
 				pkgs: []string{
 					".",
@@ -165,7 +165,7 @@ func TestPruneUnusedPackages(t *testing.T) {
 		},
 		{
 			"nested-package",
-			LockedProject{
+			lockedProject{
 				pi: pi,
 				pkgs: []string{
 					"pkg",
@@ -194,7 +194,7 @@ func TestPruneUnusedPackages(t *testing.T) {
 		},
 		{
 			"complex-project",
-			LockedProject{
+			lockedProject{
 				pi: pi,
 				pkgs: []string{
 					"pkg",
