@@ -1454,6 +1454,10 @@ func (sm *depspecSourceManager) ExportProject(context.Context, ProjectIdentifier
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
+func (sm *depspecSourceManager) ExportPrunedProject(context.Context, LockedProject, PruneOptions, string) error {
+	return fmt.Errorf("dummy sm doesn't support exporting")
+}
+
 func (sm *depspecSourceManager) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	fip := toFold(ip)
 	for _, ds := range sm.allSpecs() {

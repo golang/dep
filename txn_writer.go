@@ -6,6 +6,7 @@ package dep
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,6 +14,8 @@ import (
 	"path/filepath"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/gps/verify"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
@@ -186,10 +189,6 @@ func toRawLockedProjectDiffs(diffs []gps.LockedProjectDiff) rawLockedProjectDiff
 
 func formatLockDiff(diff gps.LockDiff) (string, error) {
 	var buf bytes.Buffer
-
-	if diff.HashDiff != nil {
-		buf.WriteString(fmt.Sprintf("Memo: %s\n\n", diff.HashDiff))
-	}
 
 	writeDiffs := func(diffs []gps.LockedProjectDiff) error {
 		raw := toRawLockedProjectDiffs(diffs)
@@ -488,4 +487,165 @@ func hasDotGit(path string) bool {
 	gitfilepath := filepath.Join(path, ".git")
 	_, err := os.Stat(gitfilepath)
 	return err == nil
+}
+
+type DeltaWriter struct {
+	lock         *Lock
+	lockDiff     *gps.LockDiff
+	pruneOptions gps.CascadingPruneOptions
+	vendorDir    string
+	changed      map[gps.ProjectRoot]changeType
+	status       map[string]pkgtree.VendorStatus
+}
+
+type changeType uint8
+
+const (
+	noChange changeType = iota
+	solveChanged
+	pruneChanged
+	hashChanged
+	// FIXME need added/removed up here
+)
+
+// NewDeltaWriter prepares a vendor writer that will construct a vendor
+// directory by writing out only those projects that actually need to be written
+// out - they have changed in some way, or they lack the necessary hash
+// information to be verified.
+func NewDeltaWriter(oldLock, newLock *Lock, prune gps.CascadingPruneOptions, vendorDir string) (TransactionWriter, error) {
+	sw := &DeltaWriter{
+		lock:         newLock,
+		pruneOptions: prune,
+		vendorDir:    vendorDir,
+		changed:      make(map[gps.ProjectRoot]changeType),
+	}
+
+	if newLock == nil {
+		return nil, errors.New("must provide a non-nil newlock")
+	}
+
+	_, err := os.Stat(vendorDir)
+	if err != nil && os.IsNotExist(err) {
+		// Provided dir does not exist, so there's no disk contents to compare
+		// against. Fall back to the old SafeWriter.
+		return NewSafeWriter(nil, oldLock, newLock, VendorOnChanged, prune)
+	}
+
+	sw.lockDiff = gps.DiffLocks(oldLock, newLock)
+
+	// 1. find all the ones that truly changed in solve
+	// 2. find the ones that only changed pruneopts
+	// 3. find the ones that (already) had a mismatch with what's in vendor
+	sums := make(map[string][]byte)
+
+	for _, lp := range newLock.Projects() {
+		pr := lp.Ident().ProjectRoot
+		// TODO(sdboyer) Not the best heuristic to assume that a PPS indicates
+		if vp, ok := lp.(verify.VerifiableProject); !ok {
+			sw.changed[pr] = solveChanged
+			sums[string(pr)] = []byte{}
+		} else {
+			sums[string(pr)] = vp.Digest.Digest
+			sw.changed[pr] = pruneChanged
+			//if _, has := sw.changed[pr]; !has && vp.PruneOpts != prune.PruneOptionsFor(pr) {
+			//}
+		}
+	}
+
+	status, err := pkgtree.VerifyDepTree(vendorDir, sums)
+	if err != nil {
+		return nil, err
+	}
+
+	for spr, stat := range status {
+		pr := gps.ProjectRoot(spr)
+		switch stat {
+		case pkgtree.NotInLock, pkgtree.NotInTree:
+			// FIXME
+		case pkgtree.EmptyDigestInLock, pkgtree.DigestMismatchInLock:
+			if _, has := sw.changed[pr]; !has {
+				sw.changed[gps.ProjectRoot(pr)] = hashChanged
+			}
+		}
+	}
+
+	return sw, nil
+}
+
+// Write executes the planned changes.
+//
+// This writes recreated projects to a new directory, then moves in existing,
+// unchanged projects from the original vendor directory. If any failures occur,
+// reasonable attempts are made to roll back the changes.
+func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, logger *log.Logger) error {
+	// TODO(sdboyer) remove path from the signature for this
+	if path != filepath.Dir(dw.vendorDir) {
+		return fmt.Errorf("target path (%q) must be the parent of the original vendor path (%q)", path, dw.vendorDir)
+	}
+
+	lpath := filepath.Join(filepath.Dir(path), LockName)
+	vpath := filepath.Join(path, "vendor")
+
+	// Write out all the deltas
+	projs := make(map[gps.ProjectRoot]gps.LockedProject)
+	for _, lp := range dw.lock.Projects() {
+		projs[lp.Ident().ProjectRoot] = lp
+	}
+
+	//for pr, reason := range dw.changed {
+	for pr, _ := range dw.changed {
+		to := filepath.FromSlash(filepath.Join(vpath, string(pr)))
+		po := dw.pruneOptions.PruneOptionsFor(pr)
+		err := sm.ExportPrunedProject(context.TODO(), projs[pr], po, to)
+		if err != nil {
+			return errors.Wrapf(err, "failed to export %s", pr)
+		}
+		digest, err := pkgtree.DigestFromDirectory(to)
+		if err != nil {
+			return errors.Wrapf(err, "failed to hash %s", pr)
+		}
+
+		// Update the new Lock with verification information.
+		for k, lp := range dw.lock.P {
+			if lp.Ident().ProjectRoot == pr {
+				dw.lock.P[k] = verify.VerifiableProject{
+					LockedProject: lp,
+					PruneOpts:     po,
+					Digest:        digest,
+				}
+			}
+		}
+	}
+
+	// Write out the lock last, now that it's updated with digests
+	l, err := dw.lock.MarshalTOML()
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal lock to TOML")
+	}
+
+	if err = ioutil.WriteFile(lpath, append(lockFileComment, l...), 0666); err != nil {
+		return errors.Wrap(err, "failed to write lock file to temp dir")
+	}
+
+	// Remove all the now-unnecessary bits from vendor.
+	for path, vs := range dw.status {
+		if vs == pkgtree.NotInLock {
+			err = os.RemoveAll(path)
+			if err != nil {
+				return errors.Wrapf(err, "vendor state may be inconsistent, could not remove %s", path)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (dw *DeltaWriter) PrintPreparedActions(output *log.Logger, verbose bool) error {
+	// FIXME
+	return nil
+}
+
+type TransactionWriter interface {
+	PrintPreparedActions(output *log.Logger, verbose bool) error
+	Write(path string, sm gps.SourceManager, examples bool, logger *log.Logger) error
 }

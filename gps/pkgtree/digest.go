@@ -8,14 +8,23 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"hash"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 )
+
+// HashVersion is an arbitrary number that identifies the hash algorithm used by
+// the directory hasher.
+//
+//   1: SHA256, as implemented in crypto/sha256
+const HashVersion = 1
 
 const osPathSeparator = string(filepath.Separator)
 
@@ -151,7 +160,7 @@ type dirWalkClosure struct {
 // While filepath.Walk could have been used, that standard library function
 // skips symbolic links, and for now, we want the hash to include the symbolic
 // link referents.
-func DigestFromDirectory(osDirname string) ([]byte, error) {
+func DigestFromDirectory(osDirname string) (VersionedDigest, error) {
 	osDirname = filepath.Clean(osDirname)
 
 	// Create a single hash instance for the entire operation, rather than a new
@@ -255,10 +264,15 @@ func DigestFromDirectory(osDirname string) ([]byte, error) {
 		}
 		return err
 	})
+
 	if err != nil {
-		return nil, err
+		return VersionedDigest{}, err
 	}
-	return closure.someHash.Sum(nil), nil
+
+	return VersionedDigest{
+		HashVersion: HashVersion,
+		Digest:      closure.someHash.Sum(nil),
+	}, nil
 }
 
 // VendorStatus represents one of a handful of possible status conditions for a
@@ -286,6 +300,11 @@ const (
 	// DigestMismatchInLock is used when the digest for a dependency listed in
 	// the lock file does not match what is calculated from the file system.
 	DigestMismatchInLock
+
+	// HashVersionMismatch indicates that the hashing algorithm used to generate
+	// the digest being compared against is not the same as the one used by the
+	// current program.
+	HashVersionMismatch
 )
 
 func (ls VendorStatus) String() string {
@@ -300,6 +319,8 @@ func (ls VendorStatus) String() string {
 		return "empty digest in lock"
 	case DigestMismatchInLock:
 		return "mismatch"
+	case HashVersionMismatch:
+		return "hasher changed"
 	}
 	return "unknown"
 }
@@ -315,6 +336,38 @@ type fsnode struct {
 	myIndex, parentIndex int    // index of this node and its parent in the tree's slice
 }
 
+// VersionedDigest comprises both a hash digest, and a simple integer indicating
+// the version of the hash algorithm that produced the digest.
+type VersionedDigest struct {
+	HashVersion int
+	Digest      []byte
+}
+
+func (vd VersionedDigest) String() string {
+	return fmt.Sprintf("%s:%s", strconv.Itoa(vd.HashVersion), hex.EncodeToString(vd.Digest))
+}
+
+// ParseVersionedDigest decodes the string representation of versioned digest
+// information - a colon-separated string with a version number in the first
+// part and the hex-encdoed hash digest in the second - as a VersionedDigest.
+func ParseVersionedDigest(input string) (VersionedDigest, error) {
+	var vd VersionedDigest
+	var err error
+
+	parts := strings.Split(input, ":")
+	if len(parts) != 2 {
+		return VersionedDigest{}, errors.Errorf("expected two colon-separated components in the versioned hash digest, got %q", input)
+	}
+	if vd.Digest, err = hex.DecodeString(parts[1]); err != nil {
+		return VersionedDigest{}, err
+	}
+	if vd.HashVersion, err = strconv.Atoi(parts[0]); err != nil {
+		return VersionedDigest{}, err
+	}
+
+	return vd, nil
+}
+
 // VerifyDepTree verifies a dependency tree according to expected digest sums,
 // and returns an associative array of file system nodes and their respective
 // vendor status conditions.
@@ -325,7 +378,7 @@ type fsnode struct {
 // platform where the file system path separator is a character other than
 // solidus, one particular dependency would be represented as
 // "github.com/alice/alice1".
-func VerifyDepTree(osDirname string, wantSums map[string][]byte) (map[string]VendorStatus, error) {
+func VerifyDepTree(osDirname string, wantDigests map[string][]byte) (map[string]VendorStatus, error) {
 	osDirname = filepath.Clean(osDirname)
 
 	// Ensure top level pathname is a directory
@@ -387,7 +440,7 @@ func VerifyDepTree(osDirname string, wantSums map[string][]byte) (map[string]Ven
 	// project is later found while traversing the vendor root hierarchy, its
 	// status will be updated to reflect whether its digest is empty, or,
 	// whether or not it matches the expected digest.
-	for slashPathname := range wantSums {
+	for slashPathname := range wantDigests {
 		slashStatus[slashPathname] = NotInTree
 	}
 
@@ -400,14 +453,14 @@ func VerifyDepTree(osDirname string, wantSums map[string][]byte) (map[string]Ven
 		slashPathname := filepath.ToSlash(currentNode.osRelative)
 		osPathname := filepath.Join(osDirname, currentNode.osRelative)
 
-		if expectedSum, ok := wantSums[slashPathname]; ok {
+		if expectedSum, ok := wantDigests[slashPathname]; ok {
 			ls := EmptyDigestInLock
 			if len(expectedSum) > 0 {
 				projectSum, err := DigestFromDirectory(osPathname)
 				if err != nil {
 					return nil, errors.Wrap(err, "cannot compute dependency hash")
 				}
-				if bytes.Equal(projectSum, expectedSum) {
+				if bytes.Equal(projectSum.Digest, expectedSum) {
 					ls = NoMismatch
 				} else {
 					ls = DigestMismatchInLock

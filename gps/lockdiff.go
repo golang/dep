@@ -5,7 +5,6 @@
 package gps
 
 import (
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -44,10 +43,9 @@ func (diff *StringDiff) String() string {
 // LockDiff is the set of differences between an existing lock file and an updated lock file.
 // Fields are only populated when there is a difference, otherwise they are empty.
 type LockDiff struct {
-	HashDiff *StringDiff
-	Add      []LockedProjectDiff
-	Remove   []LockedProjectDiff
-	Modify   []LockedProjectDiff
+	Add    []LockedProjectDiff
+	Remove []LockedProjectDiff
+	Modify []LockedProjectDiff
 }
 
 // LockedProjectDiff contains the before and after snapshot of a project reference.
@@ -78,12 +76,6 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 	p2 = sortLockedProjects(p2)
 
 	diff := LockDiff{}
-
-	h1 := hex.EncodeToString(l1.InputsDigest())
-	h2 := hex.EncodeToString(l2.InputsDigest())
-	if h1 != h2 {
-		diff.HashDiff = &StringDiff{Previous: h1, Current: h2}
-	}
 
 	var i2next int
 	for i1 := 0; i1 < len(p1); i1++ {
@@ -128,10 +120,35 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 		diff.Add = append(diff.Add, add)
 	}
 
-	if diff.HashDiff == nil && len(diff.Add) == 0 && len(diff.Remove) == 0 && len(diff.Modify) == 0 {
+	if len(diff.Add) == 0 && len(diff.Remove) == 0 && len(diff.Modify) == 0 {
 		return nil // The locks are the equivalent
 	}
 	return &diff
+}
+
+// DiffFor checks to see if there was a diff for the provided ProjectRoot. The
+// first return value is a 0 if there was no diff, 1 if it was added, 2 if it
+// was removed, and 3 if it was modified.
+func (ld *LockDiff) DiffFor(pr ProjectRoot) (uint8, LockedProjectDiff) {
+	for _, lpd := range ld.Add {
+		if lpd.Name == pr {
+			return 1, lpd
+		}
+	}
+
+	for _, lpd := range ld.Remove {
+		if lpd.Name == pr {
+			return 2, lpd
+		}
+	}
+
+	for _, lpd := range ld.Modify {
+		if lpd.Name == pr {
+			return 3, lpd
+		}
+	}
+
+	return 0, LockedProjectDiff{}
 }
 
 func buildLockedProjectDiff(lp LockedProject) LockedProjectDiff {

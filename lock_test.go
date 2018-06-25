@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/gps/verify"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -26,12 +28,20 @@ func TestReadLock(t *testing.T) {
 	}
 
 	want := &Lock{
+		SolveMeta: SolveMeta{InputImports: []string{}},
 		P: []gps.LockedProject{
-			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
-				gps.NewBranch("master").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
-				[]string{"."},
-			),
+			verify.VerifiableProject{
+				LockedProject: gps.NewLockedProject(
+					gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
+					gps.NewBranch("master").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
+					[]string{"."},
+				),
+				PruneOpts: gps.PruneOptions(1),
+				Digest: pkgtree.VersionedDigest{
+					HashVersion: pkgtree.HashVersion,
+					Digest:      []byte("foo"),
+				},
+			},
 		},
 	}
 
@@ -48,12 +58,20 @@ func TestReadLock(t *testing.T) {
 	}
 
 	want = &Lock{
+		SolveMeta: SolveMeta{InputImports: []string{}},
 		P: []gps.LockedProject{
-			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
-				gps.NewVersion("0.12.2").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
-				[]string{"."},
-			),
+			verify.VerifiableProject{
+				LockedProject: gps.NewLockedProject(
+					gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
+					gps.NewVersion("0.12.2").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
+					[]string{"."},
+				),
+				PruneOpts: gps.PruneOptions(15),
+				Digest: pkgtree.VersionedDigest{
+					HashVersion: pkgtree.HashVersion,
+					Digest:      []byte("foo"),
+				},
+			},
 		},
 	}
 
@@ -70,11 +88,18 @@ func TestWriteLock(t *testing.T) {
 	want := h.GetTestFileString(golden)
 	l := &Lock{
 		P: []gps.LockedProject{
-			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
-				gps.NewBranch("master").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
-				[]string{"."},
-			),
+			verify.VerifiableProject{
+				LockedProject: gps.NewLockedProject(
+					gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
+					gps.NewBranch("master").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
+					[]string{"."},
+				),
+				PruneOpts: gps.PruneOptions(1),
+				Digest: pkgtree.VersionedDigest{
+					HashVersion: pkgtree.HashVersion,
+					Digest:      []byte("foo"),
+				},
+			},
 		},
 	}
 
@@ -97,11 +122,18 @@ func TestWriteLock(t *testing.T) {
 	want = h.GetTestFileString(golden)
 	l = &Lock{
 		P: []gps.LockedProject{
-			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
-				gps.NewVersion("0.12.2").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
-				[]string{"."},
-			),
+			verify.VerifiableProject{
+				LockedProject: gps.NewLockedProject(
+					gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
+					gps.NewVersion("0.12.2").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
+					[]string{"."},
+				),
+				PruneOpts: gps.PruneOptions(15),
+				Digest: pkgtree.VersionedDigest{
+					HashVersion: pkgtree.HashVersion,
+					Digest:      []byte("foo"),
+				},
+			},
 		},
 	}
 
@@ -131,7 +163,7 @@ func TestReadLockErrors(t *testing.T) {
 		file string
 	}{
 		{"specified both", "lock/error0.toml"},
-		{"invalid hash", "lock/error1.toml"},
+		{"odd length", "lock/error1.toml"},
 		{"no branch or version", "lock/error2.toml"},
 	}
 

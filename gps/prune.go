@@ -5,6 +5,8 @@
 package gps
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -55,6 +57,45 @@ type PruneOptionSet struct {
 type CascadingPruneOptions struct {
 	DefaultOptions    PruneOptions
 	PerProjectOptions map[ProjectRoot]PruneOptionSet
+}
+
+func ParsePruneOptions(input string) (PruneOptions, error) {
+	var po PruneOptions
+	for _, char := range input {
+		switch char {
+		case 'T':
+			po |= PruneGoTestFiles
+		case 'U':
+			po |= PruneUnusedPackages
+		case 'N':
+			po |= PruneNonGoFiles
+		case 'V':
+			po |= PruneNestedVendorDirs
+		default:
+			return 0, errors.Errorf("unknown pruning code %q", char)
+		}
+	}
+
+	return po, nil
+}
+
+func (po PruneOptions) String() string {
+	var buf bytes.Buffer
+
+	if po&PruneGoTestFiles != 0 {
+		fmt.Fprintf(&buf, "T")
+	}
+	if po&PruneUnusedPackages != 0 {
+		fmt.Fprintf(&buf, "U")
+	}
+	if po&PruneNonGoFiles != 0 {
+		fmt.Fprintf(&buf, "N")
+	}
+	if po&PruneNestedVendorDirs != 0 {
+		fmt.Fprintf(&buf, "V")
+	}
+
+	return buf.String()
 }
 
 // PruneOptionsFor returns the PruneOptions bits for the given project,

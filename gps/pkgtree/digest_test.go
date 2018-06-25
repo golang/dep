@@ -122,7 +122,7 @@ func TestDigestFromDirectory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.Equal(got, want) {
+		if !bytes.Equal(got.Digest, want) {
 			t.Errorf("\n(GOT):\n\t%#v\n(WNT):\n\t%#v", got, want)
 		}
 	})
@@ -133,7 +133,7 @@ func TestDigestFromDirectory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.Equal(got, want) {
+		if !bytes.Equal(got.Digest, want) {
 			t.Errorf("\n(GOT):\n\t%#v\n(WNT):\n\t%#v", got, want)
 		}
 	})
@@ -186,7 +186,7 @@ func TestVerifyDepTree(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if !bytes.Equal(got, want) {
+			if !bytes.Equal(got.Digest, want) {
 				t.Errorf("%q\n(GOT):\n\t%#v\n(WNT):\n\t%#v", k, got, want)
 			}
 		}

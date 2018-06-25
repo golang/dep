@@ -357,6 +357,35 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 	return err
 }
 
+func (sg *sourceGateway) exportPrunedVersionTo(ctx context.Context, lp LockedProject, prune PruneOptions, to string) error {
+	sg.mu.Lock()
+	defer sg.mu.Unlock()
+
+	err := sg.require(ctx, sourceExistsLocally)
+	if err != nil {
+		return err
+	}
+
+	r, err := sg.convertToRevision(ctx, lp.Version())
+	if err != nil {
+		return err
+	}
+
+	if fastprune, ok := sg.src.(sourceFastPrune); ok {
+		return sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
+			return fastprune.exportPrunedRevisionTo(ctx, r, lp.Packages(), prune, to)
+		})
+	}
+
+	if err = sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
+		return sg.src.exportRevisionTo(ctx, r, to)
+	}); err != nil {
+		return err
+	}
+
+	return PruneProject(to, lp, prune)
+}
+
 func (sg *sourceGateway) getManifestAndLock(ctx context.Context, pr ProjectRoot, v Version, an ProjectAnalyzer) (Manifest, Lock, error) {
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
@@ -673,4 +702,9 @@ type source interface {
 	// listVersionsRequiresLocal returns true if calling listVersions first
 	// requires the source to exist locally.
 	listVersionsRequiresLocal() bool
+}
+
+type sourceFastPrune interface {
+	source
+	exportPrunedRevisionTo(context.Context, Revision, []string, PruneOptions, string) error
 }
