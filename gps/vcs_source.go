@@ -159,28 +159,94 @@ type gitSource struct {
 	baseVCSSource
 }
 
+// gitSubmoduleStatusRE matches the output of "git submodule status" which has lines like this:
+//  f273d8faee1af72e63c0c949287a9265af6635f9 pkg (heads/master)
+var gitSubmoduleStatusRE = regexp.MustCompile(`^.([a-fA-F0-9]+) (.*) \(.*?\)$`)
+
 func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to string) error {
 	r := s.repo
 
+	if err := s.exportTreeTo(ctx, filepath.Join(r.LocalPath(), ".git"), r.LocalPath(), rev.String(), to); err != nil {
+		return errors.Wrap(err, "exporting main repo content")
+	}
+
+	// Now do the same for any submodule, using a shell command that "git submodule"
+	// iterates over.
+	{
+		cmd := commandContext(ctx, "git", "submodule", "status", "--recursive")
+		cmd.SetDir(r.LocalPath())
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return errors.Wrapf(err, "git submodule status in %s: %s", r.LocalPath(), string(out))
+		}
+
+		// The output is something like this:
+		//  f273d8faee1af72e63c0c949287a9265af6635f9 pkg (heads/new-master2)
+		//  4782e9497d6177ebd53bf080198a7fb8320847f8 pkg/foo (heads/new-master2)
+		//
+		// We only need the paths. There's no good way to reliably distinguish
+		// paths (which may contain brackets) from the "git describe" output at the end
+		// (which might contain tags with spaces), but those pathological cases
+		// hopefully get avoided by developers.
+		for _, line := range strings.Split(string(out), "\n") {
+			if line == "" {
+				continue
+			}
+			match := gitSubmoduleStatusRE.FindStringSubmatch(line)
+			if match == nil {
+				return errors.Errorf("unexpected 'git submodule status' output line: %q", line)
+			}
+			hash := match[1]
+			relPath := match[2]
+			absPath := filepath.Join(r.LocalPath(), relPath)
+			// Each submodule path has .git text
+			// file which contains a relative link to the
+			// git directory. We need to follow that and
+			// there do the same "git read-tree + git
+			// checkout-index" with a temporary index as
+			// for the main repo.
+			//
+			// Instead of parsing that .git text file
+			// ourselves, we use "git rev-parse --git-dir".
+			var gitPath string
+			{
+				cmd := commandContext(ctx, "git", "rev-parse", "--git-dir")
+				cmd.SetDir(absPath)
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					return errors.Wrapf(err, "git rev-parse --git-dir in %s: %s", absPath, string(out))
+				}
+				gitPath = strings.TrimRight(string(out), "\n")
+			}
+			if err := s.exportTreeTo(ctx, gitPath, absPath, hash, filepath.Join(to, relPath)); err != nil {
+				return errors.Wrapf(err, "exporting submodule %s repo content", relPath)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *gitSource) exportTreeTo(ctx context.Context, gitDir, workDir, hash, to string) error {
 	if err := os.MkdirAll(to, 0777); err != nil {
 		return err
 	}
 
 	// Back up original index
-	idx, bak := filepath.Join(r.LocalPath(), ".git", "index"), filepath.Join(r.LocalPath(), ".git", "origindex")
+	idx, bak := filepath.Join(gitDir, "index"), filepath.Join(gitDir, "origindex")
 	err := fs.RenameWithFallback(idx, bak)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "rename index in %s", gitDir)
 	}
 
 	// could have an err here...but it's hard to imagine how?
 	defer fs.RenameWithFallback(bak, idx)
 
 	{
-		cmd := commandContext(ctx, "git", "read-tree", rev.String())
-		cmd.SetDir(r.LocalPath())
+		cmd := commandContext(ctx, "git", "read-tree", hash)
+		cmd.SetDir(workDir)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			return errors.Wrap(err, string(out))
+			return errors.Wrapf(err, "git read-tree %s in %s: %s", workDir, hash, string(out))
 		}
 	}
 
@@ -197,9 +263,9 @@ func (s *gitSource) exportRevisionTo(ctx context.Context, rev Revision, to strin
 	// index and HEAD.
 	{
 		cmd := commandContext(ctx, "git", "checkout-index", "-a", "--prefix="+to)
-		cmd.SetDir(r.LocalPath())
+		cmd.SetDir(workDir)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			return errors.Wrap(err, string(out))
+			return errors.Wrapf(err, "git checkout-index in %s to %q: %s", workDir, to, string(out))
 		}
 	}
 

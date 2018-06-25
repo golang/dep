@@ -36,6 +36,7 @@ IMPROVEMENTS:
 * Don't exclude `Godeps` folder ([#1822](https://github.com/golang/dep/issues/1822)).
 * Add project-package relationship graph support in graphviz ([#1588](https://github.com/golang/dep/pull/1588)).
 * Limit concurrency of `dep status` to avoid hitting open file limits ([#1923](https://github.com/golang/dep/issue/1923)).
+* Export the content of git submodules to the vendor directory ([#1909](https://github.com/golang/dep/pull/1909)).
 
 WIP:
 * Enable importing external configuration from dependencies during init (#1277). This is feature flagged and disabled by default.
