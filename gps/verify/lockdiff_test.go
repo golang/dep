@@ -2,12 +2,25 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package gps
+package verify
 
 import (
 	"bytes"
 	"testing"
+
+	"github.com/golang/dep/gps"
 )
+
+// mkPI creates a ProjectIdentifier with the ProjectRoot as the provided
+// string, and the Source unset.
+//
+// Call normalize() on the returned value if you need the Source to be be
+// equal to the ProjectRoot.
+func mkPI(root string) gps.ProjectIdentifier {
+	return gps.ProjectIdentifier{
+		ProjectRoot: gps.ProjectRoot(root),
+	}
+}
 
 func TestStringDiff_NoChange(t *testing.T) {
 	diff := StringDiff{Previous: "foo", Current: "foo"}
@@ -45,8 +58,8 @@ func TestStringDiff_Modify(t *testing.T) {
 }
 
 func TestDiffProjects_NoChange(t *testing.T) {
-	p1 := NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0"), []string{"gps"})
-	p2 := NewLockedProject(mkPI("github.com/golang/dep/gps"), NewVersion("v0.10.0"), []string{"gps"})
+	p1 := gps.NewLockedProject(mkPI("github.com/golang/dep/gps"), gps.NewVersion("v0.10.0"), []string{"gps"})
+	p2 := gps.NewLockedProject(mkPI("github.com/golang/dep/gps"), gps.NewVersion("v0.10.0"), []string{"gps"})
 
 	diff := DiffProjects(p1, p2)
 	if diff != nil {
@@ -55,19 +68,9 @@ func TestDiffProjects_NoChange(t *testing.T) {
 }
 
 func TestDiffProjects_Modify(t *testing.T) {
-	p1 := lockedProject{
-		pi:   ProjectIdentifier{ProjectRoot: "github.com/foo/bar"},
-		v:    NewBranch("master"),
-		r:    "abc123",
-		pkgs: []string{"baz", "qux"},
-	}
-
-	p2 := lockedProject{
-		pi:   ProjectIdentifier{ProjectRoot: "github.com/foo/bar", Source: "https://github.com/mcfork/gps.git"},
-		v:    NewVersion("v1.0.0"),
-		r:    "def456",
-		pkgs: []string{"baz", "derp"},
-	}
+	p1 := gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewBranch("master").Pair("abc123"), []string{"baz", "qux"})
+	p2 := gps.NewLockedProject(gps.ProjectIdentifier{ProjectRoot: "github.com/foo/bar", Source: "https://github.com/mcfork/gps.git"},
+		gps.NewVersion("v1.0.0").Pair("def456"), []string{"baz", "derp"})
 
 	diff := DiffProjects(p1, p2)
 	if diff == nil {
@@ -116,19 +119,9 @@ func TestDiffProjects_Modify(t *testing.T) {
 }
 
 func TestDiffProjects_AddPackages(t *testing.T) {
-	p1 := lockedProject{
-		pi:   ProjectIdentifier{ProjectRoot: "github.com/foo/bar"},
-		v:    NewBranch("master"),
-		r:    "abc123",
-		pkgs: []string{"foobar"},
-	}
-
-	p2 := lockedProject{
-		pi:   ProjectIdentifier{ProjectRoot: "github.com/foo/bar", Source: "https://github.com/mcfork/gps.git"},
-		v:    NewVersion("v1.0.0"),
-		r:    "def456",
-		pkgs: []string{"bazqux", "foobar", "zugzug"},
-	}
+	p1 := gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewBranch("master").Pair("abc123"), []string{"foobar"})
+	p2 := gps.NewLockedProject(gps.ProjectIdentifier{ProjectRoot: "github.com/foo/bar", Source: "https://github.com/mcfork/gps.git"},
+		gps.NewVersion("v1.0.0").Pair("def456"), []string{"bazqux", "foobar", "zugzug"})
 
 	diff := DiffProjects(p1, p2)
 	if diff == nil {
@@ -153,19 +146,9 @@ func TestDiffProjects_AddPackages(t *testing.T) {
 }
 
 func TestDiffProjects_RemovePackages(t *testing.T) {
-	p1 := lockedProject{
-		pi:   ProjectIdentifier{ProjectRoot: "github.com/foo/bar"},
-		v:    NewBranch("master"),
-		r:    "abc123",
-		pkgs: []string{"athing", "foobar"},
-	}
-
-	p2 := lockedProject{
-		pi:   ProjectIdentifier{ProjectRoot: "github.com/foo/bar", Source: "https://github.com/mcfork/gps.git"},
-		v:    NewVersion("v1.0.0"),
-		r:    "def456",
-		pkgs: []string{"bazqux"},
-	}
+	p1 := gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewBranch("master").Pair("abc123"), []string{"athing", "foobar"})
+	p2 := gps.NewLockedProject(gps.ProjectIdentifier{ProjectRoot: "github.com/foo/bar", Source: "https://github.com/mcfork/gps.git"},
+		gps.NewVersion("v1.0.0").Pair("def456"), []string{"bazqux"})
 
 	diff := DiffProjects(p1, p2)
 	if diff == nil {
@@ -192,17 +175,11 @@ func TestDiffProjects_RemovePackages(t *testing.T) {
 }
 
 func TestDiffLocks_NoChange(t *testing.T) {
-	l1 := safeLock{
-		//h: []byte("abc123"),
-		p: []LockedProject{
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
-		},
+	l1 := gps.SimpleLock{
+		gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewVersion("v1.0.0"), nil),
 	}
-	l2 := safeLock{
-		//h: []byte("abc123"),
-		p: []LockedProject{
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
-		},
+	l2 := gps.SimpleLock{
+		gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewVersion("v1.0.0"), nil),
 	}
 
 	diff := DiffLocks(l1, l2)
@@ -212,24 +189,14 @@ func TestDiffLocks_NoChange(t *testing.T) {
 }
 
 func TestDiffLocks_AddProjects(t *testing.T) {
-	l1 := safeLock{
-		//h: []byte("abc123"),
-		p: []LockedProject{
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
-		},
+	l1 := gps.SimpleLock{
+		gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewVersion("v1.0.0"), nil),
 	}
-	l2 := safeLock{
-		//h: []byte("abc123"),
-		p: []LockedProject{
-			lockedProject{
-				pi:   ProjectIdentifier{ProjectRoot: "github.com/baz/qux", Source: "https://github.com/mcfork/bazqux.git"},
-				v:    NewVersion("v0.5.0"),
-				r:    "def456",
-				pkgs: []string{"p1", "p2"},
-			},
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/zug/zug"}, v: NewVersion("v1.0.0")},
-		},
+	l2 := gps.SimpleLock{
+		gps.NewLockedProject(gps.ProjectIdentifier{ProjectRoot: "github.com/baz/qux", Source: "https://github.com/mcfork/bazqux.git"},
+			gps.NewVersion("v0.5.0").Pair("def456"), []string{"p1", "p2"}),
+		gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewVersion("v1.0.0"), nil),
+		gps.NewLockedProject(mkPI("github.com/zug/zug"), gps.NewVersion("v1.0.0"), nil),
 	}
 
 	diff := DiffLocks(l1, l2)
@@ -296,23 +263,13 @@ func TestDiffLocks_AddProjects(t *testing.T) {
 }
 
 func TestDiffLocks_RemoveProjects(t *testing.T) {
-	l1 := safeLock{
-		//h: []byte("abc123"),
-		p: []LockedProject{
-			lockedProject{
-				pi:   ProjectIdentifier{ProjectRoot: "github.com/a/thing", Source: "https://github.com/mcfork/athing.git"},
-				v:    NewBranch("master"),
-				r:    "def456",
-				pkgs: []string{"p1", "p2"},
-			},
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
-		},
+	l1 := gps.SimpleLock{
+		gps.NewLockedProject(gps.ProjectIdentifier{ProjectRoot: "github.com/a/thing", Source: "https://github.com/mcfork/athing.git"},
+			gps.NewBranch("master").Pair("def456"), []string{"p1", "p2"}),
+		gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewVersion("v1.0.0"), nil),
 	}
-	l2 := safeLock{
-		//h: []byte("abc123"),
-		p: []LockedProject{
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/baz/qux"}, v: NewVersion("v1.0.0")},
-		},
+	l2 := gps.SimpleLock{
+		gps.NewLockedProject(mkPI("github.com/baz/qux"), gps.NewVersion("v1.0.0"), nil),
 	}
 
 	diff := DiffLocks(l1, l2)
@@ -379,22 +336,16 @@ func TestDiffLocks_RemoveProjects(t *testing.T) {
 }
 
 func TestDiffLocks_ModifyProjects(t *testing.T) {
-	l1 := safeLock{
-		//h: []byte("abc123"),
-		p: []LockedProject{
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bu"}, v: NewVersion("v1.0.0")},
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/zig/zag"}, v: NewVersion("v1.0.0")},
-		},
+	l1 := gps.SimpleLock{
+		gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewVersion("v1.0.0"), nil),
+		gps.NewLockedProject(mkPI("github.com/foo/bu"), gps.NewVersion("v1.0.0"), nil),
+		gps.NewLockedProject(mkPI("github.com/zig/zag"), gps.NewVersion("v1.0.0"), nil),
 	}
-	l2 := safeLock{
-		//h: []byte("abc123"),
-		p: []LockedProject{
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/baz/qux"}, v: NewVersion("v1.0.0")},
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v2.0.0")},
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/zig/zag"}, v: NewVersion("v2.0.0")},
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/zug/zug"}, v: NewVersion("v1.0.0")},
-		},
+	l2 := gps.SimpleLock{
+		gps.NewLockedProject(mkPI("github.com/baz/qux"), gps.NewVersion("v1.0.0"), nil),
+		gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewVersion("v2.0.0"), nil),
+		gps.NewLockedProject(mkPI("github.com/zig/zag"), gps.NewVersion("v2.0.0"), nil),
+		gps.NewLockedProject(mkPI("github.com/zug/zug"), gps.NewVersion("v1.0.0"), nil),
 	}
 
 	diff := DiffLocks(l1, l2)
@@ -420,10 +371,8 @@ func TestDiffLocks_ModifyProjects(t *testing.T) {
 }
 
 func TestDiffLocks_EmptyInitialLock(t *testing.T) {
-	l2 := safeLock{
-		p: []LockedProject{
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
-		},
+	l2 := gps.SimpleLock{
+		gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewVersion("v1.0.0"), nil),
 	}
 
 	diff := DiffLocks(nil, l2)
@@ -434,11 +383,8 @@ func TestDiffLocks_EmptyInitialLock(t *testing.T) {
 }
 
 func TestDiffLocks_EmptyFinalLock(t *testing.T) {
-	l1 := safeLock{
-		//h: h1,
-		p: []LockedProject{
-			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
-		},
+	l1 := gps.SimpleLock{
+		gps.NewLockedProject(mkPI("github.com/foo/bar"), gps.NewVersion("v1.0.0"), nil),
 	}
 
 	diff := DiffLocks(l1, nil)

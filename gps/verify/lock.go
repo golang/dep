@@ -1,3 +1,7 @@
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package verify
 
 import (
@@ -13,10 +17,8 @@ import (
 type VerifiableProject struct {
 	gps.LockedProject
 	PruneOpts gps.PruneOptions
-	Digest    pkgtree.VersionedDigest
+	Digest    VersionedDigest
 }
-
-type LockDiff struct{}
 
 type lockUnsatisfy uint8
 
