@@ -7,7 +7,6 @@ package dep
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -580,26 +579,41 @@ func NewDeltaWriter(oldLock, newLock *Lock, prune gps.CascadingPruneOptions, ven
 func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, logger *log.Logger) error {
 	// TODO(sdboyer) remove path from the signature for this
 	if path != filepath.Dir(dw.vendorDir) {
-		return fmt.Errorf("target path (%q) must be the parent of the original vendor path (%q)", path, dw.vendorDir)
+		return errors.Errorf("target path (%q) must be the parent of the original vendor path (%q)", path, dw.vendorDir)
 	}
 
-	lpath := filepath.Join(filepath.Dir(path), LockName)
-	vpath := filepath.Join(path, "vendor")
+	lpath := filepath.Join(path, LockName)
+	vpath := dw.vendorDir
 
-	// Write out all the deltas
+	// Write the modified projects to a new adjacent directory. We use an
+	// adjacent directory to minimize the possibility of cross-filesystem renames
+	// becoming expensive copies, and to make removal of unneeded projects implicit
+	// and automatic.
+	vnewpath := vpath + ".new"
+	if _, err := os.Stat(vnewpath); err == nil {
+		return errors.Errorf("scratch directory %s already exists", vnewpath)
+	}
+	err := os.MkdirAll(vnewpath, os.FileMode(0777))
+	if err != nil {
+		return errors.Wrapf(err, "error while creating scratch directory at %s", vnewpath)
+	}
+
+	// Write out all the deltas to the newpath
 	projs := make(map[gps.ProjectRoot]gps.LockedProject)
 	for _, lp := range dw.lock.Projects() {
 		projs[lp.Ident().ProjectRoot] = lp
 	}
 
+	// TODO(sdboyer) add a txn/rollback layer, like the safewriter?
 	//for pr, reason := range dw.changed {
 	for pr, _ := range dw.changed {
-		to := filepath.FromSlash(filepath.Join(vpath, string(pr)))
+		to := filepath.FromSlash(filepath.Join(vnewpath, string(pr)))
 		po := dw.pruneOptions.PruneOptionsFor(pr)
-		err := sm.ExportPrunedProject(context.TODO(), projs[pr], po, to)
-		if err != nil {
+
+		if err := sm.ExportPrunedProject(context.TODO(), projs[pr], po, to); err != nil {
 			return errors.Wrapf(err, "failed to export %s", pr)
 		}
+
 		digest, err := pkgtree.DigestFromDirectory(to)
 		if err != nil {
 			return errors.Wrapf(err, "failed to hash %s", pr)
@@ -617,24 +631,41 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 		}
 	}
 
-	// Write out the lock last, now that it's updated with digests
+	// Changed projects are fully populated. Now, iterate over the lock's
+	// projects and move any remaining ones not in the changed list to vnewpath.
+	for _, lp := range dw.lock.Projects() {
+		pr := lp.Ident().ProjectRoot
+		tgt := filepath.Join(vnewpath, string(pr))
+		err := os.MkdirAll(filepath.Dir(tgt), os.FileMode(0777))
+		if err != nil {
+			return errors.Wrapf(err, "error creating parent directory in vendor for %s", tgt)
+		}
+
+		if _, has := dw.changed[pr]; !has {
+			err = fs.RenameWithFallback(filepath.Join(vpath, string(pr)), tgt)
+			if err != nil {
+				return errors.Wrapf(err, "error moving unchanged project %s into scratch vendor dir", pr)
+			}
+		}
+	}
+
+	err = os.RemoveAll(vpath)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove original vendor directory")
+	}
+	err = fs.RenameWithFallback(vnewpath, vpath)
+	if err != nil {
+		return errors.Wrap(err, "failed to put new vendor directory into place")
+	}
+
+	// Write out the lock last, now that it's fully updated with digests.
 	l, err := dw.lock.MarshalTOML()
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal lock to TOML")
 	}
 
 	if err = ioutil.WriteFile(lpath, append(lockFileComment, l...), 0666); err != nil {
-		return errors.Wrap(err, "failed to write lock file to temp dir")
-	}
-
-	// Remove all the now-unnecessary bits from vendor.
-	for path, vs := range dw.status {
-		if vs == pkgtree.NotInLock {
-			err = os.RemoveAll(path)
-			if err != nil {
-				return errors.Wrapf(err, "vendor state may be inconsistent, could not remove %s", path)
-			}
-		}
+		return errors.Wrap(err, "failed to write new lock file")
 	}
 
 	return nil
