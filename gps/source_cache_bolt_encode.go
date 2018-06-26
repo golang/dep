@@ -6,6 +6,7 @@ package gps
 
 import (
 	"encoding/binary"
+	"strings"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -17,19 +18,19 @@ import (
 )
 
 var (
-	cacheKeyComment    = []byte("c")
-	cacheKeyConstraint = cacheKeyComment
-	cacheKeyError      = []byte("e")
-	cacheKeyHash       = []byte("h")
-	cacheKeyIgnored    = []byte("i")
-	cacheKeyImport     = cacheKeyIgnored
-	cacheKeyLock       = []byte("l")
-	cacheKeyName       = []byte("n")
-	cacheKeyOverride   = []byte("o")
-	cacheKeyPTree      = []byte("p")
-	cacheKeyRequired   = []byte("r")
-	cacheKeyRevision   = cacheKeyRequired
-	cacheKeyTestImport = []byte("t")
+	cacheKeyComment      = []byte("c")
+	cacheKeyConstraint   = cacheKeyComment
+	cacheKeyError        = []byte("e")
+	cacheKeyInputImports = []byte("m")
+	cacheKeyIgnored      = []byte("i")
+	cacheKeyImport       = cacheKeyIgnored
+	cacheKeyLock         = []byte("l")
+	cacheKeyName         = []byte("n")
+	cacheKeyOverride     = []byte("o")
+	cacheKeyPTree        = []byte("p")
+	cacheKeyRequired     = []byte("r")
+	cacheKeyRevision     = cacheKeyRequired
+	cacheKeyTestImport   = []byte("t")
 
 	cacheRevision = byte('r')
 	cacheVersion  = byte('v')
@@ -306,10 +307,11 @@ func lockedProjectFromCache(m *pb.LockedProject) (LockedProject, error) {
 
 // cachePutLock stores the Lock as fields in the bolt.Bucket.
 func cachePutLock(b *bolt.Bucket, l Lock) error {
-	// InputHash
-	if v := l.InputsDigest(); len(v) > 0 {
-		if err := b.Put(cacheKeyHash, v); err != nil {
-			return errors.Wrap(err, "failed to put hash")
+	// Input imports, if present.
+	if lwp, ok := l.(LockWithImports); ok && len(lwp.InputImports()) > 0 {
+		byt := []byte(strings.Join(lwp.InputImports(), "#"))
+		if err := b.Put(cacheKeyInputImports, byt); err != nil {
+			return errors.Wrap(err, "failed to put input imports")
 		}
 	}
 
@@ -341,8 +343,9 @@ func cachePutLock(b *bolt.Bucket, l Lock) error {
 // cacheGetLock returns a new *safeLock with the fields retrieved from the bolt.Bucket.
 func cacheGetLock(b *bolt.Bucket) (*safeLock, error) {
 	l := &safeLock{
-		h: b.Get(cacheKeyHash),
+		i: strings.Split(string(b.Get(cacheKeyInputImports)), "#"),
 	}
+
 	if locked := b.Bucket(cacheKeyLock); locked != nil {
 		var msg pb.LockedProject
 		err := locked.ForEach(func(_, v []byte) error {

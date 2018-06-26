@@ -1560,21 +1560,11 @@ func (ds depspec) DependencyConstraints() ProjectConstraints {
 type fixLock []LockedProject
 
 // impl Lock interface
-func (fixLock) InputsDigest() []byte {
-	return []byte("fooooorooooofooorooofoo")
-}
-
-// impl Lock interface
 func (l fixLock) Projects() []LockedProject {
 	return l
 }
 
 type dummyLock struct{}
-
-// impl Lock interface
-func (dummyLock) InputsDigest() []byte {
-	return []byte("fooooorooooofooorooofoo")
-}
 
 // impl Lock interface
 func (dummyLock) Projects() []LockedProject {

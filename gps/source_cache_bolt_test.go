@@ -53,7 +53,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 	}
 
 	lock := &safeLock{
-		h: []byte("test_hash"),
+		//h: []byte("test_hash"),
 		p: []LockedProject{
 			NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
 			NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.10.0"), nil),
@@ -233,7 +233,7 @@ func TestBoltCacheTimeout(t *testing.T) {
 	}
 
 	newLock := &safeLock{
-		h: []byte("new_test_hash"),
+		//h: []byte("new_test_hash"),
 		p: []LockedProject{
 			NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v1"), []string{"gps"}),
 		},

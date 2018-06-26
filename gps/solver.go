@@ -323,14 +323,6 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 // a "lock file" - and/or use it to write out a directory tree of dependencies,
 // suitable to be a vendor directory, via CreateVendorTree.
 type Solver interface {
-	// HashInputs hashes the unique inputs to this solver, returning the hash
-	// digest. It is guaranteed that, if the resulting digest is equal to the
-	// digest returned from a previous Solution.InputHash(), that that Solution
-	// is valid for this Solver's inputs.
-	//
-	// In such a case, it may not be necessary to run Solve() at all.
-	HashInputs() []byte
-
 	// Solve initiates a solving run. It will either abort due to a canceled
 	// Context, complete successfully with a Solution, or fail with an
 	// informative error.
@@ -455,7 +447,7 @@ func (s *solver) Solve(ctx context.Context) (Solution, error) {
 			solv: s,
 		}
 		soln.analyzerInfo = s.rd.an.Info()
-		soln.hd = s.HashInputs()
+		soln.i = s.rd.externalImportList(s.stdLibFn)
 
 		// Convert ProjectAtoms into LockedProjects
 		soln.p = make([]LockedProject, len(all))

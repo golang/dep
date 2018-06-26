@@ -5,7 +5,6 @@
 package gps
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 )
@@ -18,35 +17,21 @@ import (
 // solution is all that would be necessary to constitute a lock file, though
 // tools can include whatever other information they want in their storage.
 type Lock interface {
-	// The hash digest of inputs to gps that resulted in this lock data.
-	InputsDigest() []byte
-
 	// Projects returns the list of LockedProjects contained in the lock data.
 	Projects() []LockedProject
 }
 
-// LocksAreEq checks if two locks are equivalent. This checks that
-// all contained LockedProjects are equal, and optionally (if `checkHash` is
-// true) whether the locks' input hashes are equal.
-func LocksAreEq(l1, l2 Lock, checkHash bool) bool {
-	// Cheapest ops first
-	if checkHash && !bytes.Equal(l1.InputsDigest(), l2.InputsDigest()) {
-		return false
-	}
-
-	p1, p2 := l1.Projects(), l2.Projects()
-	if len(p1) != len(p2) {
-		return false
-	}
-
-	p1, p2 = sortLockedProjects(p1), sortLockedProjects(p2)
-
-	for k, lp := range p1 {
-		if !lp.Eq(p2[k]) {
-			return false
-		}
-	}
-	return true
+// LockWithImports composes Lock to also add a method that reports all the
+// imports that were present when generating the Lock.
+//
+// This information can be rederived, but it requires doing whole-graph
+// analysis; tracking the information separately makes verification tasks
+// easier, especially determining if an input import has been removed.
+type LockWithImports interface {
+	Lock
+	// The set of imports (and required statements) that were the inputs that
+	// generated this Lock.
+	InputImports() []string
 }
 
 // sortLockedProjects returns a sorted copy of lps, or itself if already sorted.
@@ -85,17 +70,10 @@ type lockedProject struct {
 }
 
 // SimpleLock is a helper for tools to easily describe lock data when they know
-// that no hash, or other complex information, is available.
+// that input imports are unavailable.
 type SimpleLock []LockedProject
 
 var _ Lock = SimpleLock{}
-
-// InputsDigest always returns an empty string for SimpleLock. This makes it useless
-// as a stable lock to be written to disk, but still useful for some ephemeral
-// purposes.
-func (SimpleLock) InputsDigest() []byte {
-	return nil
-}
 
 // Projects returns the entire contents of the SimpleLock.
 func (l SimpleLock) Projects() []LockedProject {
@@ -229,12 +207,12 @@ func (lp lockedProject) String() string {
 }
 
 type safeLock struct {
-	h []byte
 	p []LockedProject
+	i []string
 }
 
-func (sl safeLock) InputsDigest() []byte {
-	return sl.h
+func (sl safeLock) InputImports() []string {
+	return sl.i
 }
 
 func (sl safeLock) Projects() []LockedProject {
@@ -250,10 +228,14 @@ func prepLock(l Lock) safeLock {
 	pl := l.Projects()
 
 	rl := safeLock{
-		h: l.InputsDigest(),
 		p: make([]LockedProject, len(pl)),
 	}
 	copy(rl.p, pl)
+
+	if lwi, ok := l.(LockWithImports); ok {
+		rl.i = make([]string, len(lwi.InputImports()))
+		copy(rl.i, lwi.InputImports())
+	}
 
 	return rl
 }

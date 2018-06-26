@@ -116,7 +116,7 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			ig: pkgtree.NewIgnoredRuleset([]string{"a", "b"}),
 		}
 		var l Lock = &safeLock{
-			h: []byte("test_hash"),
+			//h: []byte("test_hash"),
 			p: []LockedProject{
 				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
 				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.10.0"), nil),
@@ -163,7 +163,7 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			ig: pkgtree.NewIgnoredRuleset([]string{"c", "d"}),
 		}
 		l = &safeLock{
-			h: []byte("different_test_hash"),
+			//h: []byte("different_test_hash"),
 			p: []LockedProject{
 				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.11.0"), []string{"gps"}),

@@ -6,7 +6,6 @@ package gps
 
 import (
 	"bytes"
-	"encoding/hex"
 	"testing"
 )
 
@@ -194,13 +193,13 @@ func TestDiffProjects_RemovePackages(t *testing.T) {
 
 func TestDiffLocks_NoChange(t *testing.T) {
 	l1 := safeLock{
-		h: []byte("abc123"),
+		//h: []byte("abc123"),
 		p: []LockedProject{
 			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
 		},
 	}
 	l2 := safeLock{
-		h: []byte("abc123"),
+		//h: []byte("abc123"),
 		p: []LockedProject{
 			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
 		},
@@ -214,13 +213,13 @@ func TestDiffLocks_NoChange(t *testing.T) {
 
 func TestDiffLocks_AddProjects(t *testing.T) {
 	l1 := safeLock{
-		h: []byte("abc123"),
+		//h: []byte("abc123"),
 		p: []LockedProject{
 			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
 		},
 	}
 	l2 := safeLock{
-		h: []byte("abc123"),
+		//h: []byte("abc123"),
 		p: []LockedProject{
 			lockedProject{
 				pi:   ProjectIdentifier{ProjectRoot: "github.com/baz/qux", Source: "https://github.com/mcfork/bazqux.git"},
@@ -298,7 +297,7 @@ func TestDiffLocks_AddProjects(t *testing.T) {
 
 func TestDiffLocks_RemoveProjects(t *testing.T) {
 	l1 := safeLock{
-		h: []byte("abc123"),
+		//h: []byte("abc123"),
 		p: []LockedProject{
 			lockedProject{
 				pi:   ProjectIdentifier{ProjectRoot: "github.com/a/thing", Source: "https://github.com/mcfork/athing.git"},
@@ -310,7 +309,7 @@ func TestDiffLocks_RemoveProjects(t *testing.T) {
 		},
 	}
 	l2 := safeLock{
-		h: []byte("abc123"),
+		//h: []byte("abc123"),
 		p: []LockedProject{
 			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/baz/qux"}, v: NewVersion("v1.0.0")},
 		},
@@ -381,7 +380,7 @@ func TestDiffLocks_RemoveProjects(t *testing.T) {
 
 func TestDiffLocks_ModifyProjects(t *testing.T) {
 	l1 := safeLock{
-		h: []byte("abc123"),
+		//h: []byte("abc123"),
 		p: []LockedProject{
 			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
 			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bu"}, v: NewVersion("v1.0.0")},
@@ -389,7 +388,7 @@ func TestDiffLocks_ModifyProjects(t *testing.T) {
 		},
 	}
 	l2 := safeLock{
-		h: []byte("abc123"),
+		//h: []byte("abc123"),
 		p: []LockedProject{
 			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/baz/qux"}, v: NewVersion("v1.0.0")},
 			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v2.0.0")},
@@ -435,9 +434,8 @@ func TestDiffLocks_EmptyInitialLock(t *testing.T) {
 }
 
 func TestDiffLocks_EmptyFinalLock(t *testing.T) {
-	h1, _ := hex.DecodeString("abc123")
 	l1 := safeLock{
-		h: h1,
+		//h: h1,
 		p: []LockedProject{
 			lockedProject{pi: ProjectIdentifier{ProjectRoot: "github.com/foo/bar"}, v: NewVersion("v1.0.0")},
 		},

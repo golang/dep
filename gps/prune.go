@@ -82,14 +82,14 @@ func ParsePruneOptions(input string) (PruneOptions, error) {
 func (po PruneOptions) String() string {
 	var buf bytes.Buffer
 
-	if po&PruneGoTestFiles != 0 {
-		fmt.Fprintf(&buf, "T")
+	if po&PruneNonGoFiles != 0 {
+		fmt.Fprintf(&buf, "N")
 	}
 	if po&PruneUnusedPackages != 0 {
 		fmt.Fprintf(&buf, "U")
 	}
-	if po&PruneNonGoFiles != 0 {
-		fmt.Fprintf(&buf, "N")
+	if po&PruneGoTestFiles != 0 {
+		fmt.Fprintf(&buf, "T")
 	}
 	if po&PruneNestedVendorDirs != 0 {
 		fmt.Fprintf(&buf, "V")
