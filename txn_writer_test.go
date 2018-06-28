@@ -501,39 +501,6 @@ func TestSafeWriter_NewLockSkipVendor(t *testing.T) {
 	}
 }
 
-func TestSafeWriter_DiffLocks(t *testing.T) {
-	test.NeedsExternalNetwork(t)
-	test.NeedsGit(t)
-
-	h := test.NewHelper(t)
-	defer h.Cleanup()
-
-	pc := NewTestProjectContext(h, safeWriterProject)
-	defer pc.Release()
-	pc.CopyFile(LockName, "txn_writer/original_lock.toml")
-	pc.Load()
-
-	ulf := h.GetTestFile("txn_writer/updated_lock.toml")
-	defer ulf.Close()
-	updatedLock, err := readLock(ulf)
-	h.Must(err)
-
-	sw, _ := NewSafeWriter(nil, pc.Project.Lock, updatedLock, VendorOnChanged, defaultCascadingPruneOptions())
-
-	// Verify lock diff
-	diff := sw.lockDiff
-	if diff == nil {
-		t.Fatal("Expected the payload to contain a diff of the lock files")
-	}
-
-	output, err := formatLockDiff(*diff)
-	h.Must(err)
-	goldenOutput := "txn_writer/expected_diff_output.txt"
-	if err = pc.ShouldMatchGolden(goldenOutput, output); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestHasDotGit(t *testing.T) {
 	// Create a tempdir with .git file
 	td, err := ioutil.TempDir(os.TempDir(), "dotGitFile")

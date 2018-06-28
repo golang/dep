@@ -68,10 +68,10 @@ type LockDiff struct {
 	Modify []LockedProjectDiff
 }
 
-type LockDiff2 struct {
+type LockDelta struct {
 	AddedImportInputs   []string
 	RemovedImportInputs []string
-	ProjectDiffs        map[gps.ProjectRoot]LockedProjectDiff2
+	ProjectDeltas       map[gps.ProjectRoot]LockedProjectDelta
 }
 
 // LockedProjectDiff contains the before and after snapshot of a project reference.
@@ -85,13 +85,13 @@ type LockedProjectDiff struct {
 	Packages []StringDiff
 }
 
-type LockedProjectDiff2 struct {
+type LockedProjectDelta struct {
 	Name                         gps.ProjectRoot
 	ProjectRemoved, ProjectAdded bool
-	LockedProjectPartsDiff
+	LockedProjectPartsDelta
 }
 
-type LockedProjectPartsDiff struct {
+type LockedProjectPartsDelta struct {
 	PackagesAdded, PackagesRemoved  []string
 	VersionBefore, VersionAfter     gps.UnpairedVersion
 	RevisionBefore, RevisionAfter   gps.Revision
@@ -100,13 +100,13 @@ type LockedProjectPartsDiff struct {
 	HashChanged, HashVersionChanged bool
 }
 
-// DiffLocks compares two locks and identifies the differences between them.
-// Returns nil if there are no differences.
-func DiffLocks2(l1, l2 gps.Lock) LockDiff2 {
+// DiffLocks2 compares two locks and computes a semantically rich delta between
+// them.
+func DiffLocks2(l1, l2 gps.Lock) LockDelta {
 	// Default nil locks to empty locks, so that we can still generate a diff
 	if l1 == nil {
 		if l2 == nil {
-			return LockDiff2{}
+			return LockDelta{}
 		}
 		l1 = gps.SimpleLock{}
 	}
@@ -119,8 +119,8 @@ func DiffLocks2(l1, l2 gps.Lock) LockDiff2 {
 	p1 = sortLockedProjects(p1)
 	p2 = sortLockedProjects(p2)
 
-	diff := LockDiff2{
-		ProjectDiffs: make(map[gps.ProjectRoot]LockedProjectDiff2),
+	diff := LockDelta{
+		ProjectDeltas: make(map[gps.ProjectRoot]LockedProjectDelta),
 	}
 
 	var i2next int
@@ -128,7 +128,7 @@ func DiffLocks2(l1, l2 gps.Lock) LockDiff2 {
 		lp1 := p1[i1]
 		pr1 := lp1.Ident().ProjectRoot
 
-		lpd := LockedProjectDiff2{
+		lpd := LockedProjectDelta{
 			Name: pr1,
 		}
 
@@ -138,10 +138,10 @@ func DiffLocks2(l1, l2 gps.Lock) LockDiff2 {
 
 			switch strings.Compare(string(pr1), string(pr2)) {
 			case 0: // Found a matching project
-				lpd.LockedProjectPartsDiff = DiffProjects2(lp1, lp2)
+				lpd.LockedProjectPartsDelta = DiffProjects2(lp1, lp2)
 				i2next = i2 + 1 // Don't visit this project again
 			case +1: // Found a new project
-				diff.ProjectDiffs[pr2] = LockedProjectDiff2{
+				diff.ProjectDeltas[pr2] = LockedProjectDelta{
 					Name:         pr2,
 					ProjectAdded: true,
 				}
@@ -154,14 +154,14 @@ func DiffLocks2(l1, l2 gps.Lock) LockDiff2 {
 			break // Done evaluating this project, move onto the next
 		}
 
-		diff.ProjectDiffs[pr1] = lpd
+		diff.ProjectDeltas[pr1] = lpd
 	}
 
 	// Anything that still hasn't been evaluated are adds
 	for i2 := i2next; i2 < len(p2); i2++ {
 		lp2 := p2[i2]
 		pr2 := lp2.Ident().ProjectRoot
-		diff.ProjectDiffs[pr2] = LockedProjectDiff2{
+		diff.ProjectDeltas[pr2] = LockedProjectDelta{
 			Name:         pr2,
 			ProjectAdded: true,
 		}
@@ -205,8 +205,8 @@ func findAddedAndRemoved(l1, l2 []string) (add, remove []string) {
 	return add, remove
 }
 
-func DiffProjects2(lp1, lp2 gps.LockedProject) LockedProjectPartsDiff {
-	ld := LockedProjectPartsDiff{
+func DiffProjects2(lp1, lp2 gps.LockedProject) LockedProjectPartsDelta {
+	ld := LockedProjectPartsDelta{
 		SourceBefore: lp1.Ident().Source,
 		SourceAfter:  lp2.Ident().Source,
 	}
@@ -239,27 +239,48 @@ func DiffProjects2(lp1, lp2 gps.LockedProject) LockedProjectPartsDiff {
 	if ok1 && ok2 {
 		ld.PruneOptsBefore, ld.PruneOptsAfter = vp1.PruneOpts, vp2.PruneOpts
 
-		// Only consider hashes for diffing if neither were the zero value.
-		if !vp1.Digest.IsEmpty() && !vp2.Digest.IsEmpty() {
-			if vp1.Digest.HashVersion != vp2.Digest.HashVersion {
-				ld.HashVersionChanged = true
-			}
-			if !bytes.Equal(vp1.Digest.Digest, vp2.Digest.Digest) {
-				ld.HashChanged = true
-			}
+		if vp1.Digest.HashVersion != vp2.Digest.HashVersion {
+			ld.HashVersionChanged = true
 		}
+		if !bytes.Equal(vp1.Digest.Digest, vp2.Digest.Digest) {
+			ld.HashChanged = true
+		}
+	} else if ok1 {
+		ld.PruneOptsBefore = vp1.PruneOpts
+		ld.HashVersionChanged = true
+		ld.HashChanged = true
+	} else if ok2 {
+		ld.PruneOptsAfter = vp2.PruneOpts
+		ld.HashVersionChanged = true
+		ld.HashChanged = true
 	}
 
 	return ld
 }
 
-func (ld LockDiff2) Changed() bool {
-	if len(ld.AddedImportInputs) > 0 || len(ld.RemovedImportInputs) > 0 {
+type DeltaDimension uint16
+
+const (
+	InputImportsChanged DeltaDimension = 1 << iota
+	ProjectAdded
+	ProjectRemoved
+	SourceChanged
+	VersionChanged
+	RevisionChanged
+	PackagesChanged
+	PruneOptsChanged
+	HashVersionChanged
+	HashChanged
+	AnyChanged = (1 << iota) - 1
+)
+
+func (ld LockDelta) Changed(flags DeltaDimension) bool {
+	if flags&InputImportsChanged != 0 && (len(ld.AddedImportInputs) > 0 || len(ld.RemovedImportInputs) > 0) {
 		return true
 	}
 
-	for _, ld := range ld.ProjectDiffs {
-		if ld.Changed() {
+	for _, ld := range ld.ProjectDeltas {
+		if ld.Changed(AnyChanged) {
 			return true
 		}
 	}
@@ -267,23 +288,69 @@ func (ld LockDiff2) Changed() bool {
 	return false
 }
 
-func (ld LockedProjectDiff2) Changed() bool {
-	return ld.WasRemoved() || ld.WasAdded() || ld.RevisionChanged() || ld.VersionChanged() || ld.SourceChanged() || ld.PackagesChanged() || ld.HashChanged || ld.HashVersionChanged
+// Changed indicates whether the delta contains a change along the dimensions
+// with their corresponding bits set.
+//
+// For example, if only the Revision changed, and this method is called with
+// SourceChanged | VersionChanged, it will return false; if it is called with
+// VersionChanged | RevisionChanged, it will return true.
+func (ld LockedProjectDelta) Changed(flags DeltaDimension) bool {
+	if flags&ProjectAdded != 0 && ld.WasAdded() {
+		return true
+	}
+
+	if flags&ProjectRemoved != 0 && ld.WasRemoved() {
+		return true
+	}
+
+	return ld.LockedProjectPartsDelta.Changed(flags & ^ProjectAdded & ^ProjectRemoved)
 }
 
-func (ld LockedProjectDiff2) WasRemoved() bool {
+func (ld LockedProjectDelta) WasRemoved() bool {
 	return ld.ProjectRemoved
 }
 
-func (ld LockedProjectDiff2) WasAdded() bool {
+func (ld LockedProjectDelta) WasAdded() bool {
 	return ld.ProjectAdded
 }
 
-func (ld LockedProjectPartsDiff) SourceChanged() bool {
+func (ld LockedProjectPartsDelta) Changed(flags DeltaDimension) bool {
+	if flags&SourceChanged != 0 && ld.SourceChanged() {
+		return true
+	}
+
+	if flags&RevisionChanged != 0 && ld.RevisionChanged() {
+		return true
+	}
+
+	if flags&PruneOptsChanged != 0 && ld.PruneOptsChanged() {
+		return true
+	}
+
+	if flags&HashChanged != 0 && ld.HashChanged {
+		return true
+	}
+
+	if flags&HashVersionChanged != 0 && ld.HashVersionChanged {
+		return true
+	}
+
+	if flags&VersionChanged != 0 && ld.VersionChanged() {
+		return true
+	}
+
+	if flags&PackagesChanged != 0 && ld.PackagesChanged() {
+		return true
+	}
+
+	return false
+}
+
+func (ld LockedProjectPartsDelta) SourceChanged() bool {
 	return ld.SourceBefore != ld.SourceAfter
 }
 
-func (ld LockedProjectPartsDiff) VersionChanged() bool {
+func (ld LockedProjectPartsDelta) VersionChanged() bool {
 	if ld.VersionBefore == nil && ld.VersionAfter == nil {
 		return false
 	} else if (ld.VersionBefore == nil || ld.VersionAfter == nil) || (ld.VersionBefore.Type() != ld.VersionAfter.Type()) {
@@ -295,7 +362,7 @@ func (ld LockedProjectPartsDiff) VersionChanged() bool {
 	return false
 }
 
-func (ld LockedProjectPartsDiff) VersionTypeChanged() bool {
+func (ld LockedProjectPartsDelta) VersionTypeChanged() bool {
 	if ld.VersionBefore == nil && ld.VersionAfter == nil {
 		return false
 	} else if (ld.VersionBefore == nil || ld.VersionAfter == nil) || (ld.VersionBefore.Type() != ld.VersionAfter.Type()) {
@@ -305,15 +372,15 @@ func (ld LockedProjectPartsDiff) VersionTypeChanged() bool {
 	return false
 }
 
-func (ld LockedProjectPartsDiff) RevisionChanged() bool {
+func (ld LockedProjectPartsDelta) RevisionChanged() bool {
 	return ld.RevisionBefore != ld.RevisionAfter
 }
 
-func (ld LockedProjectPartsDiff) PackagesChanged() bool {
+func (ld LockedProjectPartsDelta) PackagesChanged() bool {
 	return len(ld.PackagesAdded) > 0 || len(ld.PackagesRemoved) > 0
 }
 
-func (ld LockedProjectPartsDiff) PruneOptsChanged() bool {
+func (ld LockedProjectPartsDelta) PruneOptsChanged() bool {
 	return ld.PruneOptsBefore != ld.PruneOptsAfter
 }
 
@@ -517,4 +584,9 @@ func DiffProjects(lp1, lp2 gps.LockedProject) *LockedProjectDiff {
 		return nil // The projects are equivalent
 	}
 	return &diff
+}
+
+type VendorDiff struct {
+	LockDelta    LockDelta
+	VendorStatus map[string]VendorStatus
 }

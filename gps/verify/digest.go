@@ -294,7 +294,7 @@ const (
 
 	// EmptyDigestInLock is used when the digest for a dependency listed in the
 	// lock file is the empty string. While this is a special case of
-	// DigestMismatchInLock, keeping both cases discrete is a desired feature.
+	// DigestMismatchInLock, separating the cases is a desired feature.
 	EmptyDigestInLock
 
 	// DigestMismatchInLock is used when the digest for a dependency listed in

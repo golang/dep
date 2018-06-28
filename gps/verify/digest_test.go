@@ -152,15 +152,6 @@ func TestVerifyDepTree(t *testing.T) {
 		"launchpad.net/match": {0x7e, 0x10, 0x6, 0x2f, 0x8, 0x3, 0x3c, 0x76, 0xae, 0xbc, 0xa4, 0xc9, 0xec, 0x73, 0x67, 0x15, 0x70, 0x2b, 0x0, 0x89, 0x27, 0xbb, 0x61, 0x9d, 0xc7, 0xc3, 0x39, 0x46, 0x3, 0x91, 0xb7, 0x3b},
 	}
 
-	status, err := VerifyDepTree(vendorRoot, wantSums)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if got, want := len(status), 7; got != want {
-		t.Errorf("\n(GOT): %v; (WNT): %v", got, want)
-	}
-
 	checkStatus := func(t *testing.T, status map[string]VendorStatus, key string, want VendorStatus) {
 		got, ok := status[key]
 		if !ok {
@@ -172,25 +163,74 @@ func TestVerifyDepTree(t *testing.T) {
 		}
 	}
 
-	checkStatus(t, status, "github.com/alice/match", NoMismatch)
-	checkStatus(t, status, "github.com/alice/mismatch", DigestMismatchInLock)
-	checkStatus(t, status, "github.com/alice/notInLock", NotInLock)
-	checkStatus(t, status, "github.com/bob/match", NoMismatch)
-	checkStatus(t, status, "github.com/bob/emptyDigest", EmptyDigestInLock)
-	checkStatus(t, status, "github.com/charlie/notInTree", NotInTree)
-	checkStatus(t, status, "launchpad.net/match", NoMismatch)
-
-	if t.Failed() {
-		for k, want := range wantSums {
-			got, err := DigestFromDirectory(filepath.Join(vendorRoot, k))
-			if err != nil {
-				t.Error(err)
-			}
-			if !bytes.Equal(got.Digest, want) {
-				t.Errorf("%q\n(GOT):\n\t%#v\n(WNT):\n\t%#v", k, got, want)
+	t.Run("normal", func(t *testing.T) {
+		t.Parallel()
+		wantDigests := make(map[string]VersionedDigest)
+		for k, v := range wantSums {
+			wantDigests[k] = VersionedDigest{
+				HashVersion: HashVersion,
+				Digest:      v,
 			}
 		}
-	}
+
+		status, err := VerifyDepTree(vendorRoot, wantDigests)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got, want := len(status), 7; got != want {
+			t.Errorf("Unexpected result count from VerifyDepTree:\n\t(GOT): %v\n\t(WNT): %v", got, want)
+		}
+
+		checkStatus(t, status, "github.com/alice/match", NoMismatch)
+		checkStatus(t, status, "github.com/alice/mismatch", DigestMismatchInLock)
+		checkStatus(t, status, "github.com/alice/notInLock", NotInLock)
+		checkStatus(t, status, "github.com/bob/match", NoMismatch)
+		checkStatus(t, status, "github.com/bob/emptyDigest", EmptyDigestInLock)
+		checkStatus(t, status, "github.com/charlie/notInTree", NotInTree)
+		checkStatus(t, status, "launchpad.net/match", NoMismatch)
+
+		if t.Failed() {
+			for k, want := range wantSums {
+				got, err := DigestFromDirectory(filepath.Join(vendorRoot, k))
+				if err != nil {
+					t.Error(err)
+				}
+				if !bytes.Equal(got.Digest, want) {
+					t.Errorf("Digest mismatch for %q\n(GOT):\n\t%#v\n(WNT):\n\t%#v", k, got, want)
+				}
+			}
+		}
+
+	})
+
+	t.Run("hashv-mismatch", func(t *testing.T) {
+		t.Parallel()
+		wantDigests := make(map[string]VersionedDigest)
+		for k, v := range wantSums {
+			wantDigests[k] = VersionedDigest{
+				HashVersion: HashVersion + 1,
+				Digest:      v,
+			}
+		}
+
+		status, err := VerifyDepTree(vendorRoot, wantDigests)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got, want := len(status), 7; got != want {
+			t.Errorf("Unexpected result count from VerifyDepTree:\n\t(GOT): %v\n\t(WNT): %v", got, want)
+		}
+
+		checkStatus(t, status, "github.com/alice/match", HashVersionMismatch)
+		checkStatus(t, status, "github.com/alice/mismatch", HashVersionMismatch)
+		checkStatus(t, status, "github.com/alice/notInLock", NotInLock)
+		checkStatus(t, status, "github.com/bob/match", HashVersionMismatch)
+		checkStatus(t, status, "github.com/bob/emptyDigest", HashVersionMismatch)
+		checkStatus(t, status, "github.com/charlie/notInTree", NotInTree)
+		checkStatus(t, status, "launchpad.net/match", HashVersionMismatch)
+	})
 }
 
 func BenchmarkDigestFromDirectory(b *testing.B) {
