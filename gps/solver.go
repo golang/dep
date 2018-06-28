@@ -450,11 +450,16 @@ func (s *solver) Solve(ctx context.Context) (Solution, error) {
 		soln.i = s.rd.externalImportList(s.stdLibFn)
 
 		// Convert ProjectAtoms into LockedProjects
-		soln.p = make([]LockedProject, len(all))
-		k := 0
+		soln.p = make([]LockedProject, 0, len(all))
 		for pa, pl := range all {
-			soln.p[k] = pa2lp(pa, pl)
-			k++
+			lp := pa2lp(pa, pl)
+			// Pass back the original inputlp directly if it Eqs what was
+			// selected.
+			if inputlp, has := s.rd.rlm[lp.Ident().ProjectRoot]; has && lp.Eq(inputlp) {
+				lp = inputlp
+			}
+
+			soln.p = append(soln.p, lp)
 		}
 	}
 

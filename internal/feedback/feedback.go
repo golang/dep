@@ -10,6 +10,7 @@ import (
 	"log"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/verify"
 )
 
 const (
@@ -87,7 +88,7 @@ type brokenImport interface {
 }
 
 type modifiedImport struct {
-	source, branch, revision, version *gps.StringDiff
+	source, branch, revision, version *verify.StringDiff
 	projectPath                       string
 }
 
@@ -123,7 +124,7 @@ func (mi modifiedImport) String() string {
 }
 
 type removedImport struct {
-	source, branch, revision, version *gps.StringDiff
+	source, branch, revision, version *verify.StringDiff
 	projectPath                       string
 }
 
@@ -157,7 +158,7 @@ type BrokenImportFeedback struct {
 
 // NewBrokenImportFeedback builds a feedback entry that compares an initially
 // imported, unsolved lock to the same lock after it has been solved.
-func NewBrokenImportFeedback(ld *gps.LockDiff) *BrokenImportFeedback {
+func NewBrokenImportFeedback(ld *verify.LockDiff) *BrokenImportFeedback {
 	bi := &BrokenImportFeedback{}
 	for _, lpd := range ld.Modify {
 		// Ignore diffs where it's just a modified package set

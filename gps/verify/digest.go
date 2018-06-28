@@ -347,6 +347,11 @@ func (vd VersionedDigest) String() string {
 	return fmt.Sprintf("%s:%s", strconv.Itoa(vd.HashVersion), hex.EncodeToString(vd.Digest))
 }
 
+// IsEmpty indicates if the VersionedDigest is the zero value.
+func (vd VersionedDigest) IsEmpty() bool {
+	return vd.HashVersion == 0 && len(vd.Digest) == 0
+}
+
 // ParseVersionedDigest decodes the string representation of versioned digest
 // information - a colon-separated string with a version number in the first
 // part and the hex-encdoed hash digest in the second - as a VersionedDigest.
@@ -378,7 +383,7 @@ func ParseVersionedDigest(input string) (VersionedDigest, error) {
 // platform where the file system path separator is a character other than
 // solidus, one particular dependency would be represented as
 // "github.com/alice/alice1".
-func VerifyDepTree(osDirname string, wantDigests map[string][]byte) (map[string]VendorStatus, error) {
+func VerifyDepTree(osDirname string, wantDigests map[string]VersionedDigest) (map[string]VendorStatus, error) {
 	osDirname = filepath.Clean(osDirname)
 
 	// Ensure top level pathname is a directory
@@ -455,12 +460,14 @@ func VerifyDepTree(osDirname string, wantDigests map[string][]byte) (map[string]
 
 		if expectedSum, ok := wantDigests[slashPathname]; ok {
 			ls := EmptyDigestInLock
-			if len(expectedSum) > 0 {
+			if expectedSum.HashVersion != HashVersion {
+				ls = HashVersionMismatch
+			} else if len(expectedSum.Digest) > 0 {
 				projectSum, err := DigestFromDirectory(osPathname)
 				if err != nil {
 					return nil, errors.Wrap(err, "cannot compute dependency hash")
 				}
-				if bytes.Equal(projectSum.Digest, expectedSum) {
+				if bytes.Equal(projectSum.Digest, expectedSum.Digest) {
 					ls = NoMismatch
 				} else {
 					ls = DigestMismatchInLock

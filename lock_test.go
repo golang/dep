@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/gps/verify"
 	"github.com/golang/dep/internal/test"
 )
@@ -37,8 +36,8 @@ func TestReadLock(t *testing.T) {
 					[]string{"."},
 				),
 				PruneOpts: gps.PruneOptions(1),
-				Digest: pkgtree.VersionedDigest{
-					HashVersion: pkgtree.HashVersion,
+				Digest: verify.VersionedDigest{
+					HashVersion: verify.HashVersion,
 					Digest:      []byte("foo"),
 				},
 			},
@@ -67,8 +66,8 @@ func TestReadLock(t *testing.T) {
 					[]string{"."},
 				),
 				PruneOpts: gps.PruneOptions(15),
-				Digest: pkgtree.VersionedDigest{
-					HashVersion: pkgtree.HashVersion,
+				Digest: verify.VersionedDigest{
+					HashVersion: verify.HashVersion,
 					Digest:      []byte("foo"),
 				},
 			},
@@ -95,8 +94,8 @@ func TestWriteLock(t *testing.T) {
 					[]string{"."},
 				),
 				PruneOpts: gps.PruneOptions(1),
-				Digest: pkgtree.VersionedDigest{
-					HashVersion: pkgtree.HashVersion,
+				Digest: verify.VersionedDigest{
+					HashVersion: verify.HashVersion,
 					Digest:      []byte("foo"),
 				},
 			},
@@ -129,8 +128,8 @@ func TestWriteLock(t *testing.T) {
 					[]string{"."},
 				),
 				PruneOpts: gps.PruneOptions(15),
-				Digest: pkgtree.VersionedDigest{
-					HashVersion: pkgtree.HashVersion,
+				Digest: verify.VersionedDigest{
+					HashVersion: verify.HashVersion,
 					Digest:      []byte("foo"),
 				},
 			},

@@ -24,6 +24,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
+	"github.com/golang/dep/gps/verify"
 	"github.com/pkg/errors"
 )
 
@@ -912,11 +913,6 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 		return false, 0, err
 	}
 
-	s, err := gps.Prepare(params, sm)
-	if err != nil {
-		return false, 0, errors.Wrapf(err, "could not set up solver for input hashing")
-	}
-
 	// Errors while collecting constraints should not fail the whole status run.
 	// It should count the error and tell the user about incomplete results.
 	cm, ccerrs := collectConstraints(ctx, p, sm)
@@ -932,7 +928,8 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 		return slp[i].Ident().Less(slp[j].Ident())
 	})
 
-	if bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.InputsDigest) {
+	lsat := verify.LockSatisfiesInputs(p.Lock, p.Lock.SolveMeta.InputImports, p.Manifest, params.RootPackageTree)
+	if lsat.Passed() {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.

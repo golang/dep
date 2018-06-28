@@ -157,7 +157,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		err = handleAllTheFailuresOfTheWorld(err)
 		return errors.Wrap(err, "init failed: unable to solve the dependency graph")
 	}
-	p.Lock = dep.LockFromSolution(soln)
+	p.Lock = dep.LockFromSolution(soln, p.Manifest.PruneOptions)
 
 	rootAnalyzer.FinalizeRootManifestAndLock(p.Manifest, p.Lock, copyLock)
 
@@ -168,7 +168,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		return errors.Wrap(err, "init failed: unable to recalculate the lock digest")
 	}
 
-	p.Lock.SolveMeta.InputsDigest = s.HashInputs()
+	//p.Lock.SolveMeta.InputsDigest = s.HashInputs()
 
 	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
 	vendorbak, err := dep.BackupVendor(filepath.Join(root, "vendor"), time.Now().Format("20060102150405"))

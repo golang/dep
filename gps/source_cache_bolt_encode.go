@@ -342,8 +342,9 @@ func cachePutLock(b *bolt.Bucket, l Lock) error {
 
 // cacheGetLock returns a new *safeLock with the fields retrieved from the bolt.Bucket.
 func cacheGetLock(b *bolt.Bucket) (*safeLock, error) {
-	l := &safeLock{
-		i: strings.Split(string(b.Get(cacheKeyInputImports)), "#"),
+	l := &safeLock{}
+	if ii := b.Get(cacheKeyInputImports); len(ii) > 0 {
+		l.i = strings.Split(string(ii), "#")
 	}
 
 	if locked := b.Bucket(cacheKeyLock); locked != nil {

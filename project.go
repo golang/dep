@@ -105,6 +105,9 @@ type Project struct {
 	Manifest        *Manifest
 	Lock            *Lock // Optional
 	RootPackageTree pkgtree.PackageTree
+	// If populated, contains the results of comparing the Lock against the
+	// current vendor tree, per verify.VerifyDepTree().
+	//VendorStatus map[string]verify.VendorStatus
 }
 
 // SetRoot sets the project AbsRoot and ResolvedAbsRoot. If root is not a symlink, ResolvedAbsRoot will be set to root.

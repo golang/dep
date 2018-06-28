@@ -53,7 +53,6 @@ func TestBoltCacheTimeout(t *testing.T) {
 	}
 
 	lock := &safeLock{
-		//h: []byte("test_hash"),
 		p: []LockedProject{
 			NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
 			NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.10.0"), nil),
@@ -120,8 +119,9 @@ func TestBoltCacheTimeout(t *testing.T) {
 			t.Error("no manifest and lock found for revision")
 		}
 		compareManifests(t, manifest, gotM)
-		if dl := DiffLocks(lock, gotL); dl != nil {
-			t.Errorf("lock differences:\n\t %#v", dl)
+		// TODO(sdboyer) use DiffLocks after refactoring to avoid import cycles
+		if !locksAreEq(lock, gotL) {
+			t.Errorf("locks are different:\n\t(GOT): %s\n\t(WNT): %s", lock, gotL)
 		}
 
 		got, ok := c.getPackageTree(rev, root)
@@ -162,8 +162,9 @@ func TestBoltCacheTimeout(t *testing.T) {
 			t.Error("no manifest and lock found for revision")
 		}
 		compareManifests(t, manifest, gotM)
-		if dl := DiffLocks(lock, gotL); dl != nil {
-			t.Errorf("lock differences:\n\t %#v", dl)
+		// TODO(sdboyer) use DiffLocks after refactoring to avoid import cycles
+		if !locksAreEq(lock, gotL) {
+			t.Errorf("locks are different:\n\t(GOT): %s\n\t(WNT): %s", lock, gotL)
 		}
 
 		gotPtree, ok := c.getPackageTree(rev, root)
@@ -195,8 +196,9 @@ func TestBoltCacheTimeout(t *testing.T) {
 			t.Error("no manifest and lock found for revision")
 		}
 		compareManifests(t, manifest, gotM)
-		if dl := DiffLocks(lock, gotL); dl != nil {
-			t.Errorf("lock differences:\n\t %#v", dl)
+		// TODO(sdboyer) use DiffLocks after refactoring to avoid import cycles
+		if !locksAreEq(lock, gotL) {
+			t.Errorf("locks are different:\n\t(GOT): %s\n\t(WNT): %s", lock, gotL)
 		}
 
 		got, ok := c.getPackageTree(rev, root)
@@ -233,7 +235,6 @@ func TestBoltCacheTimeout(t *testing.T) {
 	}
 
 	newLock := &safeLock{
-		//h: []byte("new_test_hash"),
 		p: []LockedProject{
 			NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v1"), []string{"gps"}),
 		},
@@ -283,8 +284,9 @@ func TestBoltCacheTimeout(t *testing.T) {
 			t.Error("no manifest and lock found for revision")
 		}
 		compareManifests(t, newManifest, gotM)
-		if dl := DiffLocks(newLock, gotL); dl != nil {
-			t.Errorf("lock differences:\n\t %#v", dl)
+		// TODO(sdboyer) use DiffLocks after refactoring to avoid import cycles
+		if !locksAreEq(lock, gotL) {
+			t.Errorf("locks are different:\n\t(GOT): %s\n\t(WNT): %s", lock, gotL)
 		}
 
 		got, ok := c.getPackageTree(rev, root)

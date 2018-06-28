@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/gps/pkgtree"
 	"github.com/golang/dep/gps/verify"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
@@ -77,7 +76,7 @@ func readLock(r io.Reader) (*Lock, error) {
 
 func fromRawLock(raw rawLock) (*Lock, error) {
 	l := &Lock{
-		P: make([]gps.LockedProject, len(raw.Projects)),
+		P: make([]gps.LockedProject, 0, len(raw.Projects)),
 	}
 
 	l.SolveMeta.AnalyzerName = raw.SolveMeta.AnalyzerName
@@ -86,7 +85,7 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 	l.SolveMeta.SolverVersion = raw.SolveMeta.SolverVersion
 	l.SolveMeta.InputImports = raw.SolveMeta.InputImports
 
-	for i, ld := range raw.Projects {
+	for _, ld := range raw.Projects {
 		r := gps.Revision(ld.Revision)
 
 		var v gps.Version = r
@@ -111,7 +110,7 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 			LockedProject: gps.NewLockedProject(id, v, ld.Packages),
 		}
 		if ld.Digest != "" {
-			vp.Digest, err = pkgtree.ParseVersionedDigest(ld.Digest)
+			vp.Digest, err = verify.ParseVersionedDigest(ld.Digest)
 			if err != nil {
 				return nil, err
 			}
@@ -124,22 +123,21 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 		// Add the vendor pruning bit so that gps doesn't get confused
 		vp.PruneOpts = po | gps.PruneNestedVendorDirs
 
-		l.P[i] = vp
+		l.P = append(l.P, vp)
 	}
 
 	return l, nil
 }
 
-// InputsDigest returns the hash of inputs which produced this lock data.
-//
-// TODO(sdboyer) remove, this is now deprecated
-func (l *Lock) InputsDigest() []byte {
-	return nil
-}
-
 // Projects returns the list of LockedProjects contained in the lock data.
 func (l *Lock) Projects() []gps.LockedProject {
 	return l.P
+}
+
+// InputImports reports the list of input imports that were used in generating
+// this Lock.
+func (l *Lock) InputImports() []string {
+	return l.SolveMeta.InputImports
 }
 
 // HasProjectWithRoot checks if the lock contains a project with the provided
@@ -162,6 +160,7 @@ func (l *Lock) toRaw() rawLock {
 		SolveMeta: solveMeta{
 			AnalyzerName:    l.SolveMeta.AnalyzerName,
 			AnalyzerVersion: l.SolveMeta.AnalyzerVersion,
+			InputImports:    l.SolveMeta.InputImports,
 			SolverName:      l.SolveMeta.SolverName,
 			SolverVersion:   l.SolveMeta.SolverVersion,
 		},
@@ -207,22 +206,35 @@ func (l *Lock) MarshalTOML() ([]byte, error) {
 }
 
 // LockFromSolution converts a gps.Solution to dep's representation of a lock.
+// It makes sure that that the provided prune options are set correctly, as the
+// solver does not use VerifiableProjects for new selections it makes.
 //
 // Data is defensively copied wherever necessary to ensure the resulting *Lock
 // shares no memory with the input solution.
-func LockFromSolution(in gps.Solution) *Lock {
+func LockFromSolution(in gps.Solution, prune gps.CascadingPruneOptions) *Lock {
 	p := in.Projects()
 
 	l := &Lock{
 		SolveMeta: SolveMeta{
 			AnalyzerName:    in.AnalyzerName(),
 			AnalyzerVersion: in.AnalyzerVersion(),
+			InputImports:    in.InputImports(),
 			SolverName:      in.SolverName(),
 			SolverVersion:   in.SolverVersion(),
 		},
-		P: make([]gps.LockedProject, len(p)),
+		P: make([]gps.LockedProject, 0, len(p)),
 	}
 
-	copy(l.P, p)
+	for _, lp := range p {
+		if vp, ok := lp.(verify.VerifiableProject); ok {
+			l.P = append(l.P, vp)
+		} else {
+			l.P = append(l.P, verify.VerifiableProject{
+				LockedProject: lp,
+				PruneOpts:     prune.PruneOptionsFor(lp.Ident().ProjectRoot),
+			})
+		}
+	}
+
 	return l
 }

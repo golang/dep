@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/verify"
 	_ "github.com/golang/dep/internal/test" // DO NOT REMOVE, allows go test ./... -update to work
 )
 
@@ -150,7 +151,7 @@ func TestFeedback_BrokenImport(t *testing.T) {
 				P: []gps.LockedProject{gps.NewLockedProject(c.altPID, c.currentVersion, nil)},
 			}
 			log := log2.New(buf, "", 0)
-			feedback := NewBrokenImportFeedback(gps.DiffLocks(&ol, &l))
+			feedback := NewBrokenImportFeedback(verify.DiffLocks(&ol, &l))
 			feedback.LogFeedback(log)
 			got := strings.TrimSpace(buf.String())
 			if c.want != got {

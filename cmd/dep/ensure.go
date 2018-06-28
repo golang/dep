@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -21,6 +20,7 @@ import (
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/gps/verify"
 	"github.com/pkg/errors"
 )
 
@@ -184,6 +184,33 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		return cmd.runVendorOnly(ctx, args, p, sm, params)
 	}
 
+	statchan := make(chan map[string]verify.VendorStatus)
+	var lps []gps.LockedProject
+	if p.Lock != nil {
+		lps = p.Lock.Projects()
+	}
+	go func(vendorDir string, p []gps.LockedProject) {
+		// Make sure vendor dir exists
+		err := os.MkdirAll(vendorDir, os.FileMode(0777))
+		if err != nil {
+			ctx.Err.Printf("Error creating vendor directory: %q", err.Error())
+			// TODO(sdboyer) handle these better
+			os.Exit(1)
+		}
+
+		sums := make(map[string]verify.VersionedDigest)
+		for _, lp := range p {
+			sums[string(lp.Ident().ProjectRoot)] = lp.(verify.VerifiableProject).Digest
+		}
+
+		status, err := verify.VerifyDepTree(vendorDir, sums)
+		if err != nil {
+			ctx.Err.Printf("Error while verifying vendor directory: %q", err.Error())
+			os.Exit(1)
+		}
+		statchan <- status
+	}(filepath.Join(p.AbsRoot, "vendor"), lps)
+
 	params.RootPackageTree, err = p.ParseRootPackageTree()
 	if err != nil {
 		return err
@@ -212,11 +239,11 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	if cmd.add {
-		return cmd.runAdd(ctx, args, p, sm, params)
+		return cmd.runAdd(ctx, args, p, sm, params, statchan)
 	} else if cmd.update {
-		return cmd.runUpdate(ctx, args, p, sm, params)
+		return cmd.runUpdate(ctx, args, p, sm, params, statchan)
 	}
-	return cmd.runDefault(ctx, args, p, sm, params)
+	return cmd.runDefault(ctx, args, p, sm, params, statchan)
 }
 
 func (cmd *ensureCommand) validateFlags() error {
@@ -246,7 +273,7 @@ func (cmd *ensureCommand) vendorBehavior() dep.VendorBehavior {
 	return dep.VendorOnChanged
 }
 
-func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
 	// Bare ensure doesn't take any args.
 	if len(args) != 0 {
 		return errors.New("dep ensure only takes spec arguments with -add or -update")
@@ -256,52 +283,37 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return err
 	}
 
-	if lsat, err := p.LockSatisfiesInputs(sm); err != nil {
-		return err
-	} else if !lsat.Passes() {
-		if ctx.Verbose {
-			ctx.Out.Printf("%s was already in sync with imports and %s\n", dep.LockName, dep.ManifestName)
-		}
+	lock := p.Lock
+	if lock != nil {
+		lsat := verify.LockSatisfiesInputs(p.Lock, p.Lock.SolveMeta.InputImports, p.Manifest, params.RootPackageTree)
+		if !lsat.Passed() {
+			// TODO(sdboyer) print out what bits are unsatisfied here
+			solver, err := gps.Prepare(params, sm)
+			if err != nil {
+				return errors.Wrap(err, "prepare solver")
+			}
 
-		if cmd.noVendor {
+			if cmd.noVendor && cmd.dryRun {
+				return errors.New("Gopkg.lock was not up to date")
+			}
+
+			solution, err := solver.Solve(context.TODO())
+			if err != nil {
+				return handleAllTheFailuresOfTheWorld(err)
+			}
+			lock = dep.LockFromSolution(solution, p.Manifest.PruneOptions)
+		} else if cmd.noVendor {
 			// The user said not to touch vendor/, so definitely nothing to do.
 			return nil
 		}
 
-		sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorOnChanged, p.Manifest.PruneOptions)
-		if err != nil {
-			return err
-		}
-
-		if cmd.dryRun {
-			return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
-		}
-
-		var logger *log.Logger
-		if ctx.Verbose {
-			logger = ctx.Err
-		}
-		return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 	}
 
-	solver, err := gps.Prepare(params, sm)
-	if err != nil {
-		return errors.Wrap(err, "prepare solver")
-	}
-
-	if cmd.noVendor && cmd.dryRun {
-		return errors.New("Gopkg.lock was not up to date")
-	}
-
-	solution, err := solver.Solve(context.TODO())
-	if err != nil {
-		return handleAllTheFailuresOfTheWorld(err)
-	}
-
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), cmd.vendorBehavior(), p.Manifest.PruneOptions)
+	sw, err := dep.NewDeltaWriter(p.Lock, lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"))
 	if err != nil {
 		return err
 	}
+
 	if cmd.dryRun {
 		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
@@ -310,7 +322,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	if ctx.Verbose {
 		logger = ctx.Err
 	}
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
+	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -339,21 +351,13 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
 	if p.Lock == nil {
 		return errors.Errorf("-update works by updating the versions recorded in %s, but %s does not exist", dep.LockName, dep.LockName)
 	}
 
 	if err := ctx.ValidateParams(sm, params); err != nil {
 		return err
-	}
-
-	// We'll need to discard this prepared solver as later work changes params,
-	// but solver preparation is cheap and worth doing up front in order to
-	// perform the fastpath check of hash comparison.
-	solver, err := gps.Prepare(params, sm)
-	if err != nil {
-		return errors.Wrap(err, "fastpath solver prepare")
 	}
 
 	// When -update is specified without args, allow every dependency to change
@@ -367,7 +371,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	}
 
 	// Re-prepare a solver now that our params are complete.
-	solver, err = gps.Prepare(params, sm)
+	solver, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "fastpath solver prepare")
 	}
@@ -379,7 +383,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), cmd.vendorBehavior(), p.Manifest.PruneOptions)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), cmd.vendorBehavior(), p.Manifest.PruneOptions)
 	if err != nil {
 		return err
 	}
@@ -394,7 +398,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
 	if len(args) == 0 {
 		return errors.New("must specify at least one project or package to -add")
 	}
@@ -409,15 +413,6 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	solver, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "fastpath solver prepare")
-	}
-
-	// Compare the hashes. If they're not equal, bail out and ask the user to
-	// run a straight `dep ensure` before updating. This is handholding the
-	// user a bit, but the extra effort required is minimal, and it ensures the
-	// user is isolating variables in the event of solve problems (was it the
-	// "pending" changes, or the -add that caused the problem?).
-	if p.Lock != nil && !bytes.Equal(p.Lock.InputsDigest(), solver.HashInputs()) {
-		ctx.Out.Printf("Warning: %s is out of sync with %s or the project's imports.", dep.LockName, dep.ManifestName)
 	}
 
 	rm, _ := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
@@ -678,7 +673,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	sort.Strings(reqlist)
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution), dep.VendorOnChanged, p.Manifest.PruneOptions)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), dep.VendorOnChanged, p.Manifest.PruneOptions)
 	if err != nil {
 		return err
 	}

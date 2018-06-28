@@ -91,7 +91,6 @@ func (c *Config) Run() int {
 		&statusCommand{},
 		&ensureCommand{},
 		&pruneCommand{},
-		&hashinCommand{},
 		&versionCommand{},
 	}
 
