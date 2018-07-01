@@ -154,6 +154,19 @@ func (l *Lock) HasProjectWithRoot(root gps.ProjectRoot) bool {
 	return false
 }
 
+func (l *Lock) dup() *Lock {
+	l2 := &Lock{
+		SolveMeta: l.SolveMeta,
+		P:         make([]gps.LockedProject, len(l.P)),
+	}
+
+	l2.SolveMeta.InputImports = make([]string, len(l.SolveMeta.InputImports))
+	copy(l2.SolveMeta.InputImports, l.SolveMeta.InputImports)
+	copy(l2.P, l.P)
+
+	return l2
+}
+
 // toRaw converts the manifest into a representation suitable to write to the lock file
 func (l *Lock) toRaw() rawLock {
 	raw := rawLock{

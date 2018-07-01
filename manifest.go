@@ -609,6 +609,9 @@ func (m *Manifest) Overrides() gps.ProjectConstraints {
 
 // IgnoredPackages returns a set of import paths to ignore.
 func (m *Manifest) IgnoredPackages() *pkgtree.IgnoredRuleset {
+	if m == nil {
+		return pkgtree.NewIgnoredRuleset(nil)
+	}
 	return pkgtree.NewIgnoredRuleset(m.Ignored)
 }
 
@@ -627,6 +630,10 @@ func (m *Manifest) HasConstraintsOn(root gps.ProjectRoot) bool {
 
 // RequiredPackages returns a set of import paths to require.
 func (m *Manifest) RequiredPackages() map[string]bool {
+	if m == nil {
+		return map[string]bool{}
+	}
+
 	if len(m.Required) == 0 {
 		return nil
 	}

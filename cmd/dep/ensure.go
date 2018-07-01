@@ -211,11 +211,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		statchan <- status
 	}(filepath.Join(p.AbsRoot, "vendor"), lps)
 
-	params.RootPackageTree, err = p.ParseRootPackageTree()
-	if err != nil {
-		return err
-	}
-
 	if fatal, err := checkErrors(params.RootPackageTree.Packages, p.Manifest.IgnoredPackages()); err != nil {
 		if fatal {
 			return err
@@ -283,18 +278,30 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return err
 	}
 
-	lock := p.Lock
+	lock := p.ChangedLock
 	if lock != nil {
-		lsat := verify.LockSatisfiesInputs(p.Lock, p.Lock.SolveMeta.InputImports, p.Manifest, params.RootPackageTree)
+		lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)
 		if !lsat.Passed() {
-			// TODO(sdboyer) print out what bits are unsatisfied here
+			if ctx.Verbose {
+				ctx.Out.Println("Gopkg.lock is out of sync with Gopkg.toml and project code:")
+				for _, missing := range lsat.MissingImports() {
+					ctx.Out.Printf("\t%s is missing from input-imports\n", missing)
+				}
+				for _, excess := range lsat.ExcessImports() {
+					ctx.Out.Printf("\t%s is in input-imports, but isn't imported\n", excess)
+				}
+				for pr, unmatched := range lsat.UnmatchedOverrides() {
+					ctx.Out.Printf("\t%s is at %s, which is not allowed by override %s\n", pr, unmatched.V, unmatched.C)
+				}
+				for pr, unmatched := range lsat.UnmatchedConstraints() {
+					ctx.Out.Printf("\t%s is at %s, which is not allowed by constraint %s\n", pr, unmatched.V, unmatched.C)
+				}
+				ctx.Out.Println()
+			}
+
 			solver, err := gps.Prepare(params, sm)
 			if err != nil {
 				return errors.Wrap(err, "prepare solver")
-			}
-
-			if cmd.noVendor && cmd.dryRun {
-				return errors.New("Gopkg.lock was not up to date")
 			}
 
 			solution, err := solver.Solve(context.TODO())
@@ -306,23 +313,22 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 			// The user said not to touch vendor/, so definitely nothing to do.
 			return nil
 		}
-
 	}
 
-	sw, err := dep.NewDeltaWriter(p.Lock, lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"))
+	dw, err := dep.NewDeltaWriter(p.Lock, lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"))
 	if err != nil {
 		return err
 	}
 
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
+		return dw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
 	var logger *log.Logger
 	if ctx.Verbose {
 		logger = ctx.Err
 	}
-	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+	return errors.WithMessage(dw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
@@ -333,9 +339,10 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	if p.Lock == nil {
 		return errors.Errorf("no %s exists from which to populate vendor/", dep.LockName)
 	}
+
 	// Pass the same lock as old and new so that the writer will observe no
 	// difference and choose not to write it out.
-	sw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways, p.Manifest.PruneOptions)
+	sw, err := dep.NewSafeWriter(nil, p.Lock, p.ChangedLock, dep.VendorAlways, p.Manifest.PruneOptions)
 	if err != nil {
 		return err
 	}
@@ -383,19 +390,19 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), cmd.vendorBehavior(), p.Manifest.PruneOptions)
+	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"))
 	if err != nil {
 		return err
 	}
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
+		return dw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
 	var logger *log.Logger
 	if ctx.Verbose {
 		logger = ctx.Err
 	}
-	return errors.Wrap(sw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
+	return errors.Wrap(dw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
@@ -416,16 +423,6 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 
 	rm, _ := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
-
-	// TODO(sdboyer) re-enable this once we ToReachMap() intelligently filters out normally-excluded (_*, .*), dirs from errmap
-	//rm, errmap := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
-	// Having some problematic internal packages isn't cause for termination,
-	// but the user needs to be warned.
-	//for fail, err := range errmap {
-	//if _, is := err.Err.(*build.NoGoError); !is {
-	//ctx.Err.Printf("Warning: %s, %s", fail, err)
-	//}
-	//}
 
 	// Compile unique sets of 1) all external packages imported or required, and
 	// 2) the project roots under which they fall.
@@ -673,20 +670,20 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	sort.Strings(reqlist)
 
-	sw, err := dep.NewSafeWriter(nil, p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), dep.VendorOnChanged, p.Manifest.PruneOptions)
+	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"))
 	if err != nil {
 		return err
 	}
 
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
+		return dw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
 	var logger *log.Logger
 	if ctx.Verbose {
 		logger = ctx.Err
 	}
-	if err := errors.Wrap(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
+	if err := errors.Wrap(dw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor"); err != nil {
 		return err
 	}
 

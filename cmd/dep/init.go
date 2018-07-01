@@ -102,12 +102,12 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 		ctx.Out.Println("Getting direct dependencies...")
 	}
 
-	ptree, directDeps, err := p.GetDirectDependencyNames(sm)
+	directDeps, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
 		return errors.Wrap(err, "init failed: unable to determine direct dependencies")
 	}
 	if ctx.Verbose {
-		ctx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(ptree.Packages), len(directDeps))
+		ctx.Out.Printf("Checked %d directories for packages.\nFound %d direct dependencies.\n", len(p.RootPackageTree.Packages), len(directDeps))
 	}
 
 	// Initialize with imported data, then fill in the gaps using the GOPATH
@@ -133,7 +133,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	params := gps.SolveParameters{
 		RootDir:         root,
-		RootPackageTree: ptree,
+		RootPackageTree: p.RootPackageTree,
 		Manifest:        p.Manifest,
 		Lock:            p.Lock,
 		ProjectAnalyzer: rootAnalyzer,

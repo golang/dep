@@ -461,7 +461,9 @@ func VerifyDepTree(osDirname string, wantDigests map[string]VersionedDigest) (ma
 		if expectedSum, ok := wantDigests[slashPathname]; ok {
 			ls := EmptyDigestInLock
 			if expectedSum.HashVersion != HashVersion {
-				ls = HashVersionMismatch
+				if !expectedSum.IsEmpty() {
+					ls = HashVersionMismatch
+				}
 			} else if len(expectedSum.Digest) > 0 {
 				projectSum, err := DigestFromDirectory(osPathname)
 				if err != nil {

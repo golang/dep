@@ -20,28 +20,24 @@ type VerifiableProject struct {
 	Digest    VersionedDigest
 }
 
-type lockUnsatisfy uint8
-
-const (
-	missingFromLock lockUnsatisfy = iota
-	inAdditionToLock
-)
-
-type constraintMismatch struct {
-	c gps.Constraint
-	v gps.Version
+// ConstraintMismatch is a two-tuple of a gps.Version, and a gps.Constraint that
+// does not allow that version.
+type ConstraintMismatch struct {
+	C gps.Constraint
+	V gps.Version
 }
 
-type constraintMismatches map[gps.ProjectRoot]constraintMismatch
-
+// LockSatisfaction holds the compound result of LockSatisfiesInputs, allowing
+// the caller to inspect each of several orthogonal possible types of failure.
 type LockSatisfaction struct {
 	nolock                  bool
 	missingPkgs, excessPkgs []string
-	badovr, badconstraint   constraintMismatches
+	badovr, badconstraint   map[gps.ProjectRoot]ConstraintMismatch
 }
 
-// Passed is a shortcut method to check if any problems with the evaluted lock
-// were identified.
+// Passed is a shortcut method that indicates whether there were any ways in
+// which the Lock did not satisfy the inputs. It will return true only if no
+// problems were found.
 func (ls LockSatisfaction) Passed() bool {
 	if ls.nolock {
 		return false
@@ -66,19 +62,27 @@ func (ls LockSatisfaction) Passed() bool {
 	return true
 }
 
-func (ls LockSatisfaction) MissingPackages() []string {
+// MissingImports reports the set of import paths that were present in the
+// inputs but missing in the Lock.
+func (ls LockSatisfaction) MissingImports() []string {
 	return ls.missingPkgs
 }
 
-func (ls LockSatisfaction) ExcessPackages() []string {
+// ExcessImports reports the set of import paths that were present in the Lock
+// but absent from the inputs.
+func (ls LockSatisfaction) ExcessImports() []string {
 	return ls.excessPkgs
 }
 
-func (ls LockSatisfaction) UnmatchedOverrides() map[gps.ProjectRoot]constraintMismatch {
+// UnmatchedOverrides reports any override rules that were not satisfied by the
+// corresponding LockedProject in the Lock.
+func (ls LockSatisfaction) UnmatchedOverrides() map[gps.ProjectRoot]ConstraintMismatch {
 	return ls.badovr
 }
 
-func (ls LockSatisfaction) UnmatchedConstraints() map[gps.ProjectRoot]constraintMismatch {
+// UnmatchedOverrides reports any normal, non-override constraint rules that
+// were not satisfied by the corresponding LockedProject in the Lock.
+func (ls LockSatisfaction) UnmatchedConstraints() map[gps.ProjectRoot]ConstraintMismatch {
 	return ls.badconstraint
 }
 
@@ -87,6 +91,8 @@ func findEffectualConstraints(m gps.Manifest, imports map[string]bool) map[strin
 	xt := radix.New()
 
 	for pr, _ := range m.DependencyConstraints() {
+		// FIXME(sdboyer) this has the trailing slash ambiguity problem; adapt
+		// code from the solver
 		xt.Insert(string(pr), nil)
 	}
 
@@ -107,7 +113,7 @@ func findEffectualConstraints(m gps.Manifest, imports map[string]bool) map[strin
 // compute package imports that may have been removed. Figuring out that
 // negative space would require exploring the entire graph to ensure there are
 // no in-edges for particular imports.
-func LockSatisfiesInputs(l gps.Lock, oldimports []string, m gps.RootManifest, rpt pkgtree.PackageTree) LockSatisfaction {
+func LockSatisfiesInputs(l gps.LockWithImports, m gps.RootManifest, rpt pkgtree.PackageTree) LockSatisfaction {
 	if l == nil {
 		return LockSatisfaction{nolock: true}
 	}
@@ -122,8 +128,15 @@ func LockSatisfiesInputs(l gps.Lock, oldimports []string, m gps.RootManifest, rp
 	rm, _ := rpt.ToReachMap(true, true, false, ig)
 	reach := rm.FlattenFn(paths.IsStandardImportPath)
 
-	inlock := make(map[string]bool, len(oldimports))
+	inlock := make(map[string]bool, len(l.InputImports()))
 	ininputs := make(map[string]bool, len(reach)+len(req))
+
+	type lockUnsatisfy uint8
+	const (
+		missingFromLock lockUnsatisfy = iota
+		inAdditionToLock
+	)
+
 	pkgDiff := make(map[string]lockUnsatisfy)
 
 	for _, imp := range reach {
@@ -134,13 +147,13 @@ func LockSatisfiesInputs(l gps.Lock, oldimports []string, m gps.RootManifest, rp
 		ininputs[imp] = true
 	}
 
-	for _, imp := range oldimports {
+	for _, imp := range l.InputImports() {
 		inlock[imp] = true
 	}
 
 	lsat := LockSatisfaction{
-		badovr:        make(constraintMismatches),
-		badconstraint: make(constraintMismatches),
+		badovr:        make(map[gps.ProjectRoot]ConstraintMismatch),
+		badconstraint: make(map[gps.ProjectRoot]ConstraintMismatch),
 	}
 
 	for ip := range ininputs {
@@ -151,6 +164,12 @@ func LockSatisfiesInputs(l gps.Lock, oldimports []string, m gps.RootManifest, rp
 			delete(inlock, ip)
 		}
 	}
+
+	// Something in the missing list might already be in the packages list,
+	// because another package in the depgraph imports it. We could make a
+	// special case for that, but it would break the simplicity of the model and
+	// complicate the notion of LockSatisfaction.Passed(), so let's see if we
+	// can get away without it.
 
 	for ip := range inlock {
 		if !ininputs[ip] {
@@ -167,23 +186,27 @@ func LockSatisfiesInputs(l gps.Lock, oldimports []string, m gps.RootManifest, rp
 	}
 
 	eff := findEffectualConstraints(m, ininputs)
-	ovr := m.Overrides()
-	constraints := m.DependencyConstraints()
+	ovr, constraints := m.Overrides(), m.DependencyConstraints()
 
 	for _, lp := range l.Projects() {
 		pr := lp.Ident().ProjectRoot
 
-		if pp, has := ovr[pr]; has && !pp.Constraint.Matches(lp.Version()) {
-			lsat.badovr[pr] = constraintMismatch{
-				c: pp.Constraint,
-				v: lp.Version(),
+		if pp, has := ovr[pr]; has {
+			if !pp.Constraint.Matches(lp.Version()) {
+				lsat.badovr[pr] = ConstraintMismatch{
+					C: pp.Constraint,
+					V: lp.Version(),
+				}
 			}
+			// The constraint isn't considered if we have an override,
+			// independent of whether the override is satisfied.
+			continue
 		}
 
 		if pp, has := constraints[pr]; has && eff[string(pr)] && !pp.Constraint.Matches(lp.Version()) {
-			lsat.badconstraint[pr] = constraintMismatch{
-				c: pp.Constraint,
-				v: lp.Version(),
+			lsat.badconstraint[pr] = ConstraintMismatch{
+				C: pp.Constraint,
+				V: lp.Version(),
 			}
 		}
 	}

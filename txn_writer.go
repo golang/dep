@@ -5,6 +5,7 @@
 package dep
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -466,6 +467,7 @@ const (
 	solveChanged
 	hashMismatch
 	hashVersionMismatch
+	hashAbsent
 	missingFromTree
 	projectAdded
 	projectRemoved
@@ -518,10 +520,12 @@ func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatu
 			switch stat {
 			case verify.NotInTree:
 				sw.changed[pr] = missingFromTree
-			case verify.EmptyDigestInLock, verify.DigestMismatchInLock:
+			case verify.DigestMismatchInLock:
 				sw.changed[pr] = hashMismatch
 			case verify.HashVersionMismatch:
 				sw.changed[pr] = hashVersionMismatch
+			case verify.EmptyDigestInLock:
+				sw.changed[pr] = hashAbsent
 			}
 		}
 	}
@@ -564,29 +568,51 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 
 	dropped := []gps.ProjectRoot{}
 	// TODO(sdboyer) add a txn/rollback layer, like the safewriter?
+	i := 0
+	tot := len(dw.changed)
 	for pr, reason := range dw.changed {
+		if reason == projectRemoved {
+			dropped = append(dropped, pr)
+			continue
+		}
+
 		to := filepath.FromSlash(filepath.Join(vnewpath, string(pr)))
 		po := dw.pruneOptions.PruneOptionsFor(pr)
-		lpd := dw.lockDiff.ProjectDeltas[pr]
+		if err := sm.ExportPrunedProject(context.TODO(), projs[pr], po, to); err != nil {
+			return errors.Wrapf(err, "failed to export %s", pr)
+		}
 
+		i++
+		lpd := dw.lockDiff.ProjectDeltas[pr]
+		v, id := projs[pr].Version(), projs[pr].Ident()
+
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "(%d/%d) Wrote %s@%s: ", i, tot, id, v)
 		switch reason {
 		case noChange:
 			panic(fmt.Sprintf("wtf, no change for %s", pr))
 		case solveChanged:
 			if lpd.SourceChanged() {
-				logger.Printf("Writing %s: source changed (%s -> %s)", pr, lpd.SourceBefore, lpd.SourceAfter)
+				fmt.Fprintf(&buf, "source changed (%s -> %s)", lpd.SourceBefore, lpd.SourceAfter)
 			} else if lpd.VersionChanged() {
-				logger.Printf("Writing %s: version changed (%s -> %s)", pr, lpd.VersionBefore, lpd.VersionAfter)
+				bv, av := "(none)", "(none)"
+				if lpd.VersionBefore != nil {
+					bv = lpd.VersionBefore.String()
+				}
+				if lpd.VersionAfter != nil {
+					av = lpd.VersionAfter.String()
+				}
+				fmt.Fprintf(&buf, "version changed (%s -> %s)", bv, av)
 			} else if lpd.RevisionChanged() {
-				logger.Printf("Writing %s: revision changed (%s -> %s)", pr, lpd.RevisionBefore, lpd.RevisionAfter)
+				fmt.Fprintf(&buf, "revision changed (%s -> %s)", lpd.RevisionBefore, lpd.RevisionAfter)
 			} else if lpd.PackagesChanged() {
 				la, lr := len(lpd.PackagesAdded), len(lpd.PackagesRemoved)
 				if la > 0 && lr > 0 {
-					logger.Printf("Writing %s: packages changed (%v added, %v removed)", pr, la, lr)
+					fmt.Fprintf(&buf, "packages changed (%v added, %v removed)", la, lr)
 				} else if la > 0 {
-					logger.Printf("Writing %s: packages changed (%v added)", pr, la)
+					fmt.Fprintf(&buf, "packages changed (%v added)", la)
 				} else {
-					logger.Printf("Writing %s: packages changed (%v removed)", pr, lr)
+					fmt.Fprintf(&buf, "packages changed (%v removed)", lr)
 				}
 			} else if lpd.PruneOptsChanged() {
 				// Override what's on the lockdiff with the extra info we have;
@@ -594,23 +620,20 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 				// value from the input param in place.
 				old := lpd.PruneOptsBefore & ^gps.PruneNestedVendorDirs
 				new := lpd.PruneOptsAfter & ^gps.PruneNestedVendorDirs
-				logger.Printf("Writing %s: prune options changed (%s -> %s)", pr, old, new)
+				fmt.Fprintf(&buf, "prune options changed (%s -> %s)", old, new)
 			}
 		case hashMismatch:
-			logger.Printf("Writing %s: hash mismatch between Gopkg.lock and vendor contents", pr)
+			fmt.Fprintf(&buf, "hash mismatch between Gopkg.lock and vendor contents")
 		case hashVersionMismatch:
-			logger.Printf("Writing %s: hashing algorithm mismatch", pr)
+			fmt.Fprintf(&buf, "hashing algorithm mismatch")
+		case hashAbsent:
+			fmt.Fprintf(&buf, "hash digest absent from lock")
 		case projectAdded:
-			logger.Printf("Writing new project %s", pr)
-		case projectRemoved:
-			dropped = append(dropped, pr)
-			continue
+			fmt.Fprintf(&buf, "new project")
 		case missingFromTree:
-			logger.Printf("Writing %s: missing from vendor", pr)
+			fmt.Fprint(&buf, "missing from vendor")
 		}
-		if err := sm.ExportPrunedProject(context.TODO(), projs[pr], po, to); err != nil {
-			return errors.Wrapf(err, "failed to export %s", pr)
-		}
+		logger.Print(buf.String())
 
 		digest, err := verify.DigestFromDirectory(to)
 		if err != nil {
@@ -649,9 +672,17 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 		}
 	}
 
-	for _, pr := range dropped {
-		// Kind of a lie to print this here. ¯\_(ツ)_/¯
-		logger.Printf("Discarding unused project %s", pr)
+	for i, pr := range dropped {
+		// Kind of a lie to print this. ¯\_(ツ)_/¯
+		logger.Printf("(%d/%d) Removed unused project %s", tot-(len(dropped)-i-1), tot, pr)
+	}
+
+	// Ensure vendor/.git is preserved if present
+	if hasDotGit(vpath) {
+		err = fs.RenameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(vnewpath, "vendor/.git"))
+		if _, ok := err.(*os.LinkError); ok {
+			return errors.Wrap(err, "failed to preserve vendor/.git")
+		}
 	}
 
 	err = os.RemoveAll(vpath)

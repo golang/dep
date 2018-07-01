@@ -329,13 +329,13 @@ type dotOutput struct {
 func (out *dotOutput) BasicHeader() error {
 	out.g = new(graphviz).New()
 
-	ptree, err := out.p.ParseRootPackageTree()
+	ptree := out.p.RootPackageTree
 	// TODO(sdboyer) should be true, true, false, out.p.Manifest.IgnoredPackages()
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
 	out.g.createNode(string(out.p.ImportRoot), "", prm.FlattenFn(paths.IsStandardImportPath))
 
-	return err
+	return nil
 }
 
 func (out *dotOutput) BasicFooter() error {
@@ -649,10 +649,7 @@ func (os OldStatus) marshalJSON() *rawOldStatus {
 func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project, sm gps.SourceManager) error {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := p.ParseRootPackageTree()
-	if err != nil {
-		return err
-	}
+	ptree := p.RootPackageTree
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
@@ -888,10 +885,7 @@ type MissingStatus struct {
 func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := p.ParseRootPackageTree()
-	if err != nil {
-		return false, 0, err
-	}
+	ptree := p.RootPackageTree
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
@@ -928,7 +922,7 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 		return slp[i].Ident().Less(slp[j].Ident())
 	})
 
-	lsat := verify.LockSatisfiesInputs(p.Lock, p.Lock.SolveMeta.InputImports, p.Manifest, params.RootPackageTree)
+	lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)
 	if lsat.Passed() {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
@@ -1305,7 +1299,7 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 
 	// Collect the complete set of direct project dependencies, incorporating
 	// requireds and ignores appropriately.
-	_, directDeps, err := p.GetDirectDependencyNames(sm)
+	directDeps, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
 		// Return empty collection, not nil, if we fail here.
 		return constraintCollection, []error{errors.Wrap(err, "failed to get direct dependencies")}

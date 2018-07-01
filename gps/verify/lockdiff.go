@@ -211,7 +211,7 @@ func DiffProjects2(lp1, lp2 gps.LockedProject) LockedProjectPartsDelta {
 		SourceAfter:  lp2.Ident().Source,
 	}
 
-	ld.PackagesRemoved, ld.PackagesAdded = findAddedAndRemoved(lp1.Packages(), lp2.Packages())
+	ld.PackagesAdded, ld.PackagesRemoved = findAddedAndRemoved(lp1.Packages(), lp2.Packages())
 
 	switch v := lp1.Version().(type) {
 	case gps.PairedVersion:

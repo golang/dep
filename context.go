@@ -9,9 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"time"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/paths"
+	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/gps/verify"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
 )
@@ -188,7 +192,53 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, errors.Wrapf(err, "error while parsing %s", lp)
 	}
 
+	// Parse in the root package tree.
+	ptree, err := p.parseRootPackageTree()
+	if err != nil {
+		return nil, err
+	}
+
+	// If there's a current Lock, apply the input and pruneopt changes that we
+	// can know without solving.
+	if p.Lock != nil {
+		p.ChangedLock = p.Lock.dup()
+		p.ChangedLock.SolveMeta.InputImports = externalImportList(ptree, p.Manifest)
+
+		for k, lp := range p.ChangedLock.Projects() {
+			vp := lp.(verify.VerifiableProject)
+			vp.PruneOpts = p.Manifest.PruneOptions.PruneOptionsFor(lp.Ident().ProjectRoot)
+			p.ChangedLock.P[k] = vp
+		}
+	}
+
 	return p, nil
+}
+
+func externalImportList(rpt pkgtree.PackageTree, m gps.RootManifest) []string {
+	rm, _ := rpt.ToReachMap(true, true, false, m.IgnoredPackages())
+	reach := rm.FlattenFn(paths.IsStandardImportPath)
+	req := m.RequiredPackages()
+
+	// If there are any requires, slide them into the reach list, as well.
+	if len(req) > 0 {
+		// Make a map of imports that are both in the import path list and the
+		// required list to avoid duplication.
+		skip := make(map[string]bool, len(req))
+		for _, r := range reach {
+			if req[r] {
+				skip[r] = true
+			}
+		}
+
+		for r := range req {
+			if !skip[r] {
+				reach = append(reach, r)
+			}
+		}
+	}
+
+	sort.Strings(reach)
+	return reach
 }
 
 // DetectProjectGOPATH attempt to find the GOPATH containing the project.
