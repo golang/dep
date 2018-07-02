@@ -41,7 +41,7 @@ func newBoltCache(cd string, epoch int64, logger *log.Logger) (*boltCache, error
 			return nil, errors.Wrapf(err, "failed to create source cache directory: %s", dir)
 		}
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "failed to check source cache directory: ", dir)
+		return nil, errors.Wrapf(err, "failed to check source cache directory: %s", dir)
 	} else if !fi.IsDir() {
 		return nil, errors.Wrapf(err, "source cache path is not directory: %s", dir)
 	}
