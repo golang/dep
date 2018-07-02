@@ -127,10 +127,6 @@ type solver struct {
 	// names a SourceManager operates on.
 	b sourceBridge
 
-	// A versionUnifier, to facilitate cross-type version comparison and set
-	// operations.
-	vUnify *versionUnifier
-
 	// A stack containing projects and packages that are currently "selected" -
 	// that is, they have passed all satisfiability checks, and are part of the
 	// current solution.
@@ -305,15 +301,11 @@ func Prepare(params SolveParameters, sm SourceManager) (Solver, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.vUnify = &versionUnifier{
-		b: s.b,
-	}
 
 	// Initialize stacks and queues
 	s.sel = &selection{
 		deps:      make(map[ProjectRoot][]dependency),
 		foldRoots: make(map[string]ProjectRoot),
-		vu:        s.vUnify,
 	}
 	s.unsel = &unselected{
 		sl:  make([]bimodalIdentifier, 0),
@@ -447,7 +439,6 @@ func (s *solver) Solve(ctx context.Context) (Solution, error) {
 
 	// Set up a metrics object
 	s.mtr = newMetrics()
-	s.vUnify.mtr = s.mtr
 
 	// Prime the queues with the root project
 	if err := s.selectRoot(); err != nil {
@@ -1007,35 +998,9 @@ func (s *solver) getLockVersionIfValid(id ProjectIdentifier) (Version, error) {
 	constraint := s.sel.getConstraint(id)
 	v := lp.Version()
 	if !constraint.Matches(v) {
-		var found bool
-		if tv, ok := v.(Revision); ok {
-			// If we only have a revision from the root's lock, allow matching
-			// against other versions that have that revision
-			for _, pv := range s.vUnify.pairRevision(id, tv) {
-				if constraint.Matches(pv) {
-					v = pv
-					found = true
-					break
-				}
-			}
-			//} else if _, ok := constraint.(Revision); ok {
-			//// If the current constraint is itself a revision, and the lock gave
-			//// an unpaired version, see if they match up
-			////
-			//if u, ok := v.(UnpairedVersion); ok {
-			//pv := s.sm.pairVersion(id, u)
-			//if constraint.Matches(pv) {
-			//v = pv
-			//found = true
-			//}
-			//}
-		}
-
-		if !found {
-			// No match found, which means we're going to be breaking the lock
-			// Still return the invalid version so that is included in the trace
-			s.b.breakLock()
-		}
+		// No match found, which means we're going to be breaking the lock
+		// Still return the invalid version so that is included in the trace
+		s.b.breakLock()
 	}
 
 	return v, nil

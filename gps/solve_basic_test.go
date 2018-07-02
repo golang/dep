@@ -847,8 +847,8 @@ var basicFixtures = map[string]basicFixture{
 			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
 		),
 		r: mksolution(
-			"foo 1.0.1 foorev",
-			"bar 1.0.1",
+			"foo 1.0.2",
+			"bar 1.0.2",
 		),
 	},
 	"lock to branch on old rev keeps old rev": {
