@@ -9,6 +9,8 @@ NEW FEATURES:
 
 BUG FIXES:
 
+* Excise certain git-reltaed environment variables. ([#1872](https://github.com/golang/dep/pull/1872))
+
 IMPROVEMENTS:
 
 * Add template operations support in dep status template output.
