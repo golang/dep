@@ -1,8 +1,8 @@
-SHELL="/bin/bash"
-PLATFORM=$(shell go env GOOS)
-ARCH=$(shell go env GOARCH)
-GOPATH=$(shell go env GOPATH)
-GOBIN=$(GOPATH)/bin
+SHELL := /bin/bash
+PLATFORM := $(shell go env GOOS)
+ARCH := $(shell go env GOARCH)
+GOPATH := $(shell go env GOPATH)
+GOBIN := $(GOPATH)/bin
 
 default: build validate test
 
