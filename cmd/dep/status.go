@@ -7,12 +7,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -26,6 +28,14 @@ import (
 )
 
 const availableTemplateVariables = "ProjectRoot, Constraint, Version, Revision, Latest, and PackageCount."
+const availableDefaultTemplateVariables = `.Projects[]{
+	    .ProjectRoot,.Source,.Constraint,.PackageCount,.Packages[],
+	    .Locked{.Branch,.Revision,.Version},.Latest{.Revision,.Version}
+	},
+	.Metadata{
+	    .AnalyzerName,.AnalyzerVersion,.InputsDigest,.SolverName,
+	    .SolverVersion
+	}`
 
 const statusShortHelp = `Report the status of the project's dependencies`
 const statusLongHelp = `
@@ -49,19 +59,36 @@ const statusExamples = `
 dep status
 
 	Displays a table of the various dependencies in the project along with
-	their properties such as the constraints they are bound by and the 
+	their properties such as the constraints they are bound by and the
 	revision they are at.
+
+dep status -detail
+
+	Displays a detailed table of the dependencies in the project including
+	the value of any source rules used and full list of packages used from
+	each project (instead of simply a count). Text wrapping may make this
+	output hard to read.
 
 dep status -f='{{if eq .Constraint "master"}}{{.ProjectRoot}} {{end}}'
 
 	Displays the list of package names constrained on the master branch.
-	The -f flag allows you to use Go templates along with it's various 
-	constructs for formating the output data. Available flags are as follows:
+	The -f flag allows you to use Go templates along with it's various
+	constructs for formating output data. Available flags are as follows:
 	` + availableTemplateVariables + `
+
+dep status -detail -f='{{range $i, $p := .Projects}}{{if ne .Source "" -}}
+	    {{- if $i}},{{end}}{{$p.ProjectRoot}}:{{$p.Source}}{{end}}{{end}}'
+
+	Displays the package name and source for each package with a source
+	rule defined, with a comma between each name-source pair.
+
+	When used with -detail, the -f flag applies the supplied Go templates
+	to the full output document, instead of to packages one at a time.
+	Available flags are as follows: ` + availableDefaultTemplateVariables + `
 
 dep status -json
 
-	Displays the dependency information in JSON format as a list of 
+	Displays the dependency information in JSON format as a list of
 	project objects. Each project object contains keys which correspond
 	to the table column names from the standard 'dep status' command.
 
@@ -97,25 +124,34 @@ func (cmd *statusCommand) Register(fs *flag.FlagSet) {
 	fs.BoolVar(&cmd.examples, "examples", false, "print detailed usage examples")
 	fs.BoolVar(&cmd.json, "json", false, "output in JSON format")
 	fs.StringVar(&cmd.template, "f", "", "output in text/template format")
+	fs.BoolVar(&cmd.lock, "lock", false, "output in the lock file format (assumes -detail)")
 	fs.BoolVar(&cmd.dot, "dot", false, "output the dependency graph in GraphViz format")
 	fs.BoolVar(&cmd.old, "old", false, "only show out-of-date dependencies")
 	fs.BoolVar(&cmd.missing, "missing", false, "only show missing dependencies")
+	fs.StringVar(&cmd.outFilePath, "out", "", "path to a file to which to write the output. Blank value will be ignored")
+	fs.BoolVar(&cmd.detail, "detail", false, "include more detail in the chosen format")
 }
 
 type statusCommand struct {
-	examples bool
-	json     bool
-	template string
-	output   string
-	dot      bool
-	old      bool
-	missing  bool
+	examples    bool
+	json        bool
+	template    string
+	lock        bool
+	output      string
+	dot         bool
+	old         bool
+	missing     bool
+	outFilePath string
+	detail      bool
 }
 
 type outputter interface {
 	BasicHeader() error
 	BasicLine(*BasicStatus) error
 	BasicFooter() error
+	DetailHeader(*dep.SolveMeta) error
+	DetailLine(*DetailStatus) error
+	DetailFooter(*dep.SolveMeta) error
 	MissingHeader() error
 	MissingLine(*MissingStatus) error
 	MissingFooter() error
@@ -148,6 +184,29 @@ func (out *tableOutput) BasicLine(bs *BasicStatus) error {
 		formatVersion(bs.Revision),
 		bs.getConsolidatedLatest(shortRev),
 		bs.PackageCount,
+	)
+	return err
+}
+
+func (out *tableOutput) DetailHeader(metadata *dep.SolveMeta) error {
+	_, err := fmt.Fprintf(out.w, "PROJECT\tSOURCE\tCONSTRAINT\tVERSION\tREVISION\tLATEST\tPKGS USED\n")
+	return err
+}
+
+func (out *tableOutput) DetailFooter(metadata *dep.SolveMeta) error {
+	return out.BasicFooter()
+}
+
+func (out *tableOutput) DetailLine(ds *DetailStatus) error {
+	_, err := fmt.Fprintf(out.w,
+		"%s\t%s\t%s\t%s\t%s\t%s\t[%s]\t\n",
+		ds.ProjectRoot,
+		ds.Source,
+		ds.getConsolidatedConstraint(),
+		formatVersion(ds.Version),
+		formatVersion(ds.Revision),
+		ds.getConsolidatedLatest(shortRev),
+		strings.Join(ds.Packages, ", "),
 	)
 	return err
 }
@@ -193,6 +252,7 @@ func (out *tableOutput) OldFooter() error {
 type jsonOutput struct {
 	w       io.Writer
 	basic   []*rawStatus
+	detail  []rawDetailProject
 	missing []*MissingStatus
 	old     []*rawOldStatus
 }
@@ -208,6 +268,25 @@ func (out *jsonOutput) BasicFooter() error {
 
 func (out *jsonOutput) BasicLine(bs *BasicStatus) error {
 	out.basic = append(out.basic, bs.marshalJSON())
+	return nil
+}
+
+func (out *jsonOutput) DetailHeader(metadata *dep.SolveMeta) error {
+	out.detail = []rawDetailProject{}
+	return nil
+}
+
+func (out *jsonOutput) DetailFooter(metadata *dep.SolveMeta) error {
+	doc := rawDetail{
+		Projects: out.detail,
+		Metadata: newRawMetadata(metadata),
+	}
+
+	return json.NewEncoder(out.w).Encode(doc)
+}
+
+func (out *jsonOutput) DetailLine(ds *DetailStatus) error {
+	out.detail = append(out.detail, *ds.marshalJSON())
 	return nil
 }
 
@@ -269,13 +348,26 @@ func (out *dotOutput) BasicLine(bs *BasicStatus) error {
 	return nil
 }
 
+func (out *dotOutput) DetailHeader(metadata *dep.SolveMeta) error {
+	return out.BasicHeader()
+}
+
+func (out *dotOutput) DetailFooter(metadata *dep.SolveMeta) error {
+	return out.BasicFooter()
+}
+
+func (out *dotOutput) DetailLine(ds *DetailStatus) error {
+	return out.BasicLine(&ds.BasicStatus)
+}
+
 func (out *dotOutput) MissingHeader() error                { return nil }
 func (out *dotOutput) MissingLine(ms *MissingStatus) error { return nil }
 func (out *dotOutput) MissingFooter() error                { return nil }
 
 type templateOutput struct {
-	w    io.Writer
-	tmpl *template.Template
+	w      io.Writer
+	tmpl   *template.Template
+	detail []rawDetailProject
 }
 
 func (out *templateOutput) BasicHeader() error { return nil }
@@ -290,6 +382,37 @@ func (out *templateOutput) BasicLine(bs *BasicStatus) error {
 		PackageCount: bs.PackageCount,
 	}
 	return out.tmpl.Execute(out.w, data)
+}
+
+func (out *templateOutput) DetailHeader(metadata *dep.SolveMeta) error {
+	out.detail = []rawDetailProject{}
+
+	return nil
+}
+
+func (out *templateOutput) DetailFooter(metadata *dep.SolveMeta) error {
+	raw := rawDetail{
+		Projects: out.detail,
+		Metadata: newRawMetadata(metadata),
+	}
+
+	return out.tmpl.Execute(out.w, raw)
+}
+
+func (out *templateOutput) DetailLine(ds *DetailStatus) error {
+	data := rawDetailProject{
+		ProjectRoot:  ds.ProjectRoot,
+		Constraint:   ds.getConsolidatedConstraint(),
+		Locked:       formatDetailVersion(ds.Version, ds.Revision),
+		Latest:       formatDetailLatestVersion(ds.Latest, ds.hasError),
+		PackageCount: ds.PackageCount,
+		Source:       ds.Source,
+		Packages:     ds.Packages,
+	}
+
+	out.detail = append(out.detail, data)
+
+	return nil
 }
 
 func (out *templateOutput) OldHeader() error { return nil }
@@ -346,7 +469,16 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 			w: &buf,
 		}
 	case cmd.template != "":
-		tmpl, err := template.New("status").Parse(cmd.template)
+		tmpl, err := parseStatusTemplate(cmd.template)
+		if err != nil {
+			return err
+		}
+		out = &templateOutput{
+			w:    &buf,
+			tmpl: tmpl,
+		}
+	case cmd.lock:
+		tmpl, err := parseStatusTemplate(statusLockTemplate)
 		if err != nil {
 			return err
 		}
@@ -374,7 +506,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	hasMissingPkgs, errCount, err := runStatusAll(ctx, out, p, sm)
+	hasMissingPkgs, errCount, err := cmd.runStatusAll(ctx, out, p, sm)
 	if err != nil {
 		switch err {
 		case errFailedUpdate:
@@ -399,8 +531,20 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	// Print the status output
-	ctx.Out.Print(buf.String())
+	if cmd.outFilePath == "" {
+		// Print the status output
+		ctx.Out.Print(buf.String())
+	} else {
+		file, err := os.Create(cmd.outFilePath)
+		if err != nil {
+			return fmt.Errorf("error creating output file: %v", err)
+		}
+
+		defer file.Close()
+		if _, err := io.Copy(file, bytes.NewReader(buf.Bytes())); err != nil {
+			return fmt.Errorf("error writing output file: %v", err)
+		}
+	}
 
 	return nil
 }
@@ -417,6 +561,10 @@ func (cmd *statusCommand) validateFlags() error {
 		opModes = append(opModes, "-missing")
 	}
 
+	if cmd.detail {
+		opModes = append(opModes, "-detail")
+	}
+
 	// Check if any other flags are passed with -dot.
 	if cmd.dot {
 		if cmd.template != "" {
@@ -429,6 +577,16 @@ func (cmd *statusCommand) validateFlags() error {
 
 		if len(opModes) > 0 {
 			return errors.New("-dot generates dependency graph; cannot pass other flags")
+		}
+	}
+
+	if cmd.lock {
+		if cmd.template != "" {
+			return errors.New("cannot pass template string with -lock")
+		}
+
+		if !cmd.detail {
+			cmd.detail = true
 		}
 	}
 
@@ -584,6 +742,51 @@ type rawStatus struct {
 	PackageCount int
 }
 
+// rawDetail is is additional information used for the status when the
+// -detail flag is specified
+type rawDetail struct {
+	Projects []rawDetailProject
+	Metadata rawDetailMetadata
+}
+
+type rawDetailVersion struct {
+	Revision string `json:"Revision,omitempty"`
+	Version  string `json:"Version,omitempty"`
+	Branch   string `json:"Branch,omitempty"`
+}
+
+type rawDetailProject struct {
+	ProjectRoot  string
+	Packages     []string
+	Locked       rawDetailVersion
+	Latest       rawDetailVersion
+	Source       string `json:"Source,omitempty"`
+	Constraint   string
+	PackageCount int
+}
+
+type rawDetailMetadata struct {
+	AnalyzerName    string
+	AnalyzerVersion int
+	InputsDigest    string
+	SolverName      string
+	SolverVersion   int
+}
+
+func newRawMetadata(metadata *dep.SolveMeta) rawDetailMetadata {
+	if metadata == nil {
+		return rawDetailMetadata{}
+	}
+
+	return rawDetailMetadata{
+		AnalyzerName:    metadata.AnalyzerName,
+		AnalyzerVersion: metadata.AnalyzerVersion,
+		InputsDigest:    hex.EncodeToString(metadata.InputsDigest),
+		SolverName:      metadata.SolverName,
+		SolverVersion:   metadata.SolverVersion,
+	}
+}
+
 // BasicStatus contains all the information reported about a single dependency
 // in the summary/list status output mode.
 type BasicStatus struct {
@@ -596,6 +799,15 @@ type BasicStatus struct {
 	PackageCount int
 	hasOverride  bool
 	hasError     bool
+}
+
+// DetailStatus contains all information reported about a single dependency
+// in the detailed status output mode. The included information matches the
+// information included about a a project in a lock file.
+type DetailStatus struct {
+	BasicStatus
+	Packages []string
+	Source   string
 }
 
 func (bs *BasicStatus) getConsolidatedConstraint() string {
@@ -652,13 +864,27 @@ func (bs *BasicStatus) marshalJSON() *rawStatus {
 	}
 }
 
+func (ds *DetailStatus) marshalJSON() *rawDetailProject {
+	rawStatus := ds.BasicStatus.marshalJSON()
+
+	return &rawDetailProject{
+		ProjectRoot:  rawStatus.ProjectRoot,
+		Constraint:   rawStatus.Constraint,
+		Locked:       formatDetailVersion(ds.Version, ds.Revision),
+		Latest:       formatDetailLatestVersion(ds.Latest, ds.hasError),
+		Source:       ds.Source,
+		Packages:     ds.Packages,
+		PackageCount: ds.PackageCount,
+	}
+}
+
 // MissingStatus contains information about all the missing packages in a project.
 type MissingStatus struct {
 	ProjectRoot     string
 	MissingPackages []string
 }
 
-func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
+func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
 	ptree, err := p.ParseRootPackageTree()
@@ -711,14 +937,10 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
 
-		if err := out.BasicHeader(); err != nil {
-			return false, 0, err
-		}
-
 		logger.Println("Checking upstream projects:")
 
-		// BasicStatus channel to collect all the BasicStatus.
-		bsCh := make(chan *BasicStatus, len(slp))
+		// DetailStatus channel to collect all the DetailStatus.
+		dsCh := make(chan *DetailStatus, len(slp))
 
 		// Error channels to collect different errors.
 		errListPkgCh := make(chan error, len(slp))
@@ -821,14 +1043,23 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 					}
 				}
 
-				bsCh <- &bs
+				ds := DetailStatus{
+					BasicStatus: bs,
+				}
+
+				if cmd.detail {
+					ds.Source = proj.Ident().Source
+					ds.Packages = proj.Packages()
+				}
+
+				dsCh <- &ds
 
 				wg.Done()
 			}(proj)
 		}
 
 		wg.Wait()
-		close(bsCh)
+		close(dsCh)
 		close(errListPkgCh)
 		close(errListVerCh)
 
@@ -865,23 +1096,30 @@ func runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceMana
 			}
 		}
 
-		// A map of ProjectRoot and *BasicStatus. This is used in maintain the
-		// order of BasicStatus in output by collecting all the BasicStatus and
-		// then using them in order.
-		bsMap := make(map[string]*BasicStatus)
-		for bs := range bsCh {
-			bsMap[bs.ProjectRoot] = bs
-		}
+		if cmd.detail {
+			// A map of ProjectRoot and *DetailStatus. This is used in maintain the
+			// order of DetailStatus in output by collecting all the DetailStatus and
+			// then using them in order.
+			dsMap := make(map[string]*DetailStatus)
+			for ds := range dsCh {
+				dsMap[ds.ProjectRoot] = ds
+			}
 
-		// Use the collected BasicStatus in outputter.
-		for _, proj := range slp {
-			if err := out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)]); err != nil {
+			if err := detailOutputAll(out, slp, dsMap, &p.Lock.SolveMeta); err != nil {
 				return false, 0, err
 			}
-		}
+		} else {
+			// A map of ProjectRoot and *BasicStatus. This is used in maintain the
+			// order of BasicStatus in output by collecting all the BasicStatus and
+			// then using them in order.
+			bsMap := make(map[string]*BasicStatus)
+			for bs := range dsCh {
+				bsMap[bs.ProjectRoot] = &bs.BasicStatus
+			}
 
-		if footerErr := out.BasicFooter(); footerErr != nil {
-			return false, 0, footerErr
+			if err := basicOutputAll(out, slp, bsMap); err != nil {
+				return false, 0, err
+			}
 		}
 
 		return false, errCount, err
@@ -956,6 +1194,42 @@ outer:
 	return hasMissingPkgs, 0, errInputDigestMismatch
 }
 
+// basicOutputAll takes an outputter, a project list, and a map of ProjectRoot to *BasicStatus and
+// uses the outputter to output basic header, body lines (in the order of the project list), and
+// footer based on the project information.
+func basicOutputAll(out outputter, slp []gps.LockedProject, bsMap map[string]*BasicStatus) (err error) {
+	if err := out.BasicHeader(); err != nil {
+		return err
+	}
+
+	// Use the collected BasicStatus in outputter.
+	for _, proj := range slp {
+		if err := out.BasicLine(bsMap[string(proj.Ident().ProjectRoot)]); err != nil {
+			return err
+		}
+	}
+
+	return out.BasicFooter()
+}
+
+// detailOutputAll takes an outputter, a project list, and a map of ProjectRoot to *DetailStatus and
+// uses the outputter to output detailed header, body lines (in the order of the project list), and
+// footer based on the project information.
+func detailOutputAll(out outputter, slp []gps.LockedProject, dsMap map[string]*DetailStatus, metadata *dep.SolveMeta) (err error) {
+	if err := out.DetailHeader(metadata); err != nil {
+		return err
+	}
+
+	// Use the collected BasicStatus in outputter.
+	for _, proj := range slp {
+		if err := out.DetailLine(dsMap[string(proj.Ident().ProjectRoot)]); err != nil {
+			return err
+		}
+	}
+
+	return out.DetailFooter(metadata)
+}
+
 func formatVersion(v gps.Version) string {
 	if v == nil {
 		return ""
@@ -971,6 +1245,40 @@ func formatVersion(v gps.Version) string {
 		return r
 	}
 	return v.String()
+}
+
+func formatDetailVersion(v gps.Version, r gps.Revision) rawDetailVersion {
+	if v == nil {
+		return rawDetailVersion{
+			Revision: r.String(),
+		}
+	}
+	switch v.Type() {
+	case gps.IsBranch:
+		return rawDetailVersion{
+			Branch:   v.String(),
+			Revision: r.String(),
+		}
+	case gps.IsRevision:
+		return rawDetailVersion{
+			Revision: v.String(),
+		}
+	}
+
+	return rawDetailVersion{
+		Version:  v.String(),
+		Revision: r.String(),
+	}
+}
+
+func formatDetailLatestVersion(v gps.Version, hasError bool) rawDetailVersion {
+	if hasError {
+		return rawDetailVersion{
+			Revision: "unknown",
+		}
+	}
+
+	return formatDetailVersion(v, "")
 }
 
 // projectConstraint stores ProjectRoot and Constraint for that project.
@@ -1099,3 +1407,34 @@ type byProject []projectConstraint
 func (p byProject) Len() int           { return len(p) }
 func (p byProject) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p byProject) Less(i, j int) bool { return p[i].Project < p[j].Project }
+
+func parseStatusTemplate(format string) (*template.Template, error) {
+	tmpl, err := template.New("status").Funcs(template.FuncMap{
+		"dec": func(i int) int {
+			return i - 1
+		},
+	}).Parse(format)
+
+	return tmpl, err
+}
+
+const statusLockTemplate = `# This file is autogenerated, do not edit; changes may be undone by the next 'dep ensure'.
+
+
+{{range $p := .Projects}}[[projects]]{{if $p.Locked.Branch}}
+  branch = "{{$p.Locked.Branch}}"{{end}}
+  name = "{{$p.ProjectRoot}}"
+  packages = [{{if eq 0 (len $p.Packages)}}"."]{{else}}{{range $i, $pkg := $p.Packages}}
+    "{{$pkg}}"{{if lt $i (dec (len $p.Packages))}},{{end}}{{end}}
+  ]{{end}}
+  revision = "{{$p.Locked.Revision}}"{{if $p.Source}}
+  source = "{{$p.Source}}"{{end}}{{if $p.Locked.Version}}
+  version = "{{$p.Locked.Version}}"{{end}}
+
+{{end}}[solve-meta]
+  analyzer-name = "{{.Metadata.AnalyzerName}}"
+  analyzer-version = {{.Metadata.AnalyzerVersion}}
+  inputs-digest = "{{.Metadata.InputsDigest}}"
+  solver-name = "{{.Metadata.SolverName}}"
+  solver-version = {{.Metadata.SolverVersion}}
+`
