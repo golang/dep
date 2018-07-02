@@ -152,6 +152,69 @@ func TestLoadProject(t *testing.T) {
 	}
 }
 
+func TestExplicitRootProject(t *testing.T) {
+	h := test.NewHelper(t)
+	defer h.Cleanup()
+
+	h.TempDir(filepath.Join("src", "test1", "sub"))
+	h.TempFile(filepath.Join("src", "test1", ManifestName), "")
+	h.TempFile(filepath.Join("src", "test1", LockName), `memo = "cdafe8641b28cd16fe025df278b0a49b9416859345d8b6ba0ace0272b74925ee"`)
+	h.TempDir(filepath.Join("src", "test2", "sub"))
+	h.TempFile(filepath.Join("src", "test2", ManifestName), "")
+	h.Setenv("DEP_PROJECT_ROOT", "github.com/user/module")
+
+	type tcase struct {
+		name string
+		lock bool
+		wd   string
+	}
+	var testcases = []tcase{
+		{"direct", true, filepath.Join("src", "test1")},
+		{"ascending", true, filepath.Join("src", "test1", "sub")},
+		{"without lock", false, filepath.Join("src", "test2")},
+		{"ascending without lock", false, filepath.Join("src", "test2", "sub")},
+	}
+
+	tf := func(withGOPATH bool, tc tcase, t *testing.T) func(t *testing.T) {
+		return func(t *testing.T) {
+			ctx := &Ctx{
+				Out: discardLogger(),
+				Err: discardLogger(),
+			}
+
+			var err error
+			if withGOPATH {
+				err = ctx.SetPaths(h.Path(tc.wd), h.Path("."))
+			} else {
+				err = ctx.SetPaths(h.Path(tc.wd))
+			}
+			if err != nil {
+				t.Fatalf("%+v", err)
+			}
+			ctx.ExplicitRoot = "github.com/user/module"
+
+			p, err := ctx.LoadProject()
+			switch {
+			case err != nil:
+				t.Fatalf("%s: LoadProject failed: %+v", tc.wd, err)
+			case p.Manifest == nil:
+				t.Fatalf("%s: Manifest file didn't load", tc.wd)
+			case tc.lock && p.Lock == nil:
+				t.Fatalf("%s: Lock file didn't load", tc.wd)
+			case !tc.lock && p.Lock != nil:
+				t.Fatalf("%s: Non-existent Lock file loaded", tc.wd)
+			}
+		}
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("within-GOPATH", tf(true, tc, t))
+			t.Run("outside-GOPATH", tf(false, tc, t))
+		})
+	}
+}
+
 func TestLoadProjectNotFoundErrors(t *testing.T) {
 	tg := test.NewHelper(t)
 	defer tg.Cleanup()
@@ -313,9 +376,9 @@ func TestLoadProjectGopkgFilenames(t *testing.T) {
 	}
 }
 
-// TestCaseInsentitive is test for Windows. This should work even though set
+// TestCaseInsensitive is test for Windows. This should work even though set
 // difference letter cases in GOPATH.
-func TestCaseInsentitiveGOPATH(t *testing.T) {
+func TestCaseInsensitiveGOPATH(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("skip this test on non-Windows")
 	}

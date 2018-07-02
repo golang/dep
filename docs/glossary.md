@@ -75,7 +75,7 @@ Stands for "Go packaging solver", it is [a subtree of library-style packages wit
 
 dep maintains its own, pristine set of upstream sources (so, generally, git repository clones). This is kept separate from `$GOPATH/src` so that there is no obligation to maintain disk state within `$GOPATH`, as dep frequently needs to change disk state in order to do its work.
 
-By default, the local cache lives at `$GOPATH/pkg/dep`. If you have multiple `$GOPATH` entries, dep will use whichever is the logical parent of the process' working directory. Alternatively, the location can be forced via the `DEPCACHEDIR` environment variable.
+By default, the local cache lives at `$GOPATH/pkg/dep`. If you have multiple `$GOPATH` entries, dep will use whichever is the logical parent of the process' working directory. Alternatively, the location can be forced via the [`DEPCACHEDIR` environment variable](env-vars.md#depcachedir).
 
 ### Lock
 
