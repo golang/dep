@@ -15,7 +15,7 @@ build:
 	cp ./release/dep-$(PLATFORM)-$(ARCH) dep
 
 licenseok:
-	go build ./hack/licenseok
+	go build -o licenseok ./hack/licenseok/main.go
 
 validate: build licenseok
 	./hack/lint.bash
