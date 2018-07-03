@@ -630,7 +630,7 @@ func (m *Manifest) HasConstraintsOn(root gps.ProjectRoot) bool {
 
 // RequiredPackages returns a set of import paths to require.
 func (m *Manifest) RequiredPackages() map[string]bool {
-	if m == nil {
+	if m == nil || m == (*Manifest)(nil) {
 		return map[string]bool{}
 	}
 

@@ -175,40 +175,39 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, errors.Wrapf(err, "error while parsing %s", mp)
 	}
 
-	lp := filepath.Join(p.AbsRoot, LockName)
-	lf, err := os.Open(lp)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// It's fine for the lock not to exist
-			return p, nil
-		}
-		// But if a lock does exist and we can't open it, that's a problem
-		return nil, errors.Wrapf(err, "could not open %s", lp)
-	}
-	defer lf.Close()
-
-	p.Lock, err = readLock(lf)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error while parsing %s", lp)
-	}
-
 	// Parse in the root package tree.
 	ptree, err := p.parseRootPackageTree()
 	if err != nil {
 		return nil, err
 	}
 
-	// If there's a current Lock, apply the input and pruneopt changes that we
-	// can know without solving.
-	if p.Lock != nil {
-		p.ChangedLock = p.Lock.dup()
-		p.ChangedLock.SolveMeta.InputImports = externalImportList(ptree, p.Manifest)
+	lp := filepath.Join(p.AbsRoot, LockName)
+	lf, err := os.Open(lp)
+	if err == nil {
+		defer lf.Close()
 
-		for k, lp := range p.ChangedLock.Projects() {
-			vp := lp.(verify.VerifiableProject)
-			vp.PruneOpts = p.Manifest.PruneOptions.PruneOptionsFor(lp.Ident().ProjectRoot)
-			p.ChangedLock.P[k] = vp
+		p.Lock, err = readLock(lf)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error while parsing %s", lp)
 		}
+
+		// If there's a current Lock, apply the input and pruneopt changes that we
+		// can know without solving.
+		if p.Lock != nil {
+			p.ChangedLock = p.Lock.dup()
+			p.ChangedLock.SolveMeta.InputImports = externalImportList(ptree, p.Manifest)
+
+			for k, lp := range p.ChangedLock.Projects() {
+				vp := lp.(verify.VerifiableProject)
+				vp.PruneOpts = p.Manifest.PruneOptions.PruneOptionsFor(lp.Ident().ProjectRoot)
+				p.ChangedLock.P[k] = vp
+			}
+		}
+
+	} else if !os.IsNotExist(err) {
+		// It's fine for the lock not to exist, but if a file does exist and we
+		// can't open it, that's a problem.
+		return nil, errors.Wrapf(err, "could not open %s", lp)
 	}
 
 	return p, nil

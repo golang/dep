@@ -2,26 +2,32 @@
 
 
 [[projects]]
+  digest = "1:c0ee004f748a2e0a166f94d0aae3e4b34d0cb1aa95672075969feded052cde73"
   name = "github.com/ChinmayR/deptestglideA"
   packages = ["."]
+  pruneopts = "UT"
   revision = "cead75b1cde64ae1353ddbf73f6089303d6001b4"
   version = "v0.3.0"
 
 [[projects]]
+  digest = "1:855fce2344c810402e7e6d34a1e7e21f6b5e161689d0c3c086f920a212e3b074"
   name = "github.com/ChinmayR/deptestglideB"
   packages = ["."]
+  pruneopts = "UT"
   revision = "571b81795d767461736e6d0ca69e5f9840bdbf0e"
   version = "v0.5.0"
 
 [[projects]]
+  digest = "1:2cb412b34b26e26b270605d2c54e94a01b5f018ca060a87543bb3b72e21dca07"
   name = "github.com/ChinmayR/deptestglideC"
   packages = ["."]
+  pruneopts = "UT"
   revision = "4d3546304e8a1ceb6bb01e7e6201e852abb8ae4d"
   version = "v0.1.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "86bfffc8c6e5de1a4f6c613dcd88d5b76d8b5b17bf797320eb6842bf9239837d"
+  input-imports = ["github.com/ChinmayR/deptestglideA"]
   solver-name = "gps-cdcl"
   solver-version = 1

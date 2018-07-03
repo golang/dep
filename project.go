@@ -173,7 +173,7 @@ func (p *Project) parseRootPackageTree() (pkgtree.PackageTree, error) {
 // GetDirectDependencyNames returns the set of unique Project Roots that are the
 // direct dependencies of this Project.
 //
-// A project is considered a direct dependency if at least one of packages in it
+// A project is considered a direct dependency if at least one of its packages
 // is named in either this Project's required list, or if there is at least one
 // non-ignored import statement from a non-ignored package in the current
 // project's package tree.

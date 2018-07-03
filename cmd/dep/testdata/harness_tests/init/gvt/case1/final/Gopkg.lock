@@ -2,27 +2,37 @@
 
 
 [[projects]]
+  digest = "1:6a4b7ea94689d9d4f231605ecc0248fbcbf16419d8571adb59c00396e37bbfc2"
   name = "github.com/sdboyer/deptest"
   packages = ["."]
+  pruneopts = "UT"
   revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
   source = "https://github.com/carolynvs/deptest"
   version = "v0.8.1"
 
 [[projects]]
+  digest = "1:d71dc37a7f6ffbbe0c768f28d904acade8f068cbd96c6e6f0885425d3c3b8df9"
   name = "github.com/sdboyer/deptestdos"
   packages = ["."]
+  pruneopts = "UT"
   revision = "5c607206be5decd28e6263ffffdcee067266015e"
   version = "v2.0.0"
 
 [[projects]]
   branch = "v2"
+  digest = "1:10978cfda94a2069ac38ed0884b606aafe89f4578ff700b7845b02201a2d6b51"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
+  pruneopts = "UT"
   revision = "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d1681978cbca0e845950451461e0d69b58c5e896d9fd10ec5c159a4db3175161"
+  input-imports = [
+    "github.com/sdboyer/deptest",
+    "github.com/sdboyer/deptestdos",
+    "gopkg.in/yaml.v2"
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1

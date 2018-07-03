@@ -2,20 +2,24 @@
 
 
 [[projects]]
+  digest = "1:6a4b7ea94689d9d4f231605ecc0248fbcbf16419d8571adb59c00396e37bbfc2"
   name = "github.com/sdboyer/deptest"
   packages = ["."]
+  pruneopts = "UT"
   revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
   version = "v0.8.1"
 
 [[projects]]
+  digest = "1:d71dc37a7f6ffbbe0c768f28d904acade8f068cbd96c6e6f0885425d3c3b8df9"
   name = "github.com/sdboyer/deptestdos"
   packages = ["."]
+  pruneopts = "UT"
   revision = "5c607206be5decd28e6263ffffdcee067266015e"
   version = "v2.0.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1ed417a0bec57ffe988fae1cba8f3d49994fb893394d61844e0b3c96d69573fe"
+  input-imports = ["github.com/sdboyer/deptestdos"]
   solver-name = "gps-cdcl"
   solver-version = 1

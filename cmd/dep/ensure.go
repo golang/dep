@@ -278,6 +278,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		return err
 	}
 
+	var solve bool
 	lock := p.ChangedLock
 	if lock != nil {
 		lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)
@@ -298,21 +299,26 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 				}
 				ctx.Out.Println()
 			}
-
-			solver, err := gps.Prepare(params, sm)
-			if err != nil {
-				return errors.Wrap(err, "prepare solver")
-			}
-
-			solution, err := solver.Solve(context.TODO())
-			if err != nil {
-				return handleAllTheFailuresOfTheWorld(err)
-			}
-			lock = dep.LockFromSolution(solution, p.Manifest.PruneOptions)
+			solve = true
 		} else if cmd.noVendor {
 			// The user said not to touch vendor/, so definitely nothing to do.
 			return nil
 		}
+	} else {
+		solve = true
+	}
+
+	if solve {
+		solver, err := gps.Prepare(params, sm)
+		if err != nil {
+			return errors.Wrap(err, "prepare solver")
+		}
+
+		solution, err := solver.Solve(context.TODO())
+		if err != nil {
+			return handleAllTheFailuresOfTheWorld(err)
+		}
+		lock = dep.LockFromSolution(solution, p.Manifest.PruneOptions)
 	}
 
 	dw, err := dep.NewDeltaWriter(p.Lock, lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"))
@@ -414,34 +420,28 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 		return err
 	}
 
-	// We'll need to discard this prepared solver as later work changes params,
-	// but solver preparation is cheap and worth doing up front in order to
-	// perform the fastpath check of hash comparison.
-	solver, err := gps.Prepare(params, sm)
-	if err != nil {
-		return errors.Wrap(err, "fastpath solver prepare")
-	}
-
-	rm, _ := params.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
-
 	// Compile unique sets of 1) all external packages imported or required, and
 	// 2) the project roots under which they fall.
 	exmap := make(map[string]bool)
-	exrmap := make(map[gps.ProjectRoot]bool)
-
-	for _, ex := range append(rm.FlattenFn(paths.IsStandardImportPath), p.Manifest.Required...) {
-		exmap[ex] = true
-		root, err := sm.DeduceProjectRoot(ex)
-		if err != nil {
-			// This should be very uncommon to hit, as it entails that we
-			// couldn't deduce the root for an import, but that some previous
-			// solve run WAS able to deduce the root. It's most likely to occur
-			// if the user has e.g. not connected to their organization's VPN,
-			// and thus cannot access an internal go-get metadata service.
-			return errors.Wrapf(err, "could not deduce project root for %s", ex)
+	if p.ChangedLock != nil {
+		for _, imp := range p.ChangedLock.InputImports() {
+			exmap[imp] = true
 		}
-		exrmap[root] = true
+	} else {
+		// The only time we'll hit this branch is if
+		rm, _ := p.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
+		for _, imp := range rm.FlattenFn(paths.IsStandardImportPath) {
+			exmap[imp] = true
+		}
+		for imp := range p.Manifest.RequiredPackages() {
+			exmap[imp] = true
+		}
 	}
+
+	//exrmap, err := p.GetDirectDependencyNames(sm)
+	//if err != nil {
+	//return err
+	//}
 
 	// Note: these flags are only partially used by the latter parts of the
 	// algorithm; rather, it relies on inference. However, they remain in their
@@ -620,7 +620,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 
 	// Re-prepare a solver now that our params are complete.
-	solver, err = gps.Prepare(params, sm)
+	solver, err := gps.Prepare(params, sm)
 	if err != nil {
 		return errors.Wrap(err, "fastpath solver prepare")
 	}

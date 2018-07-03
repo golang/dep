@@ -15,6 +15,7 @@ import (
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/verify"
+	"github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
 )
@@ -135,7 +136,7 @@ func (sw *SafeWriter) HasManifest() bool {
 }
 
 type rawStringDiff struct {
-	*verify.StringDiff
+	*feedback.StringDiff
 }
 
 // MarshalTOML serializes the diff as a string.
@@ -152,7 +153,7 @@ type rawLockedProjectDiff struct {
 	Packages []rawStringDiff `toml:"packages,omitempty"`
 }
 
-func toRawLockedProjectDiff(diff verify.LockedProjectDiff) rawLockedProjectDiff {
+func toRawLockedProjectDiff(diff feedback.LockedProjectDiff) rawLockedProjectDiff {
 	// this is a shallow copy since we aren't modifying the raw diff
 	raw := rawLockedProjectDiff{Name: diff.Name}
 	if diff.Source != nil {
@@ -178,7 +179,7 @@ type rawLockedProjectDiffs struct {
 	Projects []rawLockedProjectDiff `toml:"projects"`
 }
 
-func toRawLockedProjectDiffs(diffs []verify.LockedProjectDiff) rawLockedProjectDiffs {
+func toRawLockedProjectDiffs(diffs []feedback.LockedProjectDiff) rawLockedProjectDiffs {
 	raw := rawLockedProjectDiffs{
 		Projects: make([]rawLockedProjectDiff, len(diffs)),
 	}

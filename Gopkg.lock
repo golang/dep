@@ -128,7 +128,7 @@
     "github.com/pkg/errors",
     "github.com/sdboyer/constext",
     "golang.org/x/sync/errgroup",
-    "gopkg.in/yaml.v2",
+    "gopkg.in/yaml.v2"
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -1,1 +1,0 @@
-Warning: Gopkg.lock is out of sync with Gopkg.toml or the project's imports.

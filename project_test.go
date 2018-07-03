@@ -148,6 +148,7 @@ func TestProjectMakeParams(t *testing.T) {
 		Manifest:   m,
 		Lock:       &Lock{},
 	}
+	p.ChangedLock = p.Lock
 
 	solveParam := p.MakeParams()
 

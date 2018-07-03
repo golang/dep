@@ -2,7 +2,7 @@
 
 
 [[projects]]
-  digest = "0:"
+  digest = "1:c4844614e2b12233bb037afec536831b92a4f58f7b712432b978d34df291e43a"
   name = "github.com/sdboyer/dep-test"
   packages = ["."]
   pruneopts = ""

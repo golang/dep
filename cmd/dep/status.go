@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -779,7 +778,6 @@ func newRawMetadata(metadata *dep.SolveMeta) rawDetailMetadata {
 	return rawDetailMetadata{
 		AnalyzerName:    metadata.AnalyzerName,
 		AnalyzerVersion: metadata.AnalyzerVersion,
-		InputsDigest:    hex.EncodeToString(metadata.InputsDigest),
 		SolverName:      metadata.SolverName,
 		SolverVersion:   metadata.SolverVersion,
 	}
@@ -920,6 +918,10 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 	slp := p.Lock.Projects()
 	sort.Slice(slp, func(i, j int) bool {
 		return slp[i].Ident().Less(slp[j].Ident())
+	})
+	slcp := p.ChangedLock.Projects()
+	sort.Slice(slcp, func(i, j int) bool {
+		return slcp[i].Ident().Less(slcp[j].Ident())
 	})
 
 	lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)

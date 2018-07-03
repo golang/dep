@@ -131,12 +131,18 @@ func fromRawLock(raw rawLock) (*Lock, error) {
 
 // Projects returns the list of LockedProjects contained in the lock data.
 func (l *Lock) Projects() []gps.LockedProject {
+	if l == nil || l == (*Lock)(nil) {
+		return nil
+	}
 	return l.P
 }
 
 // InputImports reports the list of input imports that were used in generating
 // this Lock.
 func (l *Lock) InputImports() []string {
+	if l == nil || l == (*Lock)(nil) {
+		return nil
+	}
 	return l.SolveMeta.InputImports
 }
 
