@@ -42,6 +42,13 @@ type TestProject struct {
 
 // NewTestProject initializes a new test's project directory.
 func NewTestProject(t *testing.T, initPath, wd string, run RunFunc) *TestProject {
+	// Cleaning up the GIT_DIR variable is useful when running tests under git
+	// rebase. In any case, since we're operating with temporary clones,
+	// no pre-existing value could be useful here.
+	// We do it globally because the internal runs don't actually use the
+	// TestProject's environment.
+	os.Unsetenv("GIT_DIR")
+
 	new := &TestProject{
 		t:      t,
 		origWd: wd,
