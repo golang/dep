@@ -15,7 +15,6 @@ import (
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/verify"
-	"github.com/golang/dep/internal/feedback"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
 )
@@ -133,62 +132,6 @@ func (sw *SafeWriter) HasLock() bool {
 // HasManifest checks if a Manifest is present in the SafeWriter
 func (sw *SafeWriter) HasManifest() bool {
 	return sw.Manifest != nil
-}
-
-type rawStringDiff struct {
-	*feedback.StringDiff
-}
-
-// MarshalTOML serializes the diff as a string.
-func (diff rawStringDiff) MarshalTOML() ([]byte, error) {
-	return []byte(diff.String()), nil
-}
-
-type rawLockedProjectDiff struct {
-	Name     gps.ProjectRoot `toml:"name"`
-	Source   *rawStringDiff  `toml:"source,omitempty"`
-	Version  *rawStringDiff  `toml:"version,omitempty"`
-	Branch   *rawStringDiff  `toml:"branch,omitempty"`
-	Revision *rawStringDiff  `toml:"revision,omitempty"`
-	Packages []rawStringDiff `toml:"packages,omitempty"`
-}
-
-func toRawLockedProjectDiff(diff feedback.LockedProjectDiff) rawLockedProjectDiff {
-	// this is a shallow copy since we aren't modifying the raw diff
-	raw := rawLockedProjectDiff{Name: diff.Name}
-	if diff.Source != nil {
-		raw.Source = &rawStringDiff{diff.Source}
-	}
-	if diff.Version != nil {
-		raw.Version = &rawStringDiff{diff.Version}
-	}
-	if diff.Branch != nil {
-		raw.Branch = &rawStringDiff{diff.Branch}
-	}
-	if diff.Revision != nil {
-		raw.Revision = &rawStringDiff{diff.Revision}
-	}
-	raw.Packages = make([]rawStringDiff, len(diff.Packages))
-	for i := 0; i < len(diff.Packages); i++ {
-		raw.Packages[i] = rawStringDiff{&diff.Packages[i]}
-	}
-	return raw
-}
-
-type rawLockedProjectDiffs struct {
-	Projects []rawLockedProjectDiff `toml:"projects"`
-}
-
-func toRawLockedProjectDiffs(diffs []feedback.LockedProjectDiff) rawLockedProjectDiffs {
-	raw := rawLockedProjectDiffs{
-		Projects: make([]rawLockedProjectDiff, len(diffs)),
-	}
-
-	for i := 0; i < len(diffs); i++ {
-		raw.Projects[i] = toRawLockedProjectDiff(diffs[i])
-	}
-
-	return raw
 }
 
 // VendorBehavior defines when the vendor directory should be written.
@@ -452,6 +395,9 @@ func hasDotGit(path string) bool {
 	return err == nil
 }
 
+// DeltaWriter manages batched writes to populate vendor/ and update Gopkg.lock.
+// Its primary design goal is to minimize writes by only writing things that
+// have changed.
 type DeltaWriter struct {
 	lock         *Lock
 	lockDiff     verify.LockDelta
@@ -479,7 +425,7 @@ const (
 // directory by writing out only those projects that actually need to be written
 // out - they have changed in some way, or they lack the necessary hash
 // information to be verified.
-func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatus, prune gps.CascadingPruneOptions, vendorDir string, behavior VendorBehavior) (TransactionWriter, error) {
+func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatus, prune gps.CascadingPruneOptions, vendorDir string, behavior VendorBehavior) (DepWriter, error) {
 	sw := &DeltaWriter{
 		lock:         newLock,
 		pruneOptions: prune,
@@ -722,12 +668,15 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	return nil
 }
 
+// PrintPreparedActions indicates what changes the DeltaWriter plans to make.
 func (dw *DeltaWriter) PrintPreparedActions(output *log.Logger, verbose bool) error {
 	// FIXME
 	return nil
 }
 
-type TransactionWriter interface {
+// A DepWriter is responsible for writing important dep states to disk -
+// Gopkg.lock, vendor, and possibly Gopkg.toml.
+type DepWriter interface {
 	PrintPreparedActions(output *log.Logger, verbose bool) error
 	Write(path string, sm gps.SourceManager, examples bool, logger *log.Logger) error
 }

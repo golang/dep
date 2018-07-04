@@ -59,6 +59,8 @@ type CascadingPruneOptions struct {
 	PerProjectOptions map[ProjectRoot]PruneOptionSet
 }
 
+// ParsePruneOptions extracts PruneOptions from a string using the standard
+// encoding.
 func ParsePruneOptions(input string) (PruneOptions, error) {
 	var po PruneOptions
 	for _, char := range input {

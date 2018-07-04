@@ -1,5 +1,7 @@
 # (next version)
 
+# v0.5.0
+
 NEW FEATURES:
 
 * Add CI tests against go1.10. Drop support for go1.8. ([#1620](https://github.com/golang/dep/pull/1620)).
@@ -7,6 +9,8 @@ NEW FEATURES:
 * List out of date projects in dep status ([#1553](https://github.com/golang/dep/pull/1553)).
 * Enabled opt-in persistent caching via `DEPCACHEAGE` env var. ([#1711](https://github.com/golang/dep/pull/1711)).
 * Allow `DEPPROJECTROOT` [environment variable](https://golang.github.io/dep/docs/env-vars.html#depprojectroot) to supersede GOPATH deduction and explicitly set the current project's [root](https://golang.github.io/dep/docs/glossary.html#project-root) ([#1883](https://github.com/golang/dep/pull/1883)).
+* `dep ensure` now explains what changes to the code or Gopkg.toml have induced solving ([#1912](https://github.com/golang/dep/pull/1912)).
+* Hash digests of vendor contents are now stored in `Gopkg.lock`, and the contents of vendor are only rewritten on change or hash mismatch ([#1912](https://github.com/golang/dep/pull/1912)).
 
 BUG FIXES:
 
@@ -17,6 +21,7 @@ IMPROVEMENTS:
 * Add template operations support in dep status template output ([#1549](https://github.com/golang/dep/pull/1549)).
 * Reduce network access by trusting local source information and only pulling from upstream when necessary ([#1250](https://github.com/golang/dep/pull/1250)).
 * Update our dependency on Masterminds/semver to follow upstream again now that [Masterminds/semver#67](https://github.com/Masterminds/semver/pull/67) is merged([#1792](https://github.com/golang/dep/pull/1792)).
+* `inputs-digest` was removed from `Gopkg.lock` ([#1912](https://github.com/golang/dep/pull/1912)).
 
 WIP:
 * Enable importing external configuration from dependencies during init (#1277). This is feature flagged and disabled by default.

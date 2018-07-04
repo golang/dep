@@ -121,6 +121,7 @@ func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
 
 // Suppress unused linting warning.
 var _ = (*selection)(nil).getSelectedPackagesIn
+var _ = (*selection)(nil).getProjectImportMap
 
 // Compute a list of the unique packages within the given ProjectIdentifier that
 // are currently selected, and the number of times each package has been

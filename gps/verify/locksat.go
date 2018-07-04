@@ -176,7 +176,7 @@ func (ls LockSatisfaction) UnmatchedOverrides() map[gps.ProjectRoot]ConstraintMi
 	return ls.badovr
 }
 
-// UnmatchedOverrides reports any normal, non-override constraint rules that
+// UnmatchedConstraints reports any normal, non-override constraint rules that
 // were not satisfied by the corresponding LockedProject in the Lock.
 func (ls LockSatisfaction) UnmatchedConstraints() map[gps.ProjectRoot]ConstraintMismatch {
 	return ls.badconstraint
@@ -186,7 +186,7 @@ func findEffectualConstraints(m gps.Manifest, imports map[string]bool) map[strin
 	eff := make(map[string]bool)
 	xt := radix.New()
 
-	for pr, _ := range m.DependencyConstraints() {
+	for pr := range m.DependencyConstraints() {
 		// FIXME(sdboyer) this has the trailing slash ambiguity problem; adapt
 		// code from the solver
 		xt.Insert(string(pr), nil)

@@ -161,13 +161,6 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 
 	rootAnalyzer.FinalizeRootManifestAndLock(p.Manifest, p.Lock, copyLock)
 
-	// Run gps.Prepare with appropriate constraint solutions from solve run
-	// to generate the final lock memo.
-	s, err = gps.Prepare(params, sm)
-	if err != nil {
-		return errors.Wrap(err, "init failed: unable to recalculate the lock digest")
-	}
-
 	// Pass timestamp (yyyyMMddHHmmss format) as suffix to backup name.
 	vendorbak, err := dep.BackupVendor(filepath.Join(root, "vendor"), time.Now().Format("20060102150405"))
 	if err != nil {
