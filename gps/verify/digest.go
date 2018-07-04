@@ -373,7 +373,7 @@ func ParseVersionedDigest(input string) (VersionedDigest, error) {
 	return vd, nil
 }
 
-// VerifyDepTree verifies a dependency tree according to expected digest sums,
+// CheckDepTree verifies a dependency tree according to expected digest sums,
 // and returns an associative array of file system nodes and their respective
 // vendor status conditions.
 //
@@ -383,7 +383,7 @@ func ParseVersionedDigest(input string) (VersionedDigest, error) {
 // platform where the file system path separator is a character other than
 // solidus, one particular dependency would be represented as
 // "github.com/alice/alice1".
-func VerifyDepTree(osDirname string, wantDigests map[string]VersionedDigest) (map[string]VendorStatus, error) {
+func CheckDepTree(osDirname string, wantDigests map[string]VersionedDigest) (map[string]VendorStatus, error) {
 	osDirname = filepath.Clean(osDirname)
 
 	// Ensure top level pathname is a directory

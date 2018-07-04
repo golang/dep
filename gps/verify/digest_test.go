@@ -173,7 +173,7 @@ func TestVerifyDepTree(t *testing.T) {
 			}
 		}
 
-		status, err := VerifyDepTree(vendorRoot, wantDigests)
+		status, err := CheckDepTree(vendorRoot, wantDigests)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -214,7 +214,7 @@ func TestVerifyDepTree(t *testing.T) {
 			}
 		}
 
-		status, err := VerifyDepTree(vendorRoot, wantDigests)
+		status, err := CheckDepTree(vendorRoot, wantDigests)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -252,7 +252,7 @@ func BenchmarkVerifyDepTree(b *testing.B) {
 	prefix := filepath.Join(os.Getenv("GOPATH"), "src")
 
 	for i := 0; i < b.N; i++ {
-		_, err := VerifyDepTree(prefix, nil)
+		_, err := CheckDepTree(prefix, nil)
 		if err != nil {
 			b.Fatal(err)
 		}

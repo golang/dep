@@ -203,7 +203,7 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 			sums[string(lp.Ident().ProjectRoot)] = lp.(verify.VerifiableProject).Digest
 		}
 
-		status, err := verify.VerifyDepTree(vendorDir, sums)
+		status, err := verify.CheckDepTree(vendorDir, sums)
 		if err != nil {
 			ctx.Err.Printf("Error while verifying vendor directory: %q", err.Error())
 			os.Exit(1)

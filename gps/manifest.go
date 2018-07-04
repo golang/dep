@@ -96,28 +96,6 @@ func (m simpleRootManifest) IgnoredPackages() *pkgtree.IgnoredRuleset {
 func (m simpleRootManifest) RequiredPackages() map[string]bool {
 	return m.req
 }
-func (m simpleRootManifest) dup() simpleRootManifest {
-	m2 := simpleRootManifest{
-		c:   make(ProjectConstraints, len(m.c)),
-		ovr: make(ProjectConstraints, len(m.ovr)),
-		req: make(map[string]bool, len(m.req)),
-	}
-
-	for k, v := range m.c {
-		m2.c[k] = v
-	}
-	for k, v := range m.ovr {
-		m2.ovr[k] = v
-	}
-	for k, v := range m.req {
-		m2.req[k] = v
-	}
-
-	// IgnoredRulesets are immutable, and safe to reuse.
-	m2.ig = m.ig
-
-	return m2
-}
 
 // prepManifest ensures a manifest is prepared and safe for use by the solver.
 // This is mostly about ensuring that no outside routine can modify the manifest

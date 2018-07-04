@@ -404,7 +404,6 @@ type DeltaWriter struct {
 	pruneOptions gps.CascadingPruneOptions
 	vendorDir    string
 	changed      map[gps.ProjectRoot]changeType
-	status       map[string]verify.VendorStatus
 	behavior     VendorBehavior
 }
 
@@ -425,7 +424,7 @@ const (
 // directory by writing out only those projects that actually need to be written
 // out - they have changed in some way, or they lack the necessary hash
 // information to be verified.
-func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatus, prune gps.CascadingPruneOptions, vendorDir string, behavior VendorBehavior) (DepWriter, error) {
+func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatus, prune gps.CascadingPruneOptions, vendorDir string, behavior VendorBehavior) (TreeWriter, error) {
 	sw := &DeltaWriter{
 		lock:         newLock,
 		pruneOptions: prune,
@@ -674,9 +673,9 @@ func (dw *DeltaWriter) PrintPreparedActions(output *log.Logger, verbose bool) er
 	return nil
 }
 
-// A DepWriter is responsible for writing important dep states to disk -
+// A TreeWriter is responsible for writing important dep states to disk -
 // Gopkg.lock, vendor, and possibly Gopkg.toml.
-type DepWriter interface {
+type TreeWriter interface {
 	PrintPreparedActions(output *log.Logger, verbose bool) error
 	Write(path string, sm gps.SourceManager, examples bool, logger *log.Logger) error
 }
