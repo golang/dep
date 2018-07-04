@@ -321,7 +321,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		lock = dep.LockFromSolution(solution, p.Manifest.PruneOptions)
 	}
 
-	dw, err := dep.NewDeltaWriter(p.Lock, lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"))
+	dw, err := dep.NewDeltaWriter(p.Lock, lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
@@ -347,7 +347,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	}
 
 	// Pass the same lock as old and new so that the writer will observe no
-	// difference and choose not to write it out.
+	// difference and choose not to write it out, instead writing out only
 	sw, err := dep.NewSafeWriter(nil, p.Lock, p.ChangedLock, dep.VendorAlways, p.Manifest.PruneOptions)
 	if err != nil {
 		return err
@@ -396,7 +396,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"))
+	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
@@ -670,7 +670,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	sort.Strings(reqlist)
 
-	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"))
+	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}

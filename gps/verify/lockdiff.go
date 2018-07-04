@@ -29,19 +29,27 @@ func sortLockedProjects(lps []gps.LockedProject) []gps.LockedProject {
 	return cp
 }
 
+// LockDelta represents all possible differences between two Locks.
 type LockDelta struct {
 	AddedImportInputs   []string
 	RemovedImportInputs []string
 	ProjectDeltas       map[gps.ProjectRoot]LockedProjectDelta
 }
 
+// LockedProjectDelta represents all possible state changes of a LockedProject
+// within a Lock. It encapsulates the property-level differences represented by
+// a LockedProjectPropertiesDelta, but can also represent existence deltas - a
+// given name came to exist, or cease to exist, across two Locks.
 type LockedProjectDelta struct {
 	Name                         gps.ProjectRoot
 	ProjectRemoved, ProjectAdded bool
-	LockedProjectPartsDelta
+	LockedProjectPropertiesDelta
 }
 
-type LockedProjectPartsDelta struct {
+// LockedProjectPropertiesDelta represents all possible differences between the
+// properties of two LockedProjects. It can represent deltas for
+// VerifiableProject properties, as well.
+type LockedProjectPropertiesDelta struct {
 	PackagesAdded, PackagesRemoved  []string
 	VersionBefore, VersionAfter     gps.UnpairedVersion
 	RevisionBefore, RevisionAfter   gps.Revision
@@ -50,9 +58,9 @@ type LockedProjectPartsDelta struct {
 	HashChanged, HashVersionChanged bool
 }
 
-// DiffLocks2 compares two locks and computes a semantically rich delta between
+// DiffLocks compares two locks and computes a semantically rich delta between
 // them.
-func DiffLocks2(l1, l2 gps.Lock) LockDelta {
+func DiffLocks(l1, l2 gps.Lock) LockDelta {
 	// Default nil locks to empty locks, so that we can still generate a diff
 	if l1 == nil {
 		if l2 == nil {
@@ -88,7 +96,7 @@ func DiffLocks2(l1, l2 gps.Lock) LockDelta {
 
 			switch strings.Compare(string(pr1), string(pr2)) {
 			case 0: // Found a matching project
-				lpd.LockedProjectPartsDelta = DiffProjects2(lp1, lp2)
+				lpd.LockedProjectPropertiesDelta = DiffLockedProjectProperties(lp1, lp2)
 				i2next = i2 + 1 // Don't visit this project again
 			case +1: // Found a new project
 				diff.ProjectDeltas[pr2] = LockedProjectDelta{
@@ -148,8 +156,15 @@ func findAddedAndRemoved(l1, l2 []string) (add, remove []string) {
 	return add, remove
 }
 
-func DiffProjects2(lp1, lp2 gps.LockedProject) LockedProjectPartsDelta {
-	ld := LockedProjectPartsDelta{
+// DiffLockedProjectProperties takes two gps.LockedProject and computes a delta
+// for each of their component properties.
+//
+// This function is focused exclusively on the properties of a LockedProject. As
+// such, it does not compare the ProjectRoot part of the LockedProject's
+// ProjectIdentifier, as those are names, and the concern here is a difference
+// in properties, not intrinsic identity.
+func DiffLockedProjectProperties(lp1, lp2 gps.LockedProject) LockedProjectPropertiesDelta {
+	ld := LockedProjectPropertiesDelta{
 		SourceBefore: lp1.Ident().Source,
 		SourceAfter:  lp2.Ident().Source,
 	}
@@ -205,6 +220,8 @@ func DiffProjects2(lp1, lp2 gps.LockedProject) LockedProjectPartsDelta {
 // along which a Lock, and its constitutent components, can change.
 type DeltaDimension uint32
 
+// Each flag represents an ortohgonal dimension along which Locks can vary with
+// respect to each other.
 const (
 	InputImportsChanged DeltaDimension = 1 << iota
 	ProjectAdded
@@ -237,7 +254,13 @@ func (ld LockDelta) Changed(dims DeltaDimension) bool {
 	return false
 }
 
-func (ld LockDelta) Changes(DeltaDimension) DeltaDimension {
+// Changes returns a bitset indicating the dimensions along which deltas exist across
+// all contents of the LockDelta.
+//
+// This recurses down into the individual LockedProjectDeltas contained within
+// the LockDelta. A single delta along a particular dimension from a single
+// project is sufficient to flip the bit on for that dimension.
+func (ld LockDelta) Changes() DeltaDimension {
 	var dd DeltaDimension
 	if len(ld.AddedImportInputs) > 0 || len(ld.RemovedImportInputs) > 0 {
 		dd |= InputImportsChanged
@@ -256,18 +279,21 @@ func (ld LockDelta) Changes(DeltaDimension) DeltaDimension {
 // For example, if only the Revision changed, and this method is called with
 // SourceChanged | VersionChanged, it will return false; if it is called with
 // VersionChanged | RevisionChanged, it will return true.
-func (ld LockedProjectDelta) Changed(flags DeltaDimension) bool {
-	if flags&ProjectAdded != 0 && ld.WasAdded() {
+func (ld LockedProjectDelta) Changed(dims DeltaDimension) bool {
+	if dims&ProjectAdded != 0 && ld.WasAdded() {
 		return true
 	}
 
-	if flags&ProjectRemoved != 0 && ld.WasRemoved() {
+	if dims&ProjectRemoved != 0 && ld.WasRemoved() {
 		return true
 	}
 
-	return ld.LockedProjectPartsDelta.Changed(flags & ^ProjectAdded & ^ProjectRemoved)
+	return ld.LockedProjectPropertiesDelta.Changed(dims & ^ProjectAdded & ^ProjectRemoved)
 }
 
+// Changes returns a bitset indicating the dimensions along which there were
+// changes between the compared LockedProjects. This includes both
+// existence-level deltas (add/remove) and property-level deltas.
 func (ld LockedProjectDelta) Changes() DeltaDimension {
 	var dd DeltaDimension
 	if ld.WasAdded() {
@@ -278,44 +304,56 @@ func (ld LockedProjectDelta) Changes() DeltaDimension {
 		dd |= ProjectRemoved
 	}
 
-	return dd | ld.LockedProjectPartsDelta.Changes()
+	return dd | ld.LockedProjectPropertiesDelta.Changes()
 }
 
+// WasRemoved returns true if the named project existed in the first lock, but
+// did not exist in the second lock.
 func (ld LockedProjectDelta) WasRemoved() bool {
 	return ld.ProjectRemoved
 }
 
+// WasAdded returns true if the named project did not exist in the first lock,
+// but did exist in the second lock.
 func (ld LockedProjectDelta) WasAdded() bool {
 	return ld.ProjectAdded
 }
 
-func (ld LockedProjectPartsDelta) Changed(flags DeltaDimension) bool {
-	if flags&SourceChanged != 0 && ld.SourceChanged() {
+// Changed indicates whether the delta contains a change along the dimensions
+// with their corresponding bits set.
+//
+// For example, if only the Revision changed, and this method is called with
+// SourceChanged | VersionChanged, it will return false; if it is called with
+// VersionChanged | RevisionChanged, it will return true.
+func (ld LockedProjectPropertiesDelta) Changed(dims DeltaDimension) bool {
+	if dims&SourceChanged != 0 && ld.SourceChanged() {
 		return true
 	}
-	if flags&RevisionChanged != 0 && ld.RevisionChanged() {
+	if dims&RevisionChanged != 0 && ld.RevisionChanged() {
 		return true
 	}
-	if flags&PruneOptsChanged != 0 && ld.PruneOptsChanged() {
+	if dims&PruneOptsChanged != 0 && ld.PruneOptsChanged() {
 		return true
 	}
-	if flags&HashChanged != 0 && ld.HashChanged {
+	if dims&HashChanged != 0 && ld.HashChanged {
 		return true
 	}
-	if flags&HashVersionChanged != 0 && ld.HashVersionChanged {
+	if dims&HashVersionChanged != 0 && ld.HashVersionChanged {
 		return true
 	}
-	if flags&VersionChanged != 0 && ld.VersionChanged() {
+	if dims&VersionChanged != 0 && ld.VersionChanged() {
 		return true
 	}
-	if flags&PackagesChanged != 0 && ld.PackagesChanged() {
+	if dims&PackagesChanged != 0 && ld.PackagesChanged() {
 		return true
 	}
 
 	return false
 }
 
-func (ld LockedProjectPartsDelta) Changes() DeltaDimension {
+// Changes returns a bitset indicating the dimensions along which there were
+// changes between the compared LockedProjects.
+func (ld LockedProjectPropertiesDelta) Changes() DeltaDimension {
 	var dd DeltaDimension
 	if ld.SourceChanged() {
 		dd |= SourceChanged
@@ -342,11 +380,17 @@ func (ld LockedProjectPartsDelta) Changes() DeltaDimension {
 	return dd
 }
 
-func (ld LockedProjectPartsDelta) SourceChanged() bool {
+// SourceChanged returns true if the source field differed between the first and
+// second locks.
+func (ld LockedProjectPropertiesDelta) SourceChanged() bool {
 	return ld.SourceBefore != ld.SourceAfter
 }
 
-func (ld LockedProjectPartsDelta) VersionChanged() bool {
+// VersionChanged returns true if the version property differed between the
+// first and second locks. In addition to simple changes (e.g. 1.0.1 -> 1.0.2),
+// this also includes all the possible type changes covered by
+// VersionTypeCHanged(), as those necessarily also are version changes.
+func (ld LockedProjectPropertiesDelta) VersionChanged() bool {
 	if ld.VersionBefore == nil && ld.VersionAfter == nil {
 		return false
 	} else if (ld.VersionBefore == nil || ld.VersionAfter == nil) || (ld.VersionBefore.Type() != ld.VersionAfter.Type()) {
@@ -358,7 +402,11 @@ func (ld LockedProjectPartsDelta) VersionChanged() bool {
 	return false
 }
 
-func (ld LockedProjectPartsDelta) VersionTypeChanged() bool {
+// VersionTypeChanged returns true if the type of version differed between the
+// first and second locks. This includes either going from a paired version to a
+// plain revision, or the reverse direction, or the type of unpaired version
+// changing (e.g. branch -> semver).
+func (ld LockedProjectPropertiesDelta) VersionTypeChanged() bool {
 	if ld.VersionBefore == nil && ld.VersionAfter == nil {
 		return false
 	} else if (ld.VersionBefore == nil || ld.VersionAfter == nil) || (ld.VersionBefore.Type() != ld.VersionAfter.Type()) {
@@ -368,19 +416,20 @@ func (ld LockedProjectPartsDelta) VersionTypeChanged() bool {
 	return false
 }
 
-func (ld LockedProjectPartsDelta) RevisionChanged() bool {
+// RevisionChanged returns true if the revision property differed between the
+// first and second locks.
+func (ld LockedProjectPropertiesDelta) RevisionChanged() bool {
 	return ld.RevisionBefore != ld.RevisionAfter
 }
 
-func (ld LockedProjectPartsDelta) PackagesChanged() bool {
+// PackagesChanged returns true if the package set gained or lost members (or
+// both) between the first and second locks.
+func (ld LockedProjectPropertiesDelta) PackagesChanged() bool {
 	return len(ld.PackagesAdded) > 0 || len(ld.PackagesRemoved) > 0
 }
 
-func (ld LockedProjectPartsDelta) PruneOptsChanged() bool {
+// PruneOptsChanged returns true if the pruning flags for the project changed
+// between teh first and second locks.
+func (ld LockedProjectPropertiesDelta) PruneOptsChanged() bool {
 	return ld.PruneOptsBefore != ld.PruneOptsAfter
 }
-
-//type VendorDiff struct {
-//LockDelta    LockDelta
-//VendorStatus map[string]VendorStatus
-//}

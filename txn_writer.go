@@ -103,7 +103,7 @@ func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBeha
 			return nil, errors.New("must provide newLock when oldLock is specified")
 		}
 
-		sw.lockDiff = verify.DiffLocks2(oldLock, newLock)
+		sw.lockDiff = verify.DiffLocks(oldLock, newLock)
 		if sw.lockDiff.Changed(anyExceptHash) {
 			sw.writeLock = true
 		}
@@ -459,6 +459,7 @@ type DeltaWriter struct {
 	vendorDir    string
 	changed      map[gps.ProjectRoot]changeType
 	status       map[string]verify.VendorStatus
+	behavior     VendorBehavior
 }
 
 type changeType uint8
@@ -478,12 +479,13 @@ const (
 // directory by writing out only those projects that actually need to be written
 // out - they have changed in some way, or they lack the necessary hash
 // information to be verified.
-func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatus, prune gps.CascadingPruneOptions, vendorDir string) (TransactionWriter, error) {
+func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatus, prune gps.CascadingPruneOptions, vendorDir string, behavior VendorBehavior) (TransactionWriter, error) {
 	sw := &DeltaWriter{
 		lock:         newLock,
 		pruneOptions: prune,
 		vendorDir:    vendorDir,
 		changed:      make(map[gps.ProjectRoot]changeType),
+		behavior:     behavior,
 	}
 
 	if newLock == nil {
@@ -494,14 +496,14 @@ func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatu
 	if err != nil && os.IsNotExist(err) {
 		// Provided dir does not exist, so there's no disk contents to compare
 		// against. Fall back to the old SafeWriter.
-		return NewSafeWriter(nil, oldLock, newLock, VendorOnChanged, prune)
+		return NewSafeWriter(nil, oldLock, newLock, behavior, prune)
 	}
 
-	sw.lockDiff = verify.DiffLocks2(oldLock, newLock)
+	sw.lockDiff = verify.DiffLocks(oldLock, newLock)
 
 	for pr, lpd := range sw.lockDiff.ProjectDeltas {
 		// Hash changes aren't relevant at this point, as they could be empty
-		// and therefore a symptom of a solver change.
+		// in the new lock, and therefore a symptom of a solver change.
 		if lpd.Changed(anyExceptHash) {
 			if lpd.WasAdded() {
 				sw.changed[pr] = projectAdded
@@ -578,7 +580,7 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 		}
 
 		to := filepath.FromSlash(filepath.Join(vnewpath, string(pr)))
-		po := dw.pruneOptions.PruneOptionsFor(pr)
+		po := projs[pr].(verify.VerifiableProject).PruneOpts
 		if err := sm.ExportPrunedProject(context.TODO(), projs[pr], po, to); err != nil {
 			return errors.Wrapf(err, "failed to export %s", pr)
 		}
@@ -587,54 +589,58 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 		lpd := dw.lockDiff.ProjectDeltas[pr]
 		v, id := projs[pr].Version(), projs[pr].Ident()
 
-		var buf bytes.Buffer
-		fmt.Fprintf(&buf, "(%d/%d) Wrote %s@%s: ", i, tot, id, v)
-		switch reason {
-		case noChange:
-			panic(fmt.Sprintf("wtf, no change for %s", pr))
-		case solveChanged:
-			if lpd.SourceChanged() {
-				fmt.Fprintf(&buf, "source changed (%s -> %s)", lpd.SourceBefore, lpd.SourceAfter)
-			} else if lpd.VersionChanged() {
-				bv, av := "(none)", "(none)"
-				if lpd.VersionBefore != nil {
-					bv = lpd.VersionBefore.String()
+		// Only print things if we're actually going to leave behind a new
+		// vendor dir.
+		if dw.behavior != VendorNever {
+			var buf bytes.Buffer
+			fmt.Fprintf(&buf, "(%d/%d) Wrote %s@%s: ", i, tot, id, v)
+			switch reason {
+			case noChange:
+				panic(fmt.Sprintf("wtf, no change for %s", pr))
+			case solveChanged:
+				if lpd.SourceChanged() {
+					fmt.Fprintf(&buf, "source changed (%s -> %s)", lpd.SourceBefore, lpd.SourceAfter)
+				} else if lpd.VersionChanged() {
+					bv, av := "(none)", "(none)"
+					if lpd.VersionBefore != nil {
+						bv = lpd.VersionBefore.String()
+					}
+					if lpd.VersionAfter != nil {
+						av = lpd.VersionAfter.String()
+					}
+					fmt.Fprintf(&buf, "version changed (%s -> %s)", bv, av)
+				} else if lpd.RevisionChanged() {
+					fmt.Fprintf(&buf, "revision changed (%s -> %s)", lpd.RevisionBefore, lpd.RevisionAfter)
+				} else if lpd.PackagesChanged() {
+					la, lr := len(lpd.PackagesAdded), len(lpd.PackagesRemoved)
+					if la > 0 && lr > 0 {
+						fmt.Fprintf(&buf, "packages changed (%v added, %v removed)", la, lr)
+					} else if la > 0 {
+						fmt.Fprintf(&buf, "packages changed (%v added)", la)
+					} else {
+						fmt.Fprintf(&buf, "packages changed (%v removed)", lr)
+					}
+				} else if lpd.PruneOptsChanged() {
+					// Override what's on the lockdiff with the extra info we have;
+					// this lets us excise PruneNestedVendorDirs and get the real
+					// value from the input param in place.
+					old := lpd.PruneOptsBefore & ^gps.PruneNestedVendorDirs
+					new := lpd.PruneOptsAfter & ^gps.PruneNestedVendorDirs
+					fmt.Fprintf(&buf, "prune options changed (%s -> %s)", old, new)
 				}
-				if lpd.VersionAfter != nil {
-					av = lpd.VersionAfter.String()
-				}
-				fmt.Fprintf(&buf, "version changed (%s -> %s)", bv, av)
-			} else if lpd.RevisionChanged() {
-				fmt.Fprintf(&buf, "revision changed (%s -> %s)", lpd.RevisionBefore, lpd.RevisionAfter)
-			} else if lpd.PackagesChanged() {
-				la, lr := len(lpd.PackagesAdded), len(lpd.PackagesRemoved)
-				if la > 0 && lr > 0 {
-					fmt.Fprintf(&buf, "packages changed (%v added, %v removed)", la, lr)
-				} else if la > 0 {
-					fmt.Fprintf(&buf, "packages changed (%v added)", la)
-				} else {
-					fmt.Fprintf(&buf, "packages changed (%v removed)", lr)
-				}
-			} else if lpd.PruneOptsChanged() {
-				// Override what's on the lockdiff with the extra info we have;
-				// this lets us excise PruneNestedVendorDirs and get the real
-				// value from the input param in place.
-				old := lpd.PruneOptsBefore & ^gps.PruneNestedVendorDirs
-				new := lpd.PruneOptsAfter & ^gps.PruneNestedVendorDirs
-				fmt.Fprintf(&buf, "prune options changed (%s -> %s)", old, new)
+			case hashMismatch:
+				fmt.Fprintf(&buf, "hash mismatch between Gopkg.lock and vendor contents")
+			case hashVersionMismatch:
+				fmt.Fprintf(&buf, "hashing algorithm mismatch")
+			case hashAbsent:
+				fmt.Fprintf(&buf, "hash digest absent from lock")
+			case projectAdded:
+				fmt.Fprintf(&buf, "new project")
+			case missingFromTree:
+				fmt.Fprint(&buf, "missing from vendor")
 			}
-		case hashMismatch:
-			fmt.Fprintf(&buf, "hash mismatch between Gopkg.lock and vendor contents")
-		case hashVersionMismatch:
-			fmt.Fprintf(&buf, "hashing algorithm mismatch")
-		case hashAbsent:
-			fmt.Fprintf(&buf, "hash digest absent from lock")
-		case projectAdded:
-			fmt.Fprintf(&buf, "new project")
-		case missingFromTree:
-			fmt.Fprint(&buf, "missing from vendor")
+			logger.Print(buf.String())
 		}
-		logger.Print(buf.String())
 
 		digest, err := verify.DigestFromDirectory(to)
 		if err != nil {
@@ -653,6 +659,25 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 				}
 			}
 		}
+	}
+
+	// Write out the lock, now that it's fully updated with digests.
+	//
+	// This is OK to do even if -vendor-only, as the way the DeltaWriter are
+	// constructed mean that the only changes that could happen here are
+	// pruneopts (which are definitely fine) or input imports (which are less
+	// fine, but this is enough of an edge case that we can be lazy for now.)
+	l, err := dw.lock.MarshalTOML()
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal lock to TOML")
+	}
+
+	if err = ioutil.WriteFile(lpath, append(lockFileComment, l...), 0666); err != nil {
+		return errors.Wrap(err, "failed to write new lock file")
+	}
+
+	if dw.behavior == VendorNever {
+		return os.RemoveAll(vnewpath)
 	}
 
 	// Changed projects are fully populated. Now, iterate over the lock's
@@ -685,7 +710,6 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 			return errors.Wrap(err, "failed to preserve vendor/.git")
 		}
 	}
-
 	err = os.RemoveAll(vpath)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove original vendor directory")
@@ -693,16 +717,6 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	err = fs.RenameWithFallback(vnewpath, vpath)
 	if err != nil {
 		return errors.Wrap(err, "failed to put new vendor directory into place")
-	}
-
-	// Write out the lock last, now that it's fully updated with digests.
-	l, err := dw.lock.MarshalTOML()
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal lock to TOML")
-	}
-
-	if err = ioutil.WriteFile(lpath, append(lockFileComment, l...), 0666); err != nil {
-		return errors.Wrap(err, "failed to write new lock file")
 	}
 
 	return nil
