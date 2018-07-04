@@ -1564,9 +1564,19 @@ func (l fixLock) Projects() []LockedProject {
 	return l
 }
 
+// impl Lock interface
+func (fixLock) InputImports() []string {
+	return nil
+}
+
 type dummyLock struct{}
 
 // impl Lock interface
 func (dummyLock) Projects() []LockedProject {
+	return nil
+}
+
+// impl Lock interface
+func (dummyLock) InputImports() []string {
 	return nil
 }

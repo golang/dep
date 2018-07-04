@@ -117,14 +117,7 @@ func DiffLocks2(l1, l2 gps.Lock) LockDelta {
 		}
 	}
 
-	// Only do the import inputs if both of the locks fulfill the interface, AND
-	// both have non-empty inputs.
-	il1, ok1 := l1.(gps.LockWithImports)
-	il2, ok2 := l2.(gps.LockWithImports)
-
-	if ok1 && ok2 && len(il1.InputImports()) > 0 && len(il2.InputImports()) > 0 {
-		diff.AddedImportInputs, diff.RemovedImportInputs = findAddedAndRemoved(il1.InputImports(), il2.InputImports())
-	}
+	diff.AddedImportInputs, diff.RemovedImportInputs = findAddedAndRemoved(l1.InputImports(), l2.InputImports())
 
 	return diff
 }

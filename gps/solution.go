@@ -18,7 +18,7 @@ import (
 // A Solution is returned by a solver run. It is mostly just a Lock, with some
 // additional methods that report information about the solve run.
 type Solution interface {
-	LockWithImports
+	Lock
 	// The name of the ProjectAnalyzer used in generating this solution.
 	AnalyzerName() string
 	// The version of the ProjectAnalyzer used in generating this solution.

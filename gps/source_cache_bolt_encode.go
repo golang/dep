@@ -308,11 +308,9 @@ func lockedProjectFromCache(m *pb.LockedProject) (LockedProject, error) {
 // cachePutLock stores the Lock as fields in the bolt.Bucket.
 func cachePutLock(b *bolt.Bucket, l Lock) error {
 	// Input imports, if present.
-	if lwp, ok := l.(LockWithImports); ok && len(lwp.InputImports()) > 0 {
-		byt := []byte(strings.Join(lwp.InputImports(), "#"))
-		if err := b.Put(cacheKeyInputImports, byt); err != nil {
-			return errors.Wrap(err, "failed to put input imports")
-		}
+	byt := []byte(strings.Join(l.InputImports(), "#"))
+	if err := b.Put(cacheKeyInputImports, byt); err != nil {
+		return errors.Wrap(err, "failed to put input imports")
 	}
 
 	// Projects

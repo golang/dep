@@ -19,18 +19,10 @@ import (
 type Lock interface {
 	// Projects returns the list of LockedProjects contained in the lock data.
 	Projects() []LockedProject
-}
 
-// LockWithImports composes Lock to also add a method that reports all the
-// imports that were present when generating the Lock.
-//
-// This information can be rederived, but it requires doing whole-graph
-// analysis; tracking the information separately makes verification tasks
-// easier, especially determining if an input import has been removed.
-type LockWithImports interface {
-	Lock
 	// The set of imports (and required statements) that were the inputs that
-	// generated this Lock.
+	// generated this Lock. It is acceptable to return a nil slice from this
+	// method if the information cannot reasonably be made available.
 	InputImports() []string
 }
 
@@ -78,6 +70,12 @@ var _ Lock = SimpleLock{}
 // Projects returns the entire contents of the SimpleLock.
 func (l SimpleLock) Projects() []LockedProject {
 	return l
+}
+
+// InputImports returns a nil string slice, as SimpleLock does not provide a way
+// of capturing string slices.
+func (l SimpleLock) InputImports() []string {
+	return nil
 }
 
 // NewLockedProject creates a new LockedProject struct with a given
@@ -232,10 +230,8 @@ func prepLock(l Lock) safeLock {
 	}
 	copy(rl.p, pl)
 
-	if lwi, ok := l.(LockWithImports); ok {
-		rl.i = make([]string, len(lwi.InputImports()))
-		copy(rl.i, lwi.InputImports())
-	}
+	rl.i = make([]string, len(l.InputImports()))
+	copy(rl.i, l.InputImports())
 
 	return rl
 }
