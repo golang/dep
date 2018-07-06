@@ -66,11 +66,16 @@ downloadFile() {
 
 findGoBinDirectory() {
     EFFECTIVE_GOPATH=$(go env GOPATH)
+    # CYGWIN: Convert Windows-style path into sh-compatible style paths
+    if [ "$OS_CYGWIN" = "1" ]; then
+	EFFECTIVE_GOPATH=$(cygpath $EFFECTIVE_GOPATH)
+    fi
     if [ -z "$EFFECTIVE_GOPATH" ]; then
         echo "Installation could not determine your \$GOPATH."
         exit 1
     fi
     if [ -z "$GOBIN" ]; then
+	echo "${EFFECTIVE_GOPATH%%:*}/bin" | sed s#//*#/#g
         GOBIN=$(echo "${EFFECTIVE_GOPATH%%:*}/bin" | sed s#//*#/#g)
     fi
     if [ ! -d "$GOBIN" ]; then
@@ -97,6 +102,7 @@ initArch() {
 
 initOS() {
     OS=$(uname | tr '[:upper:]' '[:lower:]')
+    OS_CYGWIN=0
     if [ -n "$DEP_OS" ]; then
         echo "Using DEP_OS"
         OS="$DEP_OS"
@@ -107,6 +113,10 @@ initOS() {
         freebsd) OS='freebsd';;
         mingw*) OS='windows';;
         msys*) OS='windows';;
+	cygwin*)
+	    OS='windows'
+	    OS_CYGWIN=1
+	    ;;
         *) echo "OS ${OS} is not supported by this installation script"; exit 1;;
     esac
     echo "OS = $OS"
