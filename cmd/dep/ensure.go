@@ -428,7 +428,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 			exmap[imp] = true
 		}
 	} else {
-		// The only time we'll hit this branch is if
+		// We'll only hit this branch if Gopkg.lock did not exist.
 		rm, _ := p.RootPackageTree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
 		for _, imp := range rm.FlattenFn(paths.IsStandardImportPath) {
 			exmap[imp] = true

@@ -5,7 +5,6 @@
 package dep
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -399,12 +398,11 @@ func hasDotGit(path string) bool {
 // Its primary design goal is to minimize writes by only writing things that
 // have changed.
 type DeltaWriter struct {
-	lock         *Lock
-	lockDiff     verify.LockDelta
-	pruneOptions gps.CascadingPruneOptions
-	vendorDir    string
-	changed      map[gps.ProjectRoot]changeType
-	behavior     VendorBehavior
+	lock      *Lock
+	lockDiff  verify.LockDelta
+	vendorDir string
+	changed   map[gps.ProjectRoot]changeType
+	behavior  VendorBehavior
 }
 
 type changeType uint8
@@ -415,6 +413,7 @@ const (
 	hashMismatch
 	hashVersionMismatch
 	hashAbsent
+	pruneOptsChanged
 	missingFromTree
 	projectAdded
 	projectRemoved
@@ -426,11 +425,10 @@ const (
 // information to be verified.
 func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatus, prune gps.CascadingPruneOptions, vendorDir string, behavior VendorBehavior) (TreeWriter, error) {
 	sw := &DeltaWriter{
-		lock:         newLock,
-		pruneOptions: prune,
-		vendorDir:    vendorDir,
-		changed:      make(map[gps.ProjectRoot]changeType),
-		behavior:     behavior,
+		lock:      newLock,
+		vendorDir: vendorDir,
+		changed:   make(map[gps.ProjectRoot]changeType),
+		behavior:  behavior,
 	}
 
 	if newLock == nil {
@@ -454,6 +452,8 @@ func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatu
 				sw.changed[pr] = projectAdded
 			} else if lpd.WasRemoved() {
 				sw.changed[pr] = projectRemoved
+			} else if lpd.PruneOptsChanged() {
+				sw.changed[pr] = pruneOptsChanged
 			} else {
 				sw.changed[pr] = solveChanged
 			}
@@ -468,6 +468,8 @@ func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatu
 			switch stat {
 			case verify.NotInTree:
 				sw.changed[pr] = missingFromTree
+			case verify.NotInLock:
+				sw.changed[pr] = projectRemoved
 			case verify.DigestMismatchInLock:
 				sw.changed[pr] = hashMismatch
 			case verify.HashVersionMismatch:
@@ -499,9 +501,9 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	// adjacent directory to minimize the possibility of cross-filesystem renames
 	// becoming expensive copies, and to make removal of unneeded projects implicit
 	// and automatic.
-	vnewpath := vpath + ".new"
+	vnewpath := vpath + "-new"
 	if _, err := os.Stat(vnewpath); err == nil {
-		return errors.Errorf("scratch directory %s already exists", vnewpath)
+		return errors.Errorf("scratch directory %s already exists, please remove it", vnewpath)
 	}
 	err := os.MkdirAll(vnewpath, os.FileMode(0777))
 	if err != nil {
@@ -515,7 +517,6 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	}
 
 	dropped := []gps.ProjectRoot{}
-	// TODO(sdboyer) add a txn/rollback layer, like the safewriter?
 	i := 0
 	tot := len(dw.changed)
 	for pr, reason := range dw.changed {
@@ -537,54 +538,7 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 		// Only print things if we're actually going to leave behind a new
 		// vendor dir.
 		if dw.behavior != VendorNever {
-			var buf bytes.Buffer
-			fmt.Fprintf(&buf, "(%d/%d) Wrote %s@%s: ", i, tot, id, v)
-			switch reason {
-			case noChange:
-				panic(fmt.Sprintf("wtf, no change for %s", pr))
-			case solveChanged:
-				if lpd.SourceChanged() {
-					fmt.Fprintf(&buf, "source changed (%s -> %s)", lpd.SourceBefore, lpd.SourceAfter)
-				} else if lpd.VersionChanged() {
-					bv, av := "(none)", "(none)"
-					if lpd.VersionBefore != nil {
-						bv = lpd.VersionBefore.String()
-					}
-					if lpd.VersionAfter != nil {
-						av = lpd.VersionAfter.String()
-					}
-					fmt.Fprintf(&buf, "version changed (%s -> %s)", bv, av)
-				} else if lpd.RevisionChanged() {
-					fmt.Fprintf(&buf, "revision changed (%s -> %s)", lpd.RevisionBefore, lpd.RevisionAfter)
-				} else if lpd.PackagesChanged() {
-					la, lr := len(lpd.PackagesAdded), len(lpd.PackagesRemoved)
-					if la > 0 && lr > 0 {
-						fmt.Fprintf(&buf, "packages changed (%v added, %v removed)", la, lr)
-					} else if la > 0 {
-						fmt.Fprintf(&buf, "packages changed (%v added)", la)
-					} else {
-						fmt.Fprintf(&buf, "packages changed (%v removed)", lr)
-					}
-				} else if lpd.PruneOptsChanged() {
-					// Override what's on the lockdiff with the extra info we have;
-					// this lets us excise PruneNestedVendorDirs and get the real
-					// value from the input param in place.
-					old := lpd.PruneOptsBefore & ^gps.PruneNestedVendorDirs
-					new := lpd.PruneOptsAfter & ^gps.PruneNestedVendorDirs
-					fmt.Fprintf(&buf, "prune options changed (%s -> %s)", old, new)
-				}
-			case hashMismatch:
-				fmt.Fprintf(&buf, "hash mismatch between Gopkg.lock and vendor contents")
-			case hashVersionMismatch:
-				fmt.Fprintf(&buf, "hashing algorithm mismatch")
-			case hashAbsent:
-				fmt.Fprintf(&buf, "hash digest absent from lock")
-			case projectAdded:
-				fmt.Fprintf(&buf, "new project")
-			case missingFromTree:
-				fmt.Fprint(&buf, "missing from vendor")
-			}
-			logger.Print(buf.String())
+			logger.Printf("(%d/%d) Wrote %s@%s: %s", i, tot, id, v, changeExplanation(reason, lpd))
 		}
 
 		digest, err := verify.DigestFromDirectory(to)
@@ -607,11 +561,6 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	}
 
 	// Write out the lock, now that it's fully updated with digests.
-	//
-	// This is OK to do even if -vendor-only, as the way the DeltaWriter are
-	// constructed mean that the only changes that could happen here are
-	// pruneopts (which are definitely fine) or input imports (which are less
-	// fine, but this is enough of an edge case that we can be lazy for now.)
 	l, err := dw.lock.MarshalTOML()
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal lock to TOML")
@@ -667,9 +616,90 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	return nil
 }
 
+// changeExplanation outputs a string explaining what changed for each different
+// possible changeType.
+func changeExplanation(c changeType, lpd verify.LockedProjectDelta) string {
+	switch c {
+	case solveChanged:
+		if lpd.SourceChanged() {
+			return fmt.Sprintf("source changed (%s -> %s)", lpd.SourceBefore, lpd.SourceAfter)
+		} else if lpd.VersionChanged() {
+			bv, av := "(none)", "(none)"
+			if lpd.VersionBefore != nil {
+				bv = lpd.VersionBefore.String()
+			}
+			if lpd.VersionAfter != nil {
+				av = lpd.VersionAfter.String()
+			}
+			return fmt.Sprintf("version changed (%s -> %s)", bv, av)
+		} else if lpd.RevisionChanged() {
+			return fmt.Sprintf("revision changed (%s -> %s)", lpd.RevisionBefore, lpd.RevisionAfter)
+		} else if lpd.PackagesChanged() {
+			la, lr := len(lpd.PackagesAdded), len(lpd.PackagesRemoved)
+			if la > 0 && lr > 0 {
+				return fmt.Sprintf("packages changed (%v added, %v removed)", la, lr)
+			} else if la > 0 {
+				return fmt.Sprintf("packages changed (%v added)", la)
+			} else {
+				return fmt.Sprintf("packages changed (%v removed)", lr)
+			}
+		}
+	case pruneOptsChanged:
+		// Override what's on the lockdiff with the extra info we have;
+		// this lets us excise PruneNestedVendorDirs and get the real
+		// value from the input param in place.
+		old := lpd.PruneOptsBefore & ^gps.PruneNestedVendorDirs
+		new := lpd.PruneOptsAfter & ^gps.PruneNestedVendorDirs
+		return fmt.Sprintf("prune options changed (%s -> %s)", old, new)
+	case hashMismatch:
+		return "hash mismatch between Gopkg.lock and vendor contents"
+	case hashVersionMismatch:
+		return "hashing algorithm mismatch"
+	case hashAbsent:
+		return "hash digest absent from lock"
+	case projectAdded:
+		return "new project"
+	case missingFromTree:
+		return "missing from vendor"
+	default:
+		panic(fmt.Sprintf("unrecognized changeType value %v", c))
+	}
+
+	return ""
+}
+
 // PrintPreparedActions indicates what changes the DeltaWriter plans to make.
 func (dw *DeltaWriter) PrintPreparedActions(output *log.Logger, verbose bool) error {
-	// FIXME
+	if verbose {
+		l, err := dw.lock.MarshalTOML()
+		if err != nil {
+			return errors.Wrap(err, "ensure DryRun cannot serialize lock")
+		}
+		output.Printf("Would have written the following %s (hash digests may be incorrect):\n%s\n", LockName, string(l))
+	} else {
+		output.Printf("Would have written %s.\n", LockName)
+	}
+
+	projs := make(map[gps.ProjectRoot]gps.LockedProject)
+	for _, lp := range dw.lock.Projects() {
+		projs[lp.Ident().ProjectRoot] = lp
+	}
+
+	tot := len(dw.changed)
+	if tot > 0 {
+		output.Print("Would have updated the following projects in the vendor directory:\n\n")
+		i := 0
+		for pr, reason := range dw.changed {
+			lpd := dw.lockDiff.ProjectDeltas[pr]
+			v, id := projs[pr].Version(), projs[pr].Ident()
+			if reason == projectRemoved {
+				output.Printf("(%d/%d) Would have removed %s", i, tot, id, v, changeExplanation(reason, lpd))
+			} else {
+				output.Printf("(%d/%d) Would hae written %s@%s: %s", i, tot, id, v, changeExplanation(reason, lpd))
+			}
+		}
+	}
+
 	return nil
 }
 
