@@ -33,9 +33,9 @@ Project spec:
 
 Ensure gets a project into a complete, reproducible, and likely compilable state:
 
-  * All non-stdlib imports are fulfilled
+  * All imports are fulfilled
   * All rules in Gopkg.toml are respected
-  * Gopkg.lock records precise versions for all dependencies
+  * Gopkg.lock records immutable versions for all dependencies
   * vendor/ is populated according to Gopkg.lock
 
 Ensure has fast techniques to determine that some of these steps may be
@@ -337,7 +337,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	return errors.WithMessage(dw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
+func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
 	if len(args) != 0 {
 		return errors.Errorf("dep ensure -vendor-only only populates vendor/ from %s; it takes no spec arguments", dep.LockName)
 	}
@@ -347,21 +347,21 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	}
 
 	// Pass the same lock as old and new so that the writer will observe no
-	// difference and choose not to write it out, instead writing out only
-	sw, err := dep.NewSafeWriter(nil, p.Lock, p.ChangedLock, dep.VendorAlways, p.Manifest.PruneOptions)
+	// difference, and write out only ncessary vendor/ changes.
+	dw, err := dep.NewDeltaWriter(p.Lock, p.Lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), VendorAlways)
 	if err != nil {
 		return err
 	}
 
 	if cmd.dryRun {
-		return sw.PrintPreparedActions(ctx.Out, ctx.Verbose)
+		return dw.PrintPreparedActions(ctx.Out, ctx.Verbose)
 	}
 
 	var logger *log.Logger
 	if ctx.Verbose {
 		logger = ctx.Err
 	}
-	return errors.WithMessage(sw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
+	return errors.WithMessage(dw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
 func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
