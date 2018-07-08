@@ -1,8 +1,8 @@
-SHELL="/bin/bash"
-PLATFORM=$(shell go env GOOS)
-ARCH=$(shell go env GOARCH)
-GOPATH=$(shell go env GOPATH)
-GOBIN=$(GOPATH)/bin
+SHELL := /bin/bash
+PLATFORM := $(shell go env GOOS)
+ARCH := $(shell go env GOARCH)
+GOPATH := $(shell go env GOPATH)
+GOBIN := $(GOPATH)/bin
 
 default: build validate test
 
@@ -15,14 +15,14 @@ build:
 	cp ./release/dep-$(PLATFORM)-$(ARCH) dep
 
 licenseok:
-	go build ./hack/licenseok
+	go build -o licenseok ./hack/licenseok/main.go
 
 validate: build licenseok
 	./hack/lint.bash
 	./hack/validate-vendor.bash
 	./hack/validate-licence.bash
 
-test:
+test: build
 	./hack/test.bash
 
 install: build

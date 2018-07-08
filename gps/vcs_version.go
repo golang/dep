@@ -46,7 +46,7 @@ func VCSVersion(path string) (Version, error) {
 	// Look for the current branch.
 	branches, err := repo.Branches()
 	if err != nil {
-		return nil, errors.Wrapf(err, "getting repo branch for root: %s")
+		return nil, errors.Wrapf(err, "getting repo branch for root: %s", path)
 	}
 	// Try to match the current version to a branch.
 	if contains(branches, ver) {

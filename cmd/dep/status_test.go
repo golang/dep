@@ -7,6 +7,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -15,6 +16,8 @@ import (
 	"testing"
 	"text/tabwriter"
 	"text/template"
+
+	"io"
 
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
@@ -197,6 +200,230 @@ func TestBasicLine(t *testing.T) {
 	}
 }
 
+func TestDetailLine(t *testing.T) {
+	project := dep.Project{}
+	aSemverConstraint, _ := gps.NewSemverConstraint("1.2.3")
+
+	templateString := "{{range $p := .Projects}}PR:{{$p.ProjectRoot}}, Src:{{$p.Source}}, Const:{{$p.Constraint}}, Ver:{{$p.Locked.Version}}, Rev:{{$p.Locked.Revision}}, Lat:{{$p.Latest.Revision}}, PkgCt:{{$p.PackageCount}}, Pkgs:{{$p.Packages}}{{end}}"
+	equalityTestTemplate := `{{range $p := .Projects}}{{if eq $p.Constraint "1.2.3"}}Constraint is 1.2.3{{end}}|{{if eq $p.Locked.Version "flooboo"}}Version is flooboo{{end}}|{{if eq $p.Locked.Revision "flooboofoobooo"}}Revision is flooboofoobooo{{end}}|{{if eq $p.Latest.Revision "unknown"}}Latest is unknown{{end}}{{end}}`
+
+	tests := []struct {
+		name                 string
+		status               DetailStatus
+		wantDotStatus        []string
+		wantJSONStatus       []string
+		wantTableStatus      []string
+		wantTemplateStatus   []string
+		wantEqTemplateStatus []string
+	}{
+		{
+			name: "DetailStatus with ProjectRoot only",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar"];`},
+			wantJSONStatus:       []string{`"Locked":{}`},
+			wantTableStatus:      []string{`github.com/foo/bar                                                 []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:, Ver:, Rev:, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`||`},
+		},
+		{
+			name: "DetailStatus with Revision",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+					Revision:    gps.Revision("flooboofoobooo"),
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\nflooboo"];`},
+			wantJSONStatus:       []string{`"Locked":{"Revision":"flooboofoobooo"}`, `"Constraint":""`},
+			wantTableStatus:      []string{`github.com/foo/bar                               flooboo           []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:, Ver:, Rev:flooboofoobooo, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`|Revision is flooboofoobooo|`},
+		},
+		{
+			name: "DetailStatus with Source",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+				},
+				Packages: []string{},
+				Source:   "github.com/baz/bar",
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar"];`},
+			wantJSONStatus:       []string{`"Locked":{}`, `"Source":"github.com/baz/bar"`, `"Constraint":""`},
+			wantTableStatus:      []string{`github.com/foo/bar  github.com/baz/bar                                         []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:github.com/baz/bar, Const:, Ver:, Rev:, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`||`},
+		},
+		{
+			name: "DetailStatus with Version and Revision",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+					Version:     gps.NewVersion("1.0.0"),
+					Revision:    gps.Revision("flooboofoobooo"),
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Version":"1.0.0"`, `"Revision":"flooboofoobooo"`, `"Constraint":""`},
+			wantTableStatus:      []string{`github.com/foo/bar                      1.0.0    flooboo           []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:, Ver:1.0.0, Rev:flooboofoobooo, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`||`},
+		},
+		{
+			name: "DetailStatus with Constraint, Version and Revision",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+					Constraint:  aSemverConstraint,
+					Version:     gps.NewVersion("1.0.0"),
+					Revision:    gps.Revision("revxyz"),
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`},
+			wantTableStatus:      []string{`github.com/foo/bar          1.2.3       1.0.0    revxyz            []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:1.2.3, Ver:1.0.0, Rev:revxyz, Lat:, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`Constraint is 1.2.3||`},
+		},
+		{
+			name: "DetailStatus with Constraint, Version, Revision, and Package",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot:  "github.com/foo/bar",
+					Constraint:   aSemverConstraint,
+					Version:      gps.NewVersion("1.0.0"),
+					Revision:     gps.Revision("revxyz"),
+					PackageCount: 1,
+				},
+				Packages: []string{"."},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`, `"PackageCount":1`, `"Packages":["."]`},
+			wantTableStatus:      []string{`github.com/foo/bar          1.2.3       1.0.0    revxyz            [.]`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:1.2.3, Ver:1.0.0, Rev:revxyz, Lat:, PkgCt:1, Pkgs:[.]`},
+			wantEqTemplateStatus: []string{`Constraint is 1.2.3||`},
+		},
+		{
+			name: "DetailStatus with Constraint, Version, Revision, and Packages",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot:  "github.com/foo/bar",
+					Constraint:   aSemverConstraint,
+					Version:      gps.NewVersion("1.0.0"),
+					Revision:     gps.Revision("revxyz"),
+					PackageCount: 3,
+				},
+				Packages: []string{".", "foo", "bar"},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar\n1.0.0"];`},
+			wantJSONStatus:       []string{`"Revision":"revxyz"`, `"Constraint":"1.2.3"`, `"Version":"1.0.0"`, `"PackageCount":3`, `"Packages":[".","foo","bar"]`},
+			wantTableStatus:      []string{`github.com/foo/bar          1.2.3       1.0.0    revxyz            [., foo, bar]`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:1.2.3, Ver:1.0.0, Rev:revxyz, Lat:, PkgCt:3, Pkgs:[. foo bar]`},
+			wantEqTemplateStatus: []string{`Constraint is 1.2.3||`},
+		},
+		{
+			name: "DetailStatus with update error",
+			status: DetailStatus{
+				BasicStatus: BasicStatus{
+					ProjectRoot: "github.com/foo/bar",
+					hasError:    true,
+				},
+				Packages: []string{},
+			},
+			wantDotStatus:        []string{`[label="github.com/foo/bar"];`},
+			wantJSONStatus:       []string{`"Locked":{}`, `"Latest":{"Revision":"unknown"}`},
+			wantTableStatus:      []string{`github.com/foo/bar                                         unknown  []`},
+			wantTemplateStatus:   []string{`PR:github.com/foo/bar, Src:, Const:, Ver:, Rev:, Lat:unknown, PkgCt:0, Pkgs:[]`},
+			wantEqTemplateStatus: []string{`||Latest is unknown`},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var buf bytes.Buffer
+
+			dotout := &dotOutput{
+				p: &project,
+				w: &buf,
+			}
+			dotout.DetailHeader(nil)
+			dotout.DetailLine(&test.status)
+			dotout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantDotStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected node status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			buf.Reset()
+
+			jsonout := &jsonOutput{w: &buf}
+
+			jsonout.DetailHeader(nil)
+			jsonout.DetailLine(&test.status)
+			jsonout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantJSONStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected JSON status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			buf.Reset()
+
+			tabw := tabwriter.NewWriter(&buf, 0, 4, 2, ' ', 0)
+
+			tableout := &tableOutput{w: tabw}
+
+			tableout.DetailHeader(nil)
+			tableout.DetailLine(&test.status)
+			tableout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantTableStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected Table status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			buf.Reset()
+			template, _ := template.New("status").Parse(templateString)
+			templateout := &templateOutput{w: &buf, tmpl: template}
+			templateout.DetailHeader(nil)
+			templateout.DetailLine(&test.status)
+			templateout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantTemplateStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected template status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+
+			// The following test is to ensure that certain fields usable with string operations such as .eq
+			buf.Reset()
+			template, _ = template.New("status").Parse(equalityTestTemplate)
+			templateout = &templateOutput{w: &buf, tmpl: template}
+			templateout.DetailHeader(nil)
+			templateout.DetailLine(&test.status)
+			templateout.DetailFooter(nil)
+
+			for _, wantStatus := range test.wantEqTemplateStatus {
+				if ok := strings.Contains(buf.String(), wantStatus); !ok {
+					t.Errorf("Did not find expected template status: \n\t(GOT) %v \n\t(WNT) %v", buf.String(), wantStatus)
+				}
+			}
+		})
+	}
+}
+
 func TestBasicStatusGetConsolidatedConstraint(t *testing.T) {
 	aSemverConstraint, _ := gps.NewSemverConstraint("1.2.1")
 
@@ -352,6 +579,7 @@ func TestCollectConstraints(t *testing.T) {
 	cases := []struct {
 		name            string
 		lock            dep.Lock
+		manifest        dep.Manifest
 		wantConstraints constraintsCollection
 		wantErr         bool
 	}{
@@ -369,7 +597,7 @@ func TestCollectConstraints(t *testing.T) {
 			wantConstraints: constraintsCollection{},
 		},
 		{
-			name: "with multiple constraints",
+			name: "with multiple constraints from dependencies",
 			lock: dep.Lock{
 				P: []gps.LockedProject{
 					gps.NewLockedProject(
@@ -399,6 +627,53 @@ func TestCollectConstraints(t *testing.T) {
 				"github.com/sdboyer/deptest": []projectConstraint{
 					{"github.com/darkowlzz/deptest-project-1", ver1},
 					{"github.com/darkowlzz/deptest-project-2", ver08},
+				},
+			},
+		},
+		{
+			name: "with multiple constraints from dependencies and root project",
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-1")},
+						gps.NewVersion("v0.1.0"),
+						[]string{"."},
+					),
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/darkowlzz/deptest-project-2")},
+						gps.NewBranch("master").Pair(gps.Revision("824a8d56a4c6b2f4718824a98cd6d70d3dbd4c3e")),
+						[]string{"."},
+					),
+				},
+			},
+			manifest: dep.Manifest{
+				Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
+					gps.ProjectRoot("github.com/sdboyer/deptest"): {
+						Constraint: gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f"),
+					},
+				},
+				Ovr: make(gps.ProjectConstraints),
+				PruneOptions: gps.CascadingPruneOptions{
+					DefaultOptions:    gps.PruneNestedVendorDirs,
+					PerProjectOptions: make(map[gps.ProjectRoot]gps.PruneOptionSet),
+				},
+			},
+			wantConstraints: constraintsCollection{
+				"github.com/sdboyer/deptestdos": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-2", ver2},
+				},
+				"github.com/sdboyer/dep-test": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-2", ver1},
+				},
+				"github.com/sdboyer/deptest": []projectConstraint{
+					{"github.com/darkowlzz/deptest-project-1", ver1},
+					{"github.com/darkowlzz/deptest-project-2", ver08},
+					{"root", gps.Revision("3f4c3bea144e112a69bbe5d8d01c1b09a544253f")},
 				},
 			},
 		},
@@ -445,6 +720,31 @@ func TestCollectConstraints(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "skip ineffective constraint from manifest",
+			lock: dep.Lock{
+				P: []gps.LockedProject{
+					gps.NewLockedProject(
+						gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/sdboyer/deptest")},
+						gps.NewVersion("v1.0.0"),
+						[]string{"."},
+					),
+				},
+			},
+			manifest: dep.Manifest{
+				Constraints: map[gps.ProjectRoot]gps.ProjectProperties{
+					gps.ProjectRoot("github.com/darkowlzz/deptest-project-1"): {
+						Constraint: ver1,
+					},
+				},
+				Ovr: make(gps.ProjectConstraints),
+				PruneOptions: gps.CascadingPruneOptions{
+					DefaultOptions:    gps.PruneNestedVendorDirs,
+					PerProjectOptions: make(map[gps.ProjectRoot]gps.PruneOptionSet),
+				},
+			},
+			wantConstraints: constraintsCollection{},
+		},
 	}
 
 	h := test.NewHelper(t)
@@ -475,6 +775,7 @@ func TestCollectConstraints(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			p.Lock = &c.lock
+			p.Manifest = &c.manifest
 			gotConstraints, err := collectConstraints(ctx, p, sm)
 			if len(err) > 0 && !c.wantErr {
 				t.Fatalf("unexpected errors while collecting constraints: %v", err)
@@ -693,5 +994,134 @@ func TestStatusMissing(t *testing.T) {
 			}
 		})
 	}
+}
 
+func execStatusTemplate(w io.Writer, format string, data interface{}) error {
+	tpl, err := parseStatusTemplate(format)
+	if err != nil {
+		return err
+	}
+	return tpl.Execute(w, data)
+}
+
+const expectedStatusDetail = `# This file is autogenerated, do not edit; changes may be undone by the next 'dep ensure'.
+
+
+%s[solve-meta]
+  analyzer-name = "dep"
+  analyzer-version = 1
+  inputs-digest = "900e50172c505781bfed67991919eccea483d78173f8e5c74404a5f6d05858bb"
+  solver-name = "gps-cdcl"
+  solver-version = 1
+`
+
+var expectedStatusMetadata = rawDetailMetadata{
+	AnalyzerName:    "dep",
+	AnalyzerVersion: 1,
+	InputsDigest:    "900e50172c505781bfed67991919eccea483d78173f8e5c74404a5f6d05858bb",
+	SolverName:      "gps-cdcl",
+	SolverVersion:   1,
+}
+
+func TestStatusDetailTemplates(t *testing.T) {
+	testCases := []struct {
+		name string
+		tpl  string
+		exp  string
+		data rawDetail
+	}{
+		{
+			name: "Lock Template",
+			tpl:  statusLockTemplate,
+			exp: fmt.Sprintf(expectedStatusDetail, `[[projects]]
+  branch = "master"
+  name = "github.com/akutz/one"
+  packages = ["."]
+  revision = "b78744579491c1ceeaaa3b40205e56b0591b93a3"
+
+[[projects]]
+  name = "github.com/akutz/two"
+  packages = [
+    ".",
+    "helloworld"
+  ]
+  revision = "12bd96e66386c1960ab0f74ced1362f66f552f7b"
+  version = "v1.0.0"
+
+[[projects]]
+  branch = "feature/morning"
+  name = "github.com/akutz/three"
+  packages = [
+    "a",
+    "b",
+    "c"
+  ]
+  revision = "890a5c3458b43e6104ff5da8dfa139d013d77544"
+  source = "https://github.com/mandy/three"
+
+`),
+			data: rawDetail{
+				Projects: []rawDetailProject{
+					rawDetailProject{
+						Locked: rawDetailVersion{
+							Branch:   "master",
+							Revision: "b78744579491c1ceeaaa3b40205e56b0591b93a3",
+						},
+						ProjectRoot: "github.com/akutz/one",
+					},
+					rawDetailProject{
+						Locked: rawDetailVersion{
+							Revision: "12bd96e66386c1960ab0f74ced1362f66f552f7b",
+							Version:  "v1.0.0",
+						},
+						ProjectRoot: "github.com/akutz/two",
+						Packages: []string{
+							".",
+							"helloworld",
+						},
+					},
+					rawDetailProject{
+						Locked: rawDetailVersion{
+							Branch:   "feature/morning",
+							Revision: "890a5c3458b43e6104ff5da8dfa139d013d77544",
+						},
+						ProjectRoot: "github.com/akutz/three",
+						Packages: []string{
+							"a",
+							"b",
+							"c",
+						},
+						Source: "https://github.com/mandy/three",
+					},
+				},
+				Metadata: expectedStatusMetadata,
+			},
+		},
+		{
+			name: "Lock Template No Projects",
+			tpl:  statusLockTemplate,
+			exp:  fmt.Sprintf(expectedStatusDetail, ""),
+			data: rawDetail{
+				Metadata: expectedStatusMetadata,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			if err := execStatusTemplate(w, tc.tpl, tc.data); err != nil {
+				t.Error(err)
+			}
+			act := w.String()
+			if act != tc.exp {
+				t.Errorf(
+					"unexpected error: \n"+
+						"(GOT):\n=== BEGIN ===\n%v\n=== END ===\n"+
+						"(WNT):\n=== BEGIN ===\n%v\n=== END ===\n",
+					act,
+					tc.exp)
+			}
+		})
+	}
 }

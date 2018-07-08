@@ -811,24 +811,6 @@ var basicFixtures = map[string]basicFixture{
 			"foo 2.0.0 foorev2",
 		),
 	},
-	"pairs bare revs in lock with versions": {
-		ds: []depspec{
-			mkDepspec("root 0.0.0", "foo ~1.0.1"),
-			mkDepspec("foo 1.0.0", "bar 1.0.0"),
-			mkDepspec("foo 1.0.1 foorev", "bar 1.0.1"),
-			mkDepspec("foo 1.0.2", "bar 1.0.2"),
-			mkDepspec("bar 1.0.0"),
-			mkDepspec("bar 1.0.1"),
-			mkDepspec("bar 1.0.2"),
-		},
-		l: mkrevlock(
-			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
-		),
-		r: mksolution(
-			"foo 1.0.1 foorev",
-			"bar 1.0.1",
-		),
-	},
 	// This fixture describes a situation that should be impossible with a
 	// real-world VCS (contents of dep at same rev are different, as indicated
 	// by different constraints on bar). But, that's not the SUT here, so it's
@@ -865,8 +847,8 @@ var basicFixtures = map[string]basicFixture{
 			"foo 1.0.1 foorev", // mkrevlock drops the 1.0.1
 		),
 		r: mksolution(
-			"foo 1.0.1 foorev",
-			"bar 1.0.1",
+			"foo 1.0.2",
+			"bar 1.0.2",
 		),
 	},
 	"lock to branch on old rev keeps old rev": {

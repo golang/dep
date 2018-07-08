@@ -2,23 +2,25 @@
 
 NEW FEATURES:
 
-* Add CI tests against go1.10. Drop support for go1.8. ([#1620](https://github.com/golang/dep/pull/1620))
-* Added `install.sh` script. ([#1533](https://github.com/golang/dep/pull/1533))
+* Add CI tests against go1.10. Drop support for go1.8. ([#1620](https://github.com/golang/dep/pull/1620)).
+* Added `install.sh` script. ([#1533](https://github.com/golang/dep/pull/1533)).
 * List out of date projects in dep status ([#1553](https://github.com/golang/dep/pull/1553)).
+* Enabled opt-in persistent caching via `DEPCACHEAGE` env var. ([#1711](https://github.com/golang/dep/pull/1711)).
+* Allow `DEPPROJECTROOT` [environment variable](https://golang.github.io/dep/docs/env-vars.html#depprojectroot) to supersede GOPATH deduction and explicitly set the current project's [root](https://golang.github.io/dep/docs/glossary.html#project-root) ([#1883](https://github.com/golang/dep/pull/1883)).
 
 BUG FIXES:
 
+* Excise certain git-reltaed environment variables. ([#1872](https://github.com/golang/dep/pull/1872))
+
 IMPROVEMENTS:
 
-* Add template operations support in dep status template output.
-([#1549](https://github.com/golang/dep/pull/1549)).
-* Reduce network access by trusting local source information and only pulling
-from upstream when necessary ([#1250](https://github.com/golang/dep/pull/1250)).
+* Add template operations support in dep status template output ([#1549](https://github.com/golang/dep/pull/1549)).
+* Reduce network access by trusting local source information and only pulling from upstream when necessary ([#1250](https://github.com/golang/dep/pull/1250)).
 * Update our dependency on Masterminds/semver to follow upstream again now that [Masterminds/semver#67](https://github.com/Masterminds/semver/pull/67) is merged([#1792](https://github.com/golang/dep/pull/1792)).
+* Don't exclude `Godeps` folder ([#1822](https://github.com/golang/dep/issues/1822)).
 
 WIP:
-* Enable importing external configuration from dependencies during init (#1277). This
-is feature flagged and disabled by default.
+* Enable importing external configuration from dependencies during init (#1277). This is feature flagged and disabled by default.
 
 # v0.4.1
 

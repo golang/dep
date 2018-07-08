@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/internal/fs"
@@ -34,13 +35,15 @@ import (
 //	}
 //
 type Ctx struct {
-	WorkingDir     string      // Where to execute.
-	GOPATH         string      // Selected Go path, containing WorkingDir.
-	GOPATHs        []string    // Other Go paths.
-	Out, Err       *log.Logger // Required loggers.
-	Verbose        bool        // Enables more verbose logging.
-	DisableLocking bool        // When set, no lock file will be created to protect against simultaneous dep processes.
-	Cachedir       string      // Cache directory loaded from environment.
+	WorkingDir     string        // Where to execute.
+	GOPATH         string        // Selected Go path, containing WorkingDir.
+	GOPATHs        []string      // Other Go paths.
+	ExplicitRoot   string        // An explicitly-set path to use as the project root.
+	Out, Err       *log.Logger   // Required loggers.
+	Verbose        bool          // Enables more verbose logging.
+	DisableLocking bool          // When set, no lock file will be created to protect against simultaneous dep processes.
+	Cachedir       string        // Cache directory loaded from environment.
+	CacheAge       time.Duration // Maximum valid age of cached source data. <=0: Don't cache.
 }
 
 // SetPaths sets the WorkingDir and GOPATHs fields. If GOPATHs is empty, then
@@ -60,6 +63,8 @@ func (c *Ctx) SetPaths(wd string, GOPATHs ...string) error {
 	}
 
 	c.GOPATHs = append(c.GOPATHs, GOPATHs...)
+
+	c.ExplicitRoot = os.Getenv("DEPPROJECTROOT")
 
 	return nil
 }
@@ -99,6 +104,7 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 	}
 
 	return gps.NewSourceManager(gps.SourceManagerConfig{
+		CacheAge:       c.CacheAge,
 		Cachedir:       cachedir,
 		Logger:         c.Out,
 		DisableLocking: c.DisableLocking,
@@ -134,11 +140,15 @@ func (c *Ctx) LoadProject() (*Project, error) {
 		return nil, err
 	}
 
-	ip, err := c.ImportForAbs(p.AbsRoot)
-	if err != nil {
-		return nil, errors.Wrap(err, "root project import")
+	if c.ExplicitRoot != "" {
+		p.ImportRoot = gps.ProjectRoot(c.ExplicitRoot)
+	} else {
+		ip, err := c.ImportForAbs(p.AbsRoot)
+		if err != nil {
+			return nil, errors.Wrap(err, "root project import")
+		}
+		p.ImportRoot = gps.ProjectRoot(ip)
 	}
-	p.ImportRoot = gps.ProjectRoot(ip)
 
 	mp := filepath.Join(p.AbsRoot, ManifestName)
 	mf, err := os.Open(mp)
@@ -199,9 +209,14 @@ func (c *Ctx) DetectProjectGOPATH(p *Project) (string, error) {
 		return "", errors.New("project AbsRoot and ResolvedAbsRoot must be set to detect GOPATH")
 	}
 
+	if c.ExplicitRoot != "" {
+		// If an explicit root is set, just use the first GOPATH in the list.
+		return c.GOPATHs[0], nil
+	}
+
 	pGOPATH, perr := c.detectGOPATH(p.AbsRoot)
 
-	// If p.AbsRoot is a not symlink, attempt to detect GOPATH for p.AbsRoot only.
+	// If p.AbsRoot is a not a symlink, attempt to detect GOPATH for p.AbsRoot only.
 	if equal, _ := fs.EquivalentPaths(p.AbsRoot, p.ResolvedAbsRoot); equal {
 		return pGOPATH, perr
 	}

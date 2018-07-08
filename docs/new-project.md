@@ -28,7 +28,7 @@ In a new project like this one, both files and the `vendor` directory will be ef
 
 This would also be a good time to set up a version control, such as [git](https://git-scm.com/). While dep in no way requires version control for your project, it can make inspecting the changes made by normal dep operations easier. Plus, it's basically best practice #1 of modern software development!
 
-At this point, our project is initialized, and we're ready to start writing code. You can open up a `.go` file in an editor and start hacking away. Or, after creating your first `.go` file, you can go ahead and pre-populate your `vendor` directory with some projects that you already know that you'll need:
+At this point, our project is initialized, and we're ready to start writing code. You can open up a `.go` file in an editor and start hacking away. Or, **after creating your first `.go` file**, you can go ahead and pre-populate your `vendor` directory with some projects that you already know that you'll need:
 
 ```bash
 $ dep ensure -add github.com/foo/bar github.com/baz/quux

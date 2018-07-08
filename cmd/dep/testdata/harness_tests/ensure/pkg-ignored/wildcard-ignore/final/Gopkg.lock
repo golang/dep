@@ -2,10 +2,10 @@
 
 
 [[projects]]
+  branch = "master"
   name = "github.com/sdboyer/deptest"
   packages = ["."]
   revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
-  version = "v0.8.1"
 
 [solve-meta]
   analyzer-name = "dep"

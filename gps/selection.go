@@ -16,8 +16,6 @@ type selection struct {
 	// ProjectRoots to the particular case variant that has currently been
 	// selected.
 	foldRoots map[string]ProjectRoot
-	// The versoinUnifier in use for this solve run.
-	vu *versionUnifier
 }
 
 type selected struct {
@@ -159,7 +157,7 @@ func (s *selection) getConstraint(id ProjectIdentifier) Constraint {
 	// Start with the open set
 	var ret Constraint = any
 	for _, dep := range deps {
-		ret = s.vu.intersect(id, ret, dep.dep.Constraint)
+		ret = ret.Intersect(dep.dep.Constraint)
 	}
 
 	return ret

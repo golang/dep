@@ -7,6 +7,6 @@
 # source files to check licence
 set -e
 
-go build ./hack/licenseok
+go build -o licenseok ./hack/licenseok/main.go
 find . -path ./vendor -prune -o -regex ".+\.pb\.go$" -prune -o -type f -regex ".*\.\(go\|proto\)$"\
  -printf '%P\n' | xargs ./licenseok

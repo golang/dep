@@ -21,6 +21,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+// boltCacheFilename is a versioned filename for the bolt cache. The version
+// must be incremented whenever incompatible changes are made.
+const boltCacheFilename = "bolt-v1.db"
+
 // boltCache manages a bolt.DB cache and provides singleSourceCaches.
 type boltCache struct {
 	db     *bolt.DB
@@ -30,14 +34,14 @@ type boltCache struct {
 
 // newBoltCache returns a new boltCache backed by a BoltDB file under the cache directory.
 func newBoltCache(cd string, epoch int64, logger *log.Logger) (*boltCache, error) {
-	path := sourceCachePath(cd, "bolt") + ".db"
+	path := filepath.Join(cd, boltCacheFilename)
 	dir := filepath.Dir(path)
 	if fi, err := os.Stat(dir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, os.ModeDir|os.ModePerm); err != nil {
 			return nil, errors.Wrapf(err, "failed to create source cache directory: %s", dir)
 		}
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "failed to check source cache directory: ", dir)
+		return nil, errors.Wrapf(err, "failed to check source cache directory: %s", dir)
 	} else if !fi.IsDir() {
 		return nil, errors.Wrapf(err, "source cache path is not directory: %s", dir)
 	}
