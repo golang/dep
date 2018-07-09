@@ -1,3 +1,7 @@
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package verify
 
 import (
@@ -9,10 +13,26 @@ import (
 
 // LockSatisfaction holds the compound result of LockSatisfiesInputs, allowing
 // the caller to inspect each of several orthogonal possible types of failure.
+//
+// The zero value assumes that there was no input lock, which necessarily means
+// the inputs were not satisfied. This zero value means we err on the side of
+// failure.
 type LockSatisfaction struct {
-	nolock                  bool
-	missingPkgs, excessPkgs []string
-	badovr, badconstraint   map[gps.ProjectRoot]ConstraintMismatch
+	// If LockExisted is false, it indicates that a nil gps.Lock was passed to
+	// LockSatisfiesInputs().
+	LockExisted bool
+	// MissingImports is the set of import paths that were present in the
+	// inputs but missing in the Lock.
+	MissingImports []string
+	// ExcessImports is the set of import paths that were present in the Lock
+	// but absent from the inputs.
+	ExcessImports []string
+	// UnmatchedConstraints reports any normal, non-override constraint rules that
+	// were not satisfied by the corresponding LockedProject in the Lock.
+	UnmetConstraints map[gps.ProjectRoot]ConstraintMismatch
+	// UnmatchedOverrides reports any override rules that were not satisfied by the
+	// corresponding LockedProject in the Lock.
+	UnmetOverrides map[gps.ProjectRoot]ConstraintMismatch
 }
 
 // ConstraintMismatch is a two-tuple of a gps.Version, and a gps.Constraint that
@@ -30,9 +50,15 @@ type ConstraintMismatch struct {
 // compute package imports that may have been removed. Figuring out that
 // negative space would require exploring the entire graph to ensure there are
 // no in-edges for particular imports.
-func LockSatisfiesInputs(l gps.Lock, m gps.RootManifest, rpt pkgtree.PackageTree) LockSatisfaction {
+func LockSatisfiesInputs(l gps.Lock, m gps.RootManifest, ptree pkgtree.PackageTree) LockSatisfaction {
 	if l == nil {
-		return LockSatisfaction{nolock: true}
+		return LockSatisfaction{}
+	}
+
+	lsat := LockSatisfaction{
+		LockExisted:      true,
+		UnmetOverrides:   make(map[gps.ProjectRoot]ConstraintMismatch),
+		UnmetConstraints: make(map[gps.ProjectRoot]ConstraintMismatch),
 	}
 
 	var ig *pkgtree.IgnoredRuleset
@@ -42,7 +68,7 @@ func LockSatisfiesInputs(l gps.Lock, m gps.RootManifest, rpt pkgtree.PackageTree
 		req = m.RequiredPackages()
 	}
 
-	rm, _ := rpt.ToReachMap(true, true, false, ig)
+	rm, _ := ptree.ToReachMap(true, true, false, ig)
 	reach := rm.FlattenFn(paths.IsStandardImportPath)
 
 	inlock := make(map[string]bool, len(l.InputImports()))
@@ -68,11 +94,6 @@ func LockSatisfiesInputs(l gps.Lock, m gps.RootManifest, rpt pkgtree.PackageTree
 		inlock[imp] = true
 	}
 
-	lsat := LockSatisfaction{
-		badovr:        make(map[gps.ProjectRoot]ConstraintMismatch),
-		badconstraint: make(map[gps.ProjectRoot]ConstraintMismatch),
-	}
-
 	for ip := range ininputs {
 		if !inlock[ip] {
 			pkgDiff[ip] = missingFromLock
@@ -96,9 +117,9 @@ func LockSatisfiesInputs(l gps.Lock, m gps.RootManifest, rpt pkgtree.PackageTree
 
 	for ip, typ := range pkgDiff {
 		if typ == missingFromLock {
-			lsat.missingPkgs = append(lsat.missingPkgs, ip)
+			lsat.MissingImports = append(lsat.MissingImports, ip)
 		} else {
-			lsat.excessPkgs = append(lsat.excessPkgs, ip)
+			lsat.ExcessImports = append(lsat.ExcessImports, ip)
 		}
 	}
 
@@ -110,7 +131,7 @@ func LockSatisfiesInputs(l gps.Lock, m gps.RootManifest, rpt pkgtree.PackageTree
 
 		if pp, has := ovr[pr]; has {
 			if !pp.Constraint.Matches(lp.Version()) {
-				lsat.badovr[pr] = ConstraintMismatch{
+				lsat.UnmetOverrides[pr] = ConstraintMismatch{
 					C: pp.Constraint,
 					V: lp.Version(),
 				}
@@ -121,7 +142,7 @@ func LockSatisfiesInputs(l gps.Lock, m gps.RootManifest, rpt pkgtree.PackageTree
 		}
 
 		if pp, has := constraints[pr]; has && eff[string(pr)] && !pp.Constraint.Matches(lp.Version()) {
-			lsat.badconstraint[pr] = ConstraintMismatch{
+			lsat.UnmetConstraints[pr] = ConstraintMismatch{
 				C: pp.Constraint,
 				V: lp.Version(),
 			}
@@ -131,55 +152,31 @@ func LockSatisfiesInputs(l gps.Lock, m gps.RootManifest, rpt pkgtree.PackageTree
 	return lsat
 }
 
-// Passed is a shortcut method that indicates whether there were any ways in
-// which the Lock did not satisfy the inputs. It will return true only if no
-// problems were found.
-func (ls LockSatisfaction) Passed() bool {
-	if ls.nolock {
+// Satisfied is a shortcut method that indicates whether there were any ways in
+// which the Lock did not satisfy the inputs. It will return true only if the
+// Lock was satisfactory in all respects vis-a-vis the inputs.
+func (ls LockSatisfaction) Satisfied() bool {
+	if !ls.LockExisted {
 		return false
 	}
 
-	if len(ls.missingPkgs) > 0 {
+	if len(ls.MissingImports) > 0 {
 		return false
 	}
 
-	if len(ls.excessPkgs) > 0 {
+	if len(ls.ExcessImports) > 0 {
 		return false
 	}
 
-	if len(ls.badovr) > 0 {
+	if len(ls.UnmetOverrides) > 0 {
 		return false
 	}
 
-	if len(ls.badconstraint) > 0 {
+	if len(ls.UnmetConstraints) > 0 {
 		return false
 	}
 
 	return true
-}
-
-// MissingImports reports the set of import paths that were present in the
-// inputs but missing in the Lock.
-func (ls LockSatisfaction) MissingImports() []string {
-	return ls.missingPkgs
-}
-
-// ExcessImports reports the set of import paths that were present in the Lock
-// but absent from the inputs.
-func (ls LockSatisfaction) ExcessImports() []string {
-	return ls.excessPkgs
-}
-
-// UnmatchedOverrides reports any override rules that were not satisfied by the
-// corresponding LockedProject in the Lock.
-func (ls LockSatisfaction) UnmatchedOverrides() map[gps.ProjectRoot]ConstraintMismatch {
-	return ls.badovr
-}
-
-// UnmatchedConstraints reports any normal, non-override constraint rules that
-// were not satisfied by the corresponding LockedProject in the Lock.
-func (ls LockSatisfaction) UnmatchedConstraints() map[gps.ProjectRoot]ConstraintMismatch {
-	return ls.badconstraint
 }
 
 func findEffectualConstraints(m gps.Manifest, imports map[string]bool) map[string]bool {

@@ -282,19 +282,19 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	lock := p.ChangedLock
 	if lock != nil {
 		lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)
-		if !lsat.Passed() {
+		if !lsat.Satisfied() {
 			if ctx.Verbose {
 				ctx.Out.Println("Gopkg.lock is out of sync with Gopkg.toml and project code:")
-				for _, missing := range lsat.MissingImports() {
+				for _, missing := range lsat.MissingImports {
 					ctx.Out.Printf("\t%s is missing from input-imports\n", missing)
 				}
-				for _, excess := range lsat.ExcessImports() {
+				for _, excess := range lsat.ExcessImports {
 					ctx.Out.Printf("\t%s is in input-imports, but isn't imported\n", excess)
 				}
-				for pr, unmatched := range lsat.UnmatchedOverrides() {
+				for pr, unmatched := range lsat.UnmetOverrides {
 					ctx.Out.Printf("\t%s is at %s, which is not allowed by override %s\n", pr, unmatched.V, unmatched.C)
 				}
-				for pr, unmatched := range lsat.UnmatchedConstraints() {
+				for pr, unmatched := range lsat.UnmetConstraints {
 					ctx.Out.Printf("\t%s is at %s, which is not allowed by constraint %s\n", pr, unmatched.V, unmatched.C)
 				}
 				ctx.Out.Println()

@@ -925,7 +925,7 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 	})
 
 	lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)
-	if lsat.Passed() {
+	if lsat.Satisfied() {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
