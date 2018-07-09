@@ -22,6 +22,7 @@ IMPROVEMENTS:
 * Reduce network access by trusting local source information and only pulling from upstream when necessary ([#1250](https://github.com/golang/dep/pull/1250)).
 * Update our dependency on Masterminds/semver to follow upstream again now that [Masterminds/semver#67](https://github.com/Masterminds/semver/pull/67) is merged([#1792](https://github.com/golang/dep/pull/1792)).
 * `inputs-digest` was removed from `Gopkg.lock` ([#1912](https://github.com/golang/dep/pull/1912)).
+* Don't exclude `Godeps` folder ([#1822](https://github.com/golang/dep/issues/1822)).
 
 WIP:
 * Enable importing external configuration from dependencies during init (#1277). This is feature flagged and disabled by default.

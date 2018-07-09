@@ -89,7 +89,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		// We don't skip _*, or testdata dirs because, while it may be poor
 		// form, importing them is not a compilation error.
 		switch fi.Name() {
-		case "vendor", "Godeps":
+		case "vendor":
 			return filepath.SkipDir
 		}
 
