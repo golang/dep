@@ -180,10 +180,6 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		params.TraceLogger = ctx.Err
 	}
 
-	if cmd.vendorOnly {
-		return cmd.runVendorOnly(ctx, args, p, sm, params)
-	}
-
 	statchan := make(chan map[string]verify.VendorStatus)
 	var lps []gps.LockedProject
 	if p.Lock != nil {
@@ -210,6 +206,10 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 		statchan <- status
 	}(filepath.Join(p.AbsRoot, "vendor"), lps)
+
+	if cmd.vendorOnly {
+		return cmd.runVendorOnly(ctx, args, p, sm, params, statchan)
+	}
 
 	if fatal, err := checkErrors(params.RootPackageTree.Packages, p.Manifest.IgnoredPackages()); err != nil {
 		if fatal {
@@ -348,7 +348,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 
 	// Pass the same lock as old and new so that the writer will observe no
 	// difference, and write out only ncessary vendor/ changes.
-	dw, err := dep.NewDeltaWriter(p.Lock, p.Lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), VendorAlways)
+	dw, err := dep.NewDeltaWriter(p.Lock, p.Lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), dep.VendorAlways)
 	if err != nil {
 		return err
 	}
