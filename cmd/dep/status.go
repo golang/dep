@@ -271,7 +271,7 @@ type jsonOutput struct {
 	basic         []*rawStatus
 	detail        []rawDetailProject
 	missing       []*MissingStatus
-	statusMissing []struct{ ProjectRoot gps.ProjectRoot }
+	statusMissing []*StatusMissing
 	old           []*rawOldStatus
 }
 
@@ -323,13 +323,12 @@ func (out *jsonOutput) MissingFooter() error {
 }
 
 func (out *jsonOutput) StatusMissingHeader() error {
-	out.statusMissing = []struct{ ProjectRoot gps.ProjectRoot }{}
+	out.statusMissing = []*StatusMissing{}
 	return nil
 }
 
 func (out *jsonOutput) StatusMissingLine(missingDep gps.ProjectRoot) error {
-	out.statusMissing = append(out.statusMissing,
-		struct{ ProjectRoot gps.ProjectRoot }{missingDep})
+	out.statusMissing = append(out.statusMissing, &StatusMissing{missingDep})
 	return nil
 }
 
@@ -464,7 +463,7 @@ func (out *templateOutput) MissingLine(ms *MissingStatus) error {
 }
 func (out *templateOutput) StatusMissingHeader() error { return nil }
 func (out *templateOutput) StatusMissingLine(missingDep gps.ProjectRoot) error {
-	t := struct{ ProjectRoot gps.ProjectRoot }{missingDep}
+	t := StatusMissing{missingDep}
 	return out.tmpl.Execute(out.w, t)
 }
 func (out *templateOutput) StatusMissingFooter() error { return nil }
@@ -969,9 +968,16 @@ func (ds *DetailStatus) marshalJSON() *rawDetailProject {
 }
 
 // MissingStatus contains information about all the missing packages in a project.
+// Deprecated: Use StatusMissing instead, to-be-removed together with refactoring
+//             of runStatusAll
 type MissingStatus struct {
 	ProjectRoot     string
 	MissingPackages []string
+}
+
+// StatusMissing contains the root of missing packages in a project.
+type StatusMissing struct {
+	ProjectRoot gps.ProjectRoot
 }
 
 func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
