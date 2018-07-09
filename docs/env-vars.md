@@ -25,8 +25,4 @@ This is primarily useful if you're not using the standard `go` toolchain as a co
 
 ### `DEPNOLOCK`
 
-By default, dep creates an `sm.lock` file at `$DEPCACHEDIR/sm.lock` in order to
-prevent multiple dep processes from interacting with the [local
-cache](glossary.md#local-cache) simultaneously. Setting this variable will
-bypass that protection; no file will be created. This can be useful on certain
-filesystems; VirtualBox shares in particular are known to misbehave.
+By default, dep creates an `sm.lock` file at `$DEPCACHEDIR/sm.lock` in order to prevent multiple dep processes from interacting with the [local cache](glossary.md#local-cache) simultaneously. Setting this variable will bypass that protection; no file will be created. This can be useful on certain filesystems; VirtualBox shares in particular are known to misbehave.
