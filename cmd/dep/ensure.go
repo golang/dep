@@ -348,7 +348,8 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 
 	// Pass the same lock as old and new so that the writer will observe no
 	// difference, and write out only ncessary vendor/ changes.
-	dw, err := dep.NewDeltaWriter(p.Lock, p.Lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), dep.VendorAlways)
+	dw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways, p.Manifest.PruneOptions)
+	//dw, err := dep.NewDeltaWriter(p.Lock, p.Lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), dep.VendorAlways)
 	if err != nil {
 		return err
 	}
