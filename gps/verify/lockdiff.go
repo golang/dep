@@ -1,4 +1,4 @@
-// Copyright 2017 The Go Authors. All rights reserved.
+// Copyright 2018 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -12,22 +12,25 @@ import (
 	"github.com/golang/dep/gps"
 )
 
-// sortLockedProjects returns a sorted copy of lps, or itself if already sorted.
-func sortLockedProjects(lps []gps.LockedProject) []gps.LockedProject {
-	if len(lps) <= 1 || sort.SliceIsSorted(lps, func(i, j int) bool {
-		return lps[i].Ident().Less(lps[j].Ident())
-	}) {
-		return lps
-	}
+// DeltaDimension defines a bitset enumerating all of the different dimensions
+// along which a Lock, and its constitutent components, can change.
+type DeltaDimension uint32
 
-	cp := make([]gps.LockedProject, len(lps))
-	copy(cp, lps)
-
-	sort.Slice(cp, func(i, j int) bool {
-		return cp[i].Ident().Less(cp[j].Ident())
-	})
-	return cp
-}
+// Each flag represents an ortohgonal dimension along which Locks can vary with
+// respect to each other.
+const (
+	InputImportsChanged DeltaDimension = 1 << iota
+	ProjectAdded
+	ProjectRemoved
+	SourceChanged
+	VersionChanged
+	RevisionChanged
+	PackagesChanged
+	PruneOptsChanged
+	HashVersionChanged
+	HashChanged
+	AnyChanged = (1 << iota) - 1
+)
 
 // LockDelta represents all possible differences between two Locks.
 type LockDelta struct {
@@ -61,9 +64,10 @@ type LockedProjectPropertiesDelta struct {
 // DiffLocks compares two locks and computes a semantically rich delta between
 // them.
 func DiffLocks(l1, l2 gps.Lock) LockDelta {
-	// Default nil locks to empty locks, so that we can still generate a diff
+	// Default nil locks to empty locks, so that we can still generate a diff.
 	if l1 == nil {
 		if l2 == nil {
+			// But both locks being nil results in an empty delta.
 			return LockDelta{}
 		}
 		l1 = gps.SimpleLock{}
@@ -131,8 +135,8 @@ func DiffLocks(l1, l2 gps.Lock) LockDelta {
 }
 
 func findAddedAndRemoved(l1, l2 []string) (add, remove []string) {
-	// Computing package add/removes could probably be optimized to O(n), but
-	// it's not critical path for any known case, so not worth the effort right now.
+	// Computing package add/removes might be optimizable to O(n) (?), but it's
+	// not critical path for any known case, so not worth the effort right now.
 	p1, p2 := make(map[string]bool, len(l1)), make(map[string]bool, len(l2))
 
 	for _, pkg := range l1 {
@@ -215,26 +219,6 @@ func DiffLockedProjectProperties(lp1, lp2 gps.LockedProject) LockedProjectProper
 
 	return ld
 }
-
-// DeltaDimension defines a bitset enumerating all of the different dimensions
-// along which a Lock, and its constitutent components, can change.
-type DeltaDimension uint32
-
-// Each flag represents an ortohgonal dimension along which Locks can vary with
-// respect to each other.
-const (
-	InputImportsChanged DeltaDimension = 1 << iota
-	ProjectAdded
-	ProjectRemoved
-	SourceChanged
-	VersionChanged
-	RevisionChanged
-	PackagesChanged
-	PruneOptsChanged
-	HashVersionChanged
-	HashChanged
-	AnyChanged = (1 << iota) - 1
-)
 
 // Changed indicates whether the delta contains a change along the dimensions
 // with their corresponding bits set.
@@ -388,28 +372,15 @@ func (ld LockedProjectPropertiesDelta) SourceChanged() bool {
 
 // VersionChanged returns true if the version property differed between the
 // first and second locks. In addition to simple changes (e.g. 1.0.1 -> 1.0.2),
-// this also includes all the possible type changes covered by
-// VersionTypeCHanged(), as those necessarily also are version changes.
+// this also includes all possible version type changes either going from a
+// paired version to a plain revision, or the reverse direction, or the type of
+// unpaired version changing (e.g. branch -> semver).
 func (ld LockedProjectPropertiesDelta) VersionChanged() bool {
 	if ld.VersionBefore == nil && ld.VersionAfter == nil {
 		return false
 	} else if (ld.VersionBefore == nil || ld.VersionAfter == nil) || (ld.VersionBefore.Type() != ld.VersionAfter.Type()) {
 		return true
 	} else if !ld.VersionBefore.Matches(ld.VersionAfter) {
-		return true
-	}
-
-	return false
-}
-
-// VersionTypeChanged returns true if the type of version differed between the
-// first and second locks. This includes either going from a paired version to a
-// plain revision, or the reverse direction, or the type of unpaired version
-// changing (e.g. branch -> semver).
-func (ld LockedProjectPropertiesDelta) VersionTypeChanged() bool {
-	if ld.VersionBefore == nil && ld.VersionAfter == nil {
-		return false
-	} else if (ld.VersionBefore == nil || ld.VersionAfter == nil) || (ld.VersionBefore.Type() != ld.VersionAfter.Type()) {
 		return true
 	}
 
@@ -432,4 +403,21 @@ func (ld LockedProjectPropertiesDelta) PackagesChanged() bool {
 // between teh first and second locks.
 func (ld LockedProjectPropertiesDelta) PruneOptsChanged() bool {
 	return ld.PruneOptsBefore != ld.PruneOptsAfter
+}
+
+// sortLockedProjects returns a sorted copy of lps, or itself if already sorted.
+func sortLockedProjects(lps []gps.LockedProject) []gps.LockedProject {
+	if len(lps) <= 1 || sort.SliceIsSorted(lps, func(i, j int) bool {
+		return lps[i].Ident().Less(lps[j].Ident())
+	}) {
+		return lps
+	}
+
+	cp := make([]gps.LockedProject, len(lps))
+	copy(cp, lps)
+
+	sort.Slice(cp, func(i, j int) bool {
+		return cp[i].Ident().Less(cp[j].Ident())
+	})
+	return cp
 }

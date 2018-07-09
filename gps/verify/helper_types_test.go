@@ -33,6 +33,37 @@ func (sl safeLock) Projects() []gps.LockedProject {
 	return sl.p
 }
 
+func (sl safeLock) dup() safeLock {
+	sl2 := safeLock{
+		i: make([]string, len(sl.i)),
+		p: make([]gps.LockedProject, 0, len(sl.p)),
+	}
+	copy(sl2.i, sl.i)
+
+	for _, lp := range sl.p {
+		// Only for use with VerifiableProjects.
+		sl2.p = append(sl2.p, lp.(VerifiableProject).dup())
+	}
+
+	return sl2
+}
+
+func (vp VerifiableProject) dup() VerifiableProject {
+	pkglist := make([]string, len(vp.Packages()))
+	copy(pkglist, vp.Packages())
+	hashbytes := make([]byte, len(vp.Digest.Digest))
+	copy(hashbytes, vp.Digest.Digest)
+
+	return VerifiableProject{
+		LockedProject: gps.NewLockedProject(vp.Ident(), vp.Version(), pkglist),
+		PruneOpts:     vp.PruneOpts,
+		Digest: VersionedDigest{
+			HashVersion: vp.Digest.HashVersion,
+			Digest:      hashbytes,
+		},
+	}
+}
+
 // simpleRootManifest exists so that we have a safe value to swap into solver
 // params when a nil Manifest is provided.
 type simpleRootManifest struct {
@@ -75,4 +106,14 @@ func (m simpleRootManifest) dup() simpleRootManifest {
 	}
 
 	return m2
+}
+
+func newVerifiableProject(id gps.ProjectIdentifier, v gps.Version, pkgs []string) VerifiableProject {
+	return VerifiableProject{
+		LockedProject: gps.NewLockedProject(id, v, pkgs),
+		Digest: VersionedDigest{
+			HashVersion: HashVersion,
+			Digest:      []byte("something"),
+		},
+	}
 }
