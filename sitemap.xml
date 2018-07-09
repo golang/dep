@@ -7,6 +7,7 @@
 <url> <loc>https://golang.github.io/docs/daily-dep.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/daily-dep.html" /> </url>
 <url> <loc>https://golang.github.io/docs/deduction.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/deduction.html" /> </url>
 <url> <loc>https://golang.github.io/docs/ensure-mechanics.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/ensure-mechanics.html" /> </url>
+<url> <loc>https://golang.github.io/docs/env-vars.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/env-vars.html" /> </url>
 <url> <loc>https://golang.github.io/docs/failure-modes.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/failure-modes.html" /> </url>
 <url> <loc>https://golang.github.io/docs/FAQ.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/FAQ.html" /> </url>
 <url> <loc>https://golang.github.io/docs/glossary.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/glossary.html" /> </url>
