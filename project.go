@@ -9,9 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/gps/verify"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
 )
@@ -113,6 +115,46 @@ type Project struct {
 	// The PackageTree representing the project, with hidden and ignored
 	// packages already trimmed.
 	RootPackageTree pkgtree.PackageTree
+	// Oncer to manage access to initial check of vendor.
+	CheckVendor sync.Once
+	// The result of calling verify.CheckDepTree against the current lock and
+	// vendor dir.
+	VendorStatus map[string]verify.VendorStatus
+	// The error, if any, from checking vendor.
+	CheckVendorErr error
+}
+
+// VerifyVendor checks the vendor directory against the hash digests in
+// Gopkg.lock.
+//
+// This operation is overseen by the sync.Once in CheckVendor. This is intended
+// to facilitate running verification in the background while solving, then
+// having the results ready later.
+func (p *Project) VerifyVendor() (map[string]verify.VendorStatus, error) {
+	p.CheckVendor.Do(func() {
+		p.VendorStatus = make(map[string]verify.VendorStatus)
+		vendorDir := filepath.Join(p.AbsRoot, "vendor")
+
+		var lps []gps.LockedProject
+		if p.Lock != nil {
+			lps = p.Lock.Projects()
+		}
+
+		err := os.MkdirAll(vendorDir, os.FileMode(0777))
+		if err != nil {
+			p.CheckVendorErr = err
+			return
+		}
+
+		sums := make(map[string]verify.VersionedDigest)
+		for _, lp := range lps {
+			sums[string(lp.Ident().ProjectRoot)] = lp.(verify.VerifiableProject).Digest
+		}
+
+		p.VendorStatus, p.CheckVendorErr = verify.CheckDepTree(vendorDir, sums)
+	})
+
+	return p.VendorStatus, p.CheckVendorErr
 }
 
 // SetRoot sets the project AbsRoot and ResolvedAbsRoot. If root is not a symlink, ResolvedAbsRoot will be set to root.

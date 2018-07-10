@@ -408,8 +408,7 @@ type DeltaWriter struct {
 type changeType uint8
 
 const (
-	noChange changeType = iota
-	solveChanged
+	solveChanged changeType = iota + 1
 	hashMismatch
 	hashVersionMismatch
 	hashAbsent

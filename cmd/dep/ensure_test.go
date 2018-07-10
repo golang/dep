@@ -50,11 +50,11 @@ func TestInvalidEnsureFlagCombinations(t *testing.T) {
 	// anything other than the error being non-nil. For now, it works well
 	// because a panic will quickly result if the initial arg length validation
 	// checks are incorrectly handled.
-	if err := ec.runDefault(nil, []string{"foo"}, nil, nil, gps.SolveParameters{}, nil); err == nil {
+	if err := ec.runDefault(nil, []string{"foo"}, nil, nil, gps.SolveParameters{}); err == nil {
 		t.Errorf("no args to plain ensure with -vendor-only")
 	}
 	ec.vendorOnly = false
-	if err := ec.runDefault(nil, []string{"foo"}, nil, nil, gps.SolveParameters{}, nil); err == nil {
+	if err := ec.runDefault(nil, []string{"foo"}, nil, nil, gps.SolveParameters{}); err == nil {
 		t.Errorf("no args to plain ensure")
 	}
 }

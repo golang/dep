@@ -180,35 +180,8 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		params.TraceLogger = ctx.Err
 	}
 
-	statchan := make(chan map[string]verify.VendorStatus)
-	var lps []gps.LockedProject
-	if p.Lock != nil {
-		lps = p.Lock.Projects()
-	}
-	go func(vendorDir string, p []gps.LockedProject) {
-		// Make sure vendor dir exists
-		err := os.MkdirAll(vendorDir, os.FileMode(0777))
-		if err != nil {
-			ctx.Err.Printf("Error creating vendor directory: %q", err.Error())
-			// TODO(sdboyer) handle these better
-			os.Exit(1)
-		}
-
-		sums := make(map[string]verify.VersionedDigest)
-		for _, lp := range p {
-			sums[string(lp.Ident().ProjectRoot)] = lp.(verify.VerifiableProject).Digest
-		}
-
-		status, err := verify.CheckDepTree(vendorDir, sums)
-		if err != nil {
-			ctx.Err.Printf("Error while verifying vendor directory: %q", err.Error())
-			os.Exit(1)
-		}
-		statchan <- status
-	}(filepath.Join(p.AbsRoot, "vendor"), lps)
-
 	if cmd.vendorOnly {
-		return cmd.runVendorOnly(ctx, args, p, sm, params, statchan)
+		return cmd.runVendorOnly(ctx, args, p, sm, params)
 	}
 
 	if fatal, err := checkErrors(params.RootPackageTree.Packages, p.Manifest.IgnoredPackages()); err != nil {
@@ -233,12 +206,16 @@ func (cmd *ensureCommand) Run(ctx *dep.Ctx, args []string) error {
 		ctx.Err.Printf("on these projects, if they happen to be transitive dependencies.\n\n")
 	}
 
+	// Kick off vendor verification in the background. All of the remaining
+	// paths from here will need it, whether or not they end up solving.
+	go p.VerifyVendor()
+
 	if cmd.add {
-		return cmd.runAdd(ctx, args, p, sm, params, statchan)
+		return cmd.runAdd(ctx, args, p, sm, params)
 	} else if cmd.update {
-		return cmd.runUpdate(ctx, args, p, sm, params, statchan)
+		return cmd.runUpdate(ctx, args, p, sm, params)
 	}
-	return cmd.runDefault(ctx, args, p, sm, params, statchan)
+	return cmd.runDefault(ctx, args, p, sm, params)
 }
 
 func (cmd *ensureCommand) validateFlags() error {
@@ -268,7 +245,7 @@ func (cmd *ensureCommand) vendorBehavior() dep.VendorBehavior {
 	return dep.VendorOnChanged
 }
 
-func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
+func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	// Bare ensure doesn't take any args.
 	if len(args) != 0 {
 		return errors.New("dep ensure only takes spec arguments with -add or -update")
@@ -321,7 +298,11 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		lock = dep.LockFromSolution(solution, p.Manifest.PruneOptions)
 	}
 
-	dw, err := dep.NewDeltaWriter(p.Lock, lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
+	status, err := p.VerifyVendor()
+	if err != nil {
+		return errors.Wrap(err, "error while verifying vendor directory")
+	}
+	dw, err := dep.NewDeltaWriter(p.Lock, lock, status, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
@@ -337,7 +318,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 	return errors.WithMessage(dw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
+func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if len(args) != 0 {
 		return errors.Errorf("dep ensure -vendor-only only populates vendor/ from %s; it takes no spec arguments", dep.LockName)
 	}
@@ -349,7 +330,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	// Pass the same lock as old and new so that the writer will observe no
 	// difference, and write out only ncessary vendor/ changes.
 	dw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways, p.Manifest.PruneOptions)
-	//dw, err := dep.NewDeltaWriter(p.Lock, p.Lock, <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), dep.VendorAlways)
+	//dw, err := dep.NewDeltaWriter(p.Lock, p.Lock, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), dep.VendorAlways)
 	if err != nil {
 		return err
 	}
@@ -365,7 +346,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 	return errors.WithMessage(dw.Write(p.AbsRoot, sm, true, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
+func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if p.Lock == nil {
 		return errors.Errorf("-update works by updating the versions recorded in %s, but %s does not exist", dep.LockName, dep.LockName)
 	}
@@ -397,7 +378,11 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
+	status, err := p.VerifyVendor()
+	if err != nil {
+		return errors.Wrap(err, "error while verifying vendor directory")
+	}
+	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), status, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
@@ -412,7 +397,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 	return errors.Wrap(dw.Write(p.AbsRoot, sm, false, logger), "grouped write of manifest, lock and vendor")
 }
 
-func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters, statchan chan map[string]verify.VendorStatus) error {
+func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm gps.SourceManager, params gps.SolveParameters) error {
 	if len(args) == 0 {
 		return errors.New("must specify at least one project or package to -add")
 	}
@@ -671,7 +656,11 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	sort.Strings(reqlist)
 
-	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), <-statchan, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
+	status, err := p.VerifyVendor()
+	if err != nil {
+		return errors.Wrap(err, "error while verifying vendor directory")
+	}
+	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), status, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
