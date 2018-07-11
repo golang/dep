@@ -11,6 +11,7 @@ NEW FEATURES:
 * Allow `DEPPROJECTROOT` [environment variable](https://golang.github.io/dep/docs/env-vars.html#depprojectroot) to supersede GOPATH deduction and explicitly set the current project's [root](https://golang.github.io/dep/docs/glossary.html#project-root) ([#1883](https://github.com/golang/dep/pull/1883)).
 * `dep ensure` now explains what changes to the code or Gopkg.toml have induced solving ([#1912](https://github.com/golang/dep/pull/1912)).
 * Hash digests of vendor contents are now stored in `Gopkg.lock`, and the contents of vendor are only rewritten on change or hash mismatch ([#1912](https://github.com/golang/dep/pull/1912)).
+* Added support for ppc64/ppc64le.
 
 BUG FIXES:
 
