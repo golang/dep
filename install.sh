@@ -68,7 +68,7 @@ findGoBinDirectory() {
     EFFECTIVE_GOPATH=$(go env GOPATH)
     # CYGWIN: Convert Windows-style path into sh-compatible style paths
     if [ "$OS_CYGWIN" = "1" ]; then
-	EFFECTIVE_GOPATH=$(cygpath $EFFECTIVE_GOPATH)
+	EFFECTIVE_GOPATH=$(cygpath "$EFFECTIVE_GOPATH")
     fi
     if [ -z "$EFFECTIVE_GOPATH" ]; then
         echo "Installation could not determine your \$GOPATH."
@@ -135,7 +135,7 @@ fi
 echo "Will install into $INSTALL_DIRECTORY"
 
 # assemble expected release artifact name
-if [[ "${ARCH}" == "ppc64" || "${ARCH}" == "ppc64le" ]] && [[ "${OS}" != "linux" ]]; then
+if [ "${OS}" != "linux" ] && { [ "${ARCH}" = "ppc64" ] || [ "${ARCH}" = "ppc64le" ];}; then
     # ppc64 and ppc64le are only supported on Linux.
     echo "${OS}-${ARCH} is not supported by this instalation script"
 else
