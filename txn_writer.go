@@ -6,6 +6,7 @@ package dep
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -348,6 +349,9 @@ fail:
 
 // PrintPreparedActions logs the actions a call to Write would perform.
 func (sw *SafeWriter) PrintPreparedActions(output *log.Logger, verbose bool) error {
+	if output == nil {
+		output = log.New(ioutil.Discard, "", 0)
+	}
 	if sw.HasManifest() {
 		if verbose {
 			m, err := sw.Manifest.MarshalTOML()
@@ -493,6 +497,10 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 		return errors.Errorf("target path (%q) must be the parent of the original vendor path (%q)", path, dw.vendorDir)
 	}
 
+	if logger == nil {
+		logger = log.New(ioutil.Discard, "", 0)
+	}
+
 	lpath := filepath.Join(path, LockName)
 	vpath := dw.vendorDir
 
@@ -500,7 +508,7 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	// adjacent directory to minimize the possibility of cross-filesystem renames
 	// becoming expensive copies, and to make removal of unneeded projects implicit
 	// and automatic.
-	vnewpath := vpath + "-new"
+	vnewpath := filepath.Join(filepath.Dir(vpath), ".vendor-new")
 	if _, err := os.Stat(vnewpath); err == nil {
 		return errors.Errorf("scratch directory %s already exists, please remove it", vnewpath)
 	}
@@ -518,6 +526,9 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	dropped := []gps.ProjectRoot{}
 	i := 0
 	tot := len(dw.changed)
+	if len(dw.changed) > 0 {
+		logger.Println("\n# Bringing vendor into sync")
+	}
 	for pr, reason := range dw.changed {
 		if reason == projectRemoved {
 			dropped = append(dropped, pr)
@@ -623,16 +634,12 @@ func changeExplanation(c changeType, lpd verify.LockedProjectDelta) string {
 		if lpd.SourceChanged() {
 			return fmt.Sprintf("source changed (%s -> %s)", lpd.SourceBefore, lpd.SourceAfter)
 		} else if lpd.VersionChanged() {
-			bv, av := "(none)", "(none)"
-			if lpd.VersionBefore != nil {
-				bv = lpd.VersionBefore.String()
+			if lpd.VersionBefore == nil {
+				return fmt.Sprintf("version changed (was a bare revision)")
 			}
-			if lpd.VersionAfter != nil {
-				av = lpd.VersionAfter.String()
-			}
-			return fmt.Sprintf("version changed (%s -> %s)", bv, av)
+			return fmt.Sprintf("version changed (was %s)", lpd.VersionAfter.String())
 		} else if lpd.RevisionChanged() {
-			return fmt.Sprintf("revision changed (%s -> %s)", lpd.RevisionBefore, lpd.RevisionAfter)
+			return fmt.Sprintf("revision changed (%s -> %s)", trimSHA(lpd.RevisionBefore), trimSHA(lpd.RevisionAfter))
 		} else if lpd.PackagesChanged() {
 			la, lr := len(lpd.PackagesAdded), len(lpd.PackagesRemoved)
 			if la > 0 && lr > 0 {
@@ -651,7 +658,7 @@ func changeExplanation(c changeType, lpd verify.LockedProjectDelta) string {
 		new := lpd.PruneOptsAfter & ^gps.PruneNestedVendorDirs
 		return fmt.Sprintf("prune options changed (%s -> %s)", old, new)
 	case hashMismatch:
-		return "hash mismatch between Gopkg.lock and vendor contents"
+		return "hash of vendored tree didn't match digest in Gopkg.lock"
 	case hashVersionMismatch:
 		return "hashing algorithm mismatch"
 	case hashAbsent:
@@ -707,4 +714,16 @@ func (dw *DeltaWriter) PrintPreparedActions(output *log.Logger, verbose bool) er
 type TreeWriter interface {
 	PrintPreparedActions(output *log.Logger, verbose bool) error
 	Write(path string, sm gps.SourceManager, examples bool, logger *log.Logger) error
+}
+
+// trimSHA checks if revision is a valid SHA1 digest and trims to 10 characters.
+func trimSHA(revision gps.Revision) string {
+	if len(revision) == 40 {
+		if _, err := hex.DecodeString(string(revision)); err == nil {
+			// Valid SHA1 digest
+			revision = revision[0:10]
+		}
+	}
+
+	return string(revision)
 }
