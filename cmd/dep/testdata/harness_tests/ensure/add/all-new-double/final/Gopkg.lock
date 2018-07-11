@@ -15,7 +15,7 @@
   name = "github.com/sdboyer/deptesttres"
   packages = [
     ".",
-    "subp"
+    "subp",
   ]
   pruneopts = "UT"
   revision = "54aaeb0023e1f3dcf5f98f31dd8c565457945a12"
@@ -26,7 +26,7 @@
   input-imports = [
     "github.com/sdboyer/deptest",
     "github.com/sdboyer/deptesttres",
-    "github.com/sdboyer/deptesttres/subp"
+    "github.com/sdboyer/deptesttres/subp",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

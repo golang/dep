@@ -1,6 +1,6 @@
 ignored = [
   "github.com/golang/notexist/samples*",
-  "github.com/sdboyer/dep-test*"
+  "github.com/sdboyer/dep-test*",
 ]
 
 [[constraint]]

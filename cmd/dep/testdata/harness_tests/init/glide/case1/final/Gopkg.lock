@@ -29,7 +29,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/carolynvs/deptest-subpkg/subby",
-    "github.com/sdboyer/deptestdos"
+    "github.com/sdboyer/deptestdos",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

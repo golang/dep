@@ -32,7 +32,7 @@
   input-imports = [
     "github.com/sdboyer/deptest",
     "github.com/sdboyer/deptestdos",
-    "gopkg.in/yaml.v2"
+    "gopkg.in/yaml.v2",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -22,7 +22,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/ChinmayR/deptestglideA",
-    "github.com/ChinmayR/deptestglideB"
+    "github.com/ChinmayR/deptestglideB",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -31,7 +31,7 @@
   input-imports = [
     "github.com/carolynvs/go-dep-test",
     "github.com/sdboyer/deptest",
-    "github.com/sdboyer/deptestdos"
+    "github.com/sdboyer/deptestdos",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
