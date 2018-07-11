@@ -21,7 +21,7 @@ const checkLongHelp = `
 Check determines if your project is in a good state. If problems are found, it
 prints a description of each issue, then exits 1. Passing -q suppresses output.
 
-Flags control which specific checks will be run. By default,dep check verifies
+Flags control which specific checks will be run. By default, dep check verifies
 that Gopkg.lock is in sync with Gopkg.toml and the imports in your project's .go
 files, and that the vendor directory is in sync with Gopkg.lock. These checks
 can be disabled with -skip-lock and -skip-vendor, respectively.
