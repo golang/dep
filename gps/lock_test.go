@@ -34,14 +34,14 @@ func TestLockedProjectSorting(t *testing.T) {
 
 func TestLockedProjectsEq(t *testing.T) {
 	lps := []LockedProject{
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), nil),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
-		NewLockedProject(mkPI("foo"), NewVersion("nada"), []string{"foo"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"}),
-		NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV"), nil),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV"), []string{"gps", "flugle"}),
+		NewLockedProject(mkPI("foo"), NewVersion("nada").Pair("OTHERREV"), []string{"foo"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV"), []string{"flugle", "gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("REV2"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0").Pair("REV"), []string{"gps"}),
+		NewLockedProject(mkPI("github.com/sdboyer/gps"), Revision("REV2"), []string{"gps"}),
 	}
 
 	fix := map[string]struct {
@@ -80,55 +80,6 @@ func TestLockedProjectsEq(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestLocksAreEq(t *testing.T) {
-	gpl := NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"})
-	svpl := NewLockedProject(mkPI("github.com/Masterminds/semver"), NewVersion("v2.0.0"), []string{"semver"})
-	bbbt := NewLockedProject(mkPI("github.com/beeblebrox/browntown"), NewBranch("master").Pair("63fc17eb7966a6f4cc0b742bf42731c52c4ac740"), []string{"browntown", "smoochies"})
-
-	l1 := solution{
-		hd: []byte("foo"),
-		p: []LockedProject{
-			gpl,
-			bbbt,
-			svpl,
-		},
-	}
-
-	l2 := solution{
-		p: []LockedProject{
-			svpl,
-			gpl,
-		},
-	}
-
-	if LocksAreEq(l1, l2, true) {
-		t.Fatal("should have failed on hash check")
-	}
-
-	if LocksAreEq(l1, l2, false) {
-		t.Fatal("should have failed on length check")
-	}
-
-	l2.p = append(l2.p, bbbt)
-
-	if !LocksAreEq(l1, l2, false) {
-		t.Fatal("should be eq, must have failed on individual lp check")
-	}
-
-	// ensure original input sort order is maintained
-	if !l1.p[0].Eq(gpl) {
-		t.Error("checking equality resorted l1")
-	}
-	if !l2.p[0].Eq(svpl) {
-		t.Error("checking equality resorted l2")
-	}
-
-	l1.p[0] = NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.11.0"), []string{"gps"})
-	if LocksAreEq(l1, l2, false) {
-		t.Error("should fail when individual lp were not eq")
 	}
 }
 

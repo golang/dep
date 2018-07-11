@@ -5,12 +5,12 @@
 package dep
 
 import (
-	"encoding/hex"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/golang/dep/gps"
+	"github.com/golang/dep/gps/verify"
 	"github.com/golang/dep/internal/test"
 )
 
@@ -26,17 +26,21 @@ func TestReadLock(t *testing.T) {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
 
-	b, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	want := &Lock{
-		SolveMeta: SolveMeta{
-			InputsDigest: b,
-		},
+		SolveMeta: SolveMeta{InputImports: []string{}},
 		P: []gps.LockedProject{
-			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
-				gps.NewBranch("master").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
-				[]string{"."},
-			),
+			verify.VerifiableProject{
+				LockedProject: gps.NewLockedProject(
+					gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
+					gps.NewBranch("master").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
+					[]string{"."},
+				),
+				PruneOpts: gps.PruneOptions(1),
+				Digest: verify.VersionedDigest{
+					HashVersion: verify.HashVersion,
+					Digest:      []byte("foo"),
+				},
+			},
 		},
 	}
 
@@ -52,17 +56,21 @@ func TestReadLock(t *testing.T) {
 		t.Fatalf("Should have read Lock correctly, but got err %q", err)
 	}
 
-	b, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	want = &Lock{
-		SolveMeta: SolveMeta{
-			InputsDigest: b,
-		},
+		SolveMeta: SolveMeta{InputImports: []string{}},
 		P: []gps.LockedProject{
-			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
-				gps.NewVersion("0.12.2").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
-				[]string{"."},
-			),
+			verify.VerifiableProject{
+				LockedProject: gps.NewLockedProject(
+					gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
+					gps.NewVersion("0.12.2").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
+					[]string{"."},
+				),
+				PruneOpts: gps.PruneOptions(15),
+				Digest: verify.VersionedDigest{
+					HashVersion: verify.HashVersion,
+					Digest:      []byte("foo"),
+				},
+			},
 		},
 	}
 
@@ -77,17 +85,20 @@ func TestWriteLock(t *testing.T) {
 
 	golden := "lock/golden0.toml"
 	want := h.GetTestFileString(golden)
-	memo, _ := hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l := &Lock{
-		SolveMeta: SolveMeta{
-			InputsDigest: memo,
-		},
 		P: []gps.LockedProject{
-			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
-				gps.NewBranch("master").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
-				[]string{"."},
-			),
+			verify.VerifiableProject{
+				LockedProject: gps.NewLockedProject(
+					gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
+					gps.NewBranch("master").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
+					[]string{"."},
+				),
+				PruneOpts: gps.PruneOptions(1),
+				Digest: verify.VersionedDigest{
+					HashVersion: verify.HashVersion,
+					Digest:      []byte("foo"),
+				},
+			},
 		},
 	}
 
@@ -108,17 +119,20 @@ func TestWriteLock(t *testing.T) {
 
 	golden = "lock/golden1.toml"
 	want = h.GetTestFileString(golden)
-	memo, _ = hex.DecodeString("2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e")
 	l = &Lock{
-		SolveMeta: SolveMeta{
-			InputsDigest: memo,
-		},
 		P: []gps.LockedProject{
-			gps.NewLockedProject(
-				gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
-				gps.NewVersion("0.12.2").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
-				[]string{"."},
-			),
+			verify.VerifiableProject{
+				LockedProject: gps.NewLockedProject(
+					gps.ProjectIdentifier{ProjectRoot: gps.ProjectRoot("github.com/golang/dep")},
+					gps.NewVersion("0.12.2").Pair(gps.Revision("d05d5aca9f895d19e9265839bffeadd74a2d2ecb")),
+					[]string{"."},
+				),
+				PruneOpts: gps.PruneOptions(15),
+				Digest: verify.VersionedDigest{
+					HashVersion: verify.HashVersion,
+					Digest:      []byte("foo"),
+				},
+			},
 		},
 	}
 
@@ -148,7 +162,7 @@ func TestReadLockErrors(t *testing.T) {
 		file string
 	}{
 		{"specified both", "lock/error0.toml"},
-		{"invalid hash", "lock/error1.toml"},
+		{"odd length", "lock/error1.toml"},
 		{"no branch or version", "lock/error2.toml"},
 	}
 

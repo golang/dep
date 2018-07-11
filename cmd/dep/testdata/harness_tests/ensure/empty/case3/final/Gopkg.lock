@@ -3,13 +3,15 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:6a4b7ea94689d9d4f231605ecc0248fbcbf16419d8571adb59c00396e37bbfc2"
   name = "github.com/sdboyer/deptest"
   packages = ["."]
+  pruneopts = ""
   revision = "3f4c3bea144e112a69bbe5d8d01c1b09a544253f"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e5c16e09ed6f0a1a2b3cf472c34b7fd50861dd070e81d5e623f72e8173f0c065"
+  input-imports = ["github.com/sdboyer/deptest"]
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -1,6 +1,0 @@
-{
-  "commands": [
-    ["ensure", "-no-vendor", "-dry-run"]
-  ],
-  "error-expected": "Gopkg.lock was not up to date"
-}

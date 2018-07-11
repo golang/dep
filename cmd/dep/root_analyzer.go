@@ -167,7 +167,7 @@ func (a *rootAnalyzer) DeriveManifestAndLock(dir string, pr gps.ProjectRoot) (gp
 func (a *rootAnalyzer) FinalizeRootManifestAndLock(m *dep.Manifest, l *dep.Lock, ol dep.Lock) {
 	// Iterate through the new projects in solved lock and add them to manifest
 	// if they are direct deps and log feedback for all the new projects.
-	diff := gps.DiffLocks(&ol, l)
+	diff := fb.DiffLocks(&ol, l)
 	bi := fb.NewBrokenImportFeedback(diff)
 	bi.LogFeedback(a.ctx.Err)
 	for _, y := range l.Projects() {

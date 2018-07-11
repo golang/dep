@@ -104,6 +104,15 @@ type SourceManager interface {
 	// provided version, to the provided directory.
 	ExportProject(context.Context, ProjectIdentifier, Version, string) error
 
+	// ExportPrunedProject writes out the tree corresponding to the provided
+	// LockedProject, the provided version, to the provided directory, applying
+	// the provided pruning options.
+	//
+	// The first return value is the hex-encoded string representation of the
+	// hash, including colon-separated leaders indicating the version of the
+	// hashing function used, and the prune options that were applied.
+	ExportPrunedProject(context.Context, LockedProject, PruneOptions, string) error
+
 	// DeduceProjectRoot takes an import path and deduces the corresponding
 	// project/source root.
 	DeduceProjectRoot(ip string) (ProjectRoot, error)
@@ -113,9 +122,9 @@ type SourceManager interface {
 	// In general, these URLs differ only by protocol (e.g. https vs. ssh), not path
 	SourceURLsForPath(ip string) ([]*url.URL, error)
 
-	// Release lets go of any locks held by the SourceManager. Once called, it is
-	// no longer safe to call methods against it; all method calls will
-	// immediately result in errors.
+	// Release lets go of any locks held by the SourceManager. Once called, it
+	// is no longer allowed to call methods of that SourceManager; all
+	// method calls will immediately result in errors.
 	Release()
 
 	// InferConstraint tries to puzzle out what kind of version is given in a string -
@@ -396,9 +405,9 @@ func (e CouldNotCreateLockError) Error() string {
 	return e.Err.Error()
 }
 
-// Release lets go of any resources held by the SourceManager. Once called, it is no
-// longer safe to call methods against it; all method calls will immediately
-// result in errors.
+// Release lets go of any locks held by the SourceManager. Once called, it is no
+// longer allowed to call methods of that SourceManager; all method calls will
+// immediately result in errors.
 func (sm *SourceMgr) Release() {
 	atomic.StoreInt32(&sm.releasing, 1)
 
@@ -548,6 +557,21 @@ func (sm *SourceMgr) ExportProject(ctx context.Context, id ProjectIdentifier, v 
 	}
 
 	return srcg.exportVersionTo(ctx, v, to)
+}
+
+// ExportPrunedProject writes out a tree of the provided LockedProject, applying
+// provided pruning rules as appropriate.
+func (sm *SourceMgr) ExportPrunedProject(ctx context.Context, lp LockedProject, prune PruneOptions, to string) error {
+	if atomic.LoadInt32(&sm.releasing) == 1 {
+		return ErrSourceManagerIsReleased
+	}
+
+	srcg, err := sm.srcCoord.getSourceGatewayFor(ctx, lp.Ident())
+	if err != nil {
+		return err
+	}
+
+	return srcg.exportPrunedVersionTo(ctx, lp, prune, to)
 }
 
 // DeduceProjectRoot takes an import path and deduces the corresponding

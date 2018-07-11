@@ -116,13 +116,12 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			ig: pkgtree.NewIgnoredRuleset([]string{"a", "b"}),
 		}
 		var l Lock = &safeLock{
-			h: []byte("test_hash"),
 			p: []LockedProject{
-				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0"), []string{"gps"}),
-				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.10.0"), nil),
-				NewLockedProject(mkPI("github.com/sdboyer/gps3"), NewVersion("v0.10.0"), []string{"gps", "flugle"}),
-				NewLockedProject(mkPI("foo"), NewVersion("nada"), []string{"foo"}),
-				NewLockedProject(mkPI("github.com/sdboyer/gps4"), NewVersion("v0.10.0"), []string{"flugle", "gps"}),
+				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("anything"), []string{"gps"}),
+				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.10.0").Pair("whatever"), nil),
+				NewLockedProject(mkPI("github.com/sdboyer/gps3"), NewVersion("v0.10.0").Pair("again"), []string{"gps", "flugle"}),
+				NewLockedProject(mkPI("foo"), NewVersion("nada").Pair("itsaliving"), []string{"foo"}),
+				NewLockedProject(mkPI("github.com/sdboyer/gps4"), NewVersion("v0.10.0").Pair("meow"), []string{"flugle", "gps"}),
 			},
 		}
 		c.setManifestAndLock(rev, testAnalyzerInfo, m, l)
@@ -140,8 +139,9 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			t.Error("no manifest and lock found for revision")
 		}
 		compareManifests(t, m, gotM)
-		if dl := DiffLocks(l, gotL); dl != nil {
-			t.Errorf("lock differences:\n\t %#v", dl)
+		// TODO(sdboyer) use DiffLocks after refactoring to avoid import cycles
+		if !locksAreEq(l, gotL) {
+			t.Errorf("locks are different:\n\t(GOT): %s\n\t(WNT): %s", l, gotL)
 		}
 
 		m = &simpleRootManifest{
@@ -163,10 +163,9 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			ig: pkgtree.NewIgnoredRuleset([]string{"c", "d"}),
 		}
 		l = &safeLock{
-			h: []byte("different_test_hash"),
 			p: []LockedProject{
 				NewLockedProject(mkPI("github.com/sdboyer/gps"), NewVersion("v0.10.0").Pair("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
-				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.11.0"), []string{"gps"}),
+				NewLockedProject(mkPI("github.com/sdboyer/gps2"), NewVersion("v0.11.0").Pair("anything"), []string{"gps"}),
 				NewLockedProject(mkPI("github.com/sdboyer/gps3"), Revision("278a227dfc3d595a33a77ff3f841fd8ca1bc8cd0"), []string{"gps"}),
 			},
 		}
@@ -185,8 +184,9 @@ func (test singleSourceCacheTest) run(t *testing.T) {
 			t.Error("no manifest and lock found for revision")
 		}
 		compareManifests(t, m, gotM)
-		if dl := DiffLocks(l, gotL); dl != nil {
-			t.Errorf("lock differences:\n\t %#v", dl)
+		// TODO(sdboyer) use DiffLocks after refactoring to avoid import cycles
+		if !locksAreEq(l, gotL) {
+			t.Errorf("locks are different:\n\t(GOT): %s\n\t(WNT): %s", l, gotL)
 		}
 	})
 

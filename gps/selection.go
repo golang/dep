@@ -119,8 +119,9 @@ func (s *selection) getRequiredPackagesIn(id ProjectIdentifier) map[string]int {
 	return uniq
 }
 
-// Suppress unused warning.
+// Suppress unused linting warning.
 var _ = (*selection)(nil).getSelectedPackagesIn
+var _ = (*selection)(nil).getProjectImportMap
 
 // Compute a list of the unique packages within the given ProjectIdentifier that
 // are currently selected, and the number of times each package has been
@@ -139,6 +140,29 @@ func (s *selection) getSelectedPackagesIn(id ProjectIdentifier) map[string]int {
 	}
 
 	return uniq
+}
+
+// getProjectImportMap extracts the set of package imports from the used
+// packages in each selected project.
+func (s *selection) getProjectImportMap() map[ProjectRoot]map[string]struct{} {
+	importMap := make(map[ProjectRoot]map[string]struct{})
+	for _, edges := range s.deps {
+		for _, edge := range edges {
+			var curmap map[string]struct{}
+			if imap, has := importMap[edge.depender.id.ProjectRoot]; !has {
+				curmap = make(map[string]struct{})
+			} else {
+				curmap = imap
+			}
+
+			for _, pl := range edge.dep.pl {
+				curmap[pl] = struct{}{}
+			}
+			importMap[edge.depender.id.ProjectRoot] = curmap
+		}
+	}
+
+	return importMap
 }
 
 func (s *selection) getConstraint(id ProjectIdentifier) Constraint {

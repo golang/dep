@@ -362,27 +362,6 @@ func pcSliceToMap(l []ProjectConstraint, r ...[]ProjectConstraint) ProjectConstr
 	return final
 }
 
-func (m ProjectConstraints) asSortedSlice() []ProjectConstraint {
-	pcs := make([]ProjectConstraint, len(m))
-
-	k := 0
-	for pr, pp := range m {
-		pcs[k] = ProjectConstraint{
-			Ident: ProjectIdentifier{
-				ProjectRoot: pr,
-				Source:      pp.Source,
-			},
-			Constraint: pp.Constraint,
-		}
-		k++
-	}
-
-	sort.SliceStable(pcs, func(i, j int) bool {
-		return pcs[i].Ident.Less(pcs[j].Ident)
-	})
-	return pcs
-}
-
 // overrideAll treats the receiver ProjectConstraints map as a set of override
 // instructions, and applies overridden values to the ProjectConstraints.
 //

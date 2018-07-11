@@ -3,6 +3,4 @@
   branch = "master"
   revision = "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
   packages = ["."]
-
-[solve-meta]
-  inputs-digest = "000aaa2a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e"
+  digest = "1:000aaa2a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e"

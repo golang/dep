@@ -1,13 +1,15 @@
 
 [[projects]]
+  digest = "1:666f6f"
   name = "github.com/golang/dep"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "d05d5aca9f895d19e9265839bffeadd74a2d2ecb"
   version = "0.12.2"
 
 [solve-meta]
   analyzer-name = ""
   analyzer-version = 0
-  inputs-digest = "2252a285ab27944a4d7adcba8dbd03980f59ba652f12db39fa93b927c345593e"
+  input-imports = []
   solver-name = ""
   solver-version = 0

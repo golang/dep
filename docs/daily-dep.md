@@ -83,7 +83,7 @@ $ dep ensure -update
 
 ### Adding and removing `import` statements
 
-As noted in [the section on adding dependencies](#adding-a-new-dependency), dep relies on the import statements in your code to figure out which dependencies your project actually needs. Thus, when you add or remove import statements, dep might need to care about it.
+As noted in [the section on adding dependencies](#adding-a-new-dependency), dep relies on the `import` statements in your code to figure out which dependencies your project actually needs. Thus, when you add or remove import statements, dep might need to care about it.
 
 It's only "might," though, because most of the time, adding or removing imports doesn't matter to dep. Only if one of the following has occurred will a `dep ensure` be necessary to bring the project back in sync:
 

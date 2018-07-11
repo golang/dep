@@ -7,6 +7,7 @@ package gps
 import (
 	"fmt"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 
@@ -270,4 +271,37 @@ func (c *singleSourceCacheMemory) toUnpaired(v Version) (UnpairedVersion, bool) 
 	default:
 		panic(fmt.Sprintf("unknown version type %T", v))
 	}
+}
+
+// TODO(sdboyer) remove once source caching can be moved into separate package
+func locksAreEq(l1, l2 Lock) bool {
+	ii1, ii2 := l1.InputImports(), l2.InputImports()
+	if len(ii1) != len(ii2) {
+		return false
+	}
+
+	ilen := len(ii1)
+	if ilen > 0 {
+		sort.Strings(ii1)
+		sort.Strings(ii2)
+		for i := 0; i < ilen; i++ {
+			if ii1[i] != ii2[i] {
+				return false
+			}
+		}
+	}
+
+	p1, p2 := l1.Projects(), l2.Projects()
+	if len(p1) != len(p2) {
+		return false
+	}
+
+	p1, p2 = sortLockedProjects(p1), sortLockedProjects(p2)
+
+	for k, lp := range p1 {
+		if !lp.Eq(p2[k]) {
+			return false
+		}
+	}
+	return true
 }

@@ -308,7 +308,7 @@ func mksolution(inputs ...interface{}) map[ProjectIdentifier]LockedProject {
 			a := mkAtom(t)
 			m[a.id] = NewLockedProject(a.id, a.v, []string{"."})
 		case LockedProject:
-			m[t.pi] = t
+			m[t.Ident()] = t
 		default:
 			panic(fmt.Sprintf("unexpected input to mksolution: %T %s", in, in))
 		}
@@ -1454,6 +1454,10 @@ func (sm *depspecSourceManager) ExportProject(context.Context, ProjectIdentifier
 	return fmt.Errorf("dummy sm doesn't support exporting")
 }
 
+func (sm *depspecSourceManager) ExportPrunedProject(context.Context, LockedProject, PruneOptions, string) error {
+	return fmt.Errorf("dummy sm doesn't support exporting")
+}
+
 func (sm *depspecSourceManager) DeduceProjectRoot(ip string) (ProjectRoot, error) {
 	fip := toFold(ip)
 	for _, ds := range sm.allSpecs() {
@@ -1556,23 +1560,23 @@ func (ds depspec) DependencyConstraints() ProjectConstraints {
 type fixLock []LockedProject
 
 // impl Lock interface
-func (fixLock) InputsDigest() []byte {
-	return []byte("fooooorooooofooorooofoo")
+func (l fixLock) Projects() []LockedProject {
+	return l
 }
 
 // impl Lock interface
-func (l fixLock) Projects() []LockedProject {
-	return l
+func (fixLock) InputImports() []string {
+	return nil
 }
 
 type dummyLock struct{}
 
 // impl Lock interface
-func (dummyLock) InputsDigest() []byte {
-	return []byte("fooooorooooofooorooofoo")
+func (dummyLock) Projects() []LockedProject {
+	return nil
 }
 
 // impl Lock interface
-func (dummyLock) Projects() []LockedProject {
+func (dummyLock) InputImports() []string {
 	return nil
 }

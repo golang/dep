@@ -74,34 +74,6 @@ func TestDepCachedir(t *testing.T) {
 
 	initPath := filepath.Join("testdata", "cachedir")
 
-	t.Run("env-cachedir", func(t *testing.T) {
-		t.Parallel()
-		testProj := integration.NewTestProject(t, initPath, wd, runMain)
-		defer testProj.Cleanup()
-
-		testProj.TempDir("cachedir")
-		cachedir := testProj.Path("cachedir")
-		testProj.Setenv("DEPCACHEDIR", cachedir)
-
-		// Running `dep ensure` will pull in the dependency into cachedir.
-		err = testProj.DoRun([]string{"ensure"})
-		if err != nil {
-			// Log the error output from running `dep ensure`, could be useful.
-			t.Logf("`dep ensure` error output: \n%s", testProj.GetStderr())
-			t.Errorf("got an unexpected error: %s", err)
-		}
-
-		// Check that the cache was created in the cachedir. Our fixture has the dependency
-		// `github.com/sdboyer/deptest`
-		_, err = os.Stat(testProj.Path("cachedir", "sources", "https---github.com-sdboyer-deptest"))
-		if err != nil {
-			if os.IsNotExist(err) {
-				t.Error("expected cachedir to have been populated but none was found")
-			} else {
-				t.Errorf("got an unexpected error: %s", err)
-			}
-		}
-	})
 	t.Run("env-invalid-cachedir", func(t *testing.T) {
 		t.Parallel()
 		testProj := integration.NewTestProject(t, initPath, wd, runMain)

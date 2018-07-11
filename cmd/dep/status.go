@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -24,6 +23,7 @@ import (
 	"github.com/golang/dep"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
+	"github.com/golang/dep/gps/verify"
 	"github.com/pkg/errors"
 )
 
@@ -328,13 +328,13 @@ type dotOutput struct {
 func (out *dotOutput) BasicHeader() error {
 	out.g = new(graphviz).New()
 
-	ptree, err := out.p.ParseRootPackageTree()
+	ptree := out.p.RootPackageTree
 	// TODO(sdboyer) should be true, true, false, out.p.Manifest.IgnoredPackages()
 	prm, _ := ptree.ToReachMap(true, false, false, nil)
 
 	out.g.createNode(string(out.p.ImportRoot), "", prm.FlattenFn(paths.IsStandardImportPath))
 
-	return err
+	return nil
 }
 
 func (out *dotOutput) BasicFooter() error {
@@ -648,10 +648,7 @@ func (os OldStatus) marshalJSON() *rawOldStatus {
 func (cmd *statusCommand) runOld(ctx *dep.Ctx, out oldOutputter, p *dep.Project, sm gps.SourceManager) error {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := p.ParseRootPackageTree()
-	if err != nil {
-		return err
-	}
+	ptree := p.RootPackageTree
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
@@ -781,7 +778,6 @@ func newRawMetadata(metadata *dep.SolveMeta) rawDetailMetadata {
 	return rawDetailMetadata{
 		AnalyzerName:    metadata.AnalyzerName,
 		AnalyzerVersion: metadata.AnalyzerVersion,
-		InputsDigest:    hex.EncodeToString(metadata.InputsDigest),
 		SolverName:      metadata.SolverName,
 		SolverVersion:   metadata.SolverVersion,
 	}
@@ -887,10 +883,7 @@ type MissingStatus struct {
 func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Project, sm gps.SourceManager) (hasMissingPkgs bool, errCount int, err error) {
 	// While the network churns on ListVersions() requests, statically analyze
 	// code from the current project.
-	ptree, err := p.ParseRootPackageTree()
-	if err != nil {
-		return false, 0, err
-	}
+	ptree := p.RootPackageTree
 
 	// Set up a solver in order to check the InputHash.
 	params := gps.SolveParameters{
@@ -912,11 +905,6 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 		return false, 0, err
 	}
 
-	s, err := gps.Prepare(params, sm)
-	if err != nil {
-		return false, 0, errors.Wrapf(err, "could not set up solver for input hashing")
-	}
-
 	// Errors while collecting constraints should not fail the whole status run.
 	// It should count the error and tell the user about incomplete results.
 	cm, ccerrs := collectConstraints(ctx, p, sm)
@@ -931,8 +919,13 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 	sort.Slice(slp, func(i, j int) bool {
 		return slp[i].Ident().Less(slp[j].Ident())
 	})
+	slcp := p.ChangedLock.Projects()
+	sort.Slice(slcp, func(i, j int) bool {
+		return slcp[i].Ident().Less(slcp[j].Ident())
+	})
 
-	if bytes.Equal(s.HashInputs(), p.Lock.SolveMeta.InputsDigest) {
+	lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)
+	if lsat.Satisfied() {
 		// If these are equal, we're guaranteed that the lock is a transitively
 		// complete picture of all deps. That eliminates the need for at least
 		// some checks.
@@ -1308,7 +1301,7 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 
 	// Collect the complete set of direct project dependencies, incorporating
 	// requireds and ignores appropriately.
-	_, directDeps, err := p.GetDirectDependencyNames(sm)
+	directDeps, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
 		// Return empty collection, not nil, if we fail here.
 		return constraintCollection, []error{errors.Wrap(err, "failed to get direct dependencies")}

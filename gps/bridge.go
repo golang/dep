@@ -195,8 +195,8 @@ func (b *bridge) breakLock() {
 	}
 
 	for _, lp := range b.s.rd.rl.Projects() {
-		if _, is := b.s.sel.selected(lp.pi); !is {
-			pi, v := lp.pi, lp.Version()
+		if _, is := b.s.sel.selected(lp.Ident()); !is {
+			pi, v := lp.Ident(), lp.Version()
 			go func() {
 				// Sync first
 				b.sm.SyncSourceFor(pi)

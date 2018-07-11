@@ -1,14 +1,15 @@
-// Copyright 2017 The Go Authors. All rights reserved.
+// Copyright 2018 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package gps
+package feedback
 
 import (
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/golang/dep/gps"
 )
 
 // StringDiff represents a modified string value.
@@ -44,16 +45,15 @@ func (diff *StringDiff) String() string {
 // LockDiff is the set of differences between an existing lock file and an updated lock file.
 // Fields are only populated when there is a difference, otherwise they are empty.
 type LockDiff struct {
-	HashDiff *StringDiff
-	Add      []LockedProjectDiff
-	Remove   []LockedProjectDiff
-	Modify   []LockedProjectDiff
+	Add    []LockedProjectDiff
+	Remove []LockedProjectDiff
+	Modify []LockedProjectDiff
 }
 
 // LockedProjectDiff contains the before and after snapshot of a project reference.
 // Fields are only populated when there is a difference, otherwise they are empty.
 type LockedProjectDiff struct {
-	Name     ProjectRoot
+	Name     gps.ProjectRoot
 	Source   *StringDiff
 	Version  *StringDiff
 	Branch   *StringDiff
@@ -63,37 +63,31 @@ type LockedProjectDiff struct {
 
 // DiffLocks compares two locks and identifies the differences between them.
 // Returns nil if there are no differences.
-func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
+func DiffLocks(l1, l2 gps.Lock) *LockDiff {
 	// Default nil locks to empty locks, so that we can still generate a diff
 	if l1 == nil {
-		l1 = &SimpleLock{}
+		l1 = gps.SimpleLock{}
 	}
 	if l2 == nil {
-		l2 = &SimpleLock{}
+		l2 = gps.SimpleLock{}
 	}
 
 	p1, p2 := l1.Projects(), l2.Projects()
 
-	p1 = sortedLockedProjects(p1)
-	p2 = sortedLockedProjects(p2)
+	p1 = sortLockedProjects(p1)
+	p2 = sortLockedProjects(p2)
 
 	diff := LockDiff{}
-
-	h1 := hex.EncodeToString(l1.InputsDigest())
-	h2 := hex.EncodeToString(l2.InputsDigest())
-	if h1 != h2 {
-		diff.HashDiff = &StringDiff{Previous: h1, Current: h2}
-	}
 
 	var i2next int
 	for i1 := 0; i1 < len(p1); i1++ {
 		lp1 := p1[i1]
-		pr1 := lp1.pi.ProjectRoot
+		pr1 := lp1.Ident().ProjectRoot
 
 		var matched bool
 		for i2 := i2next; i2 < len(p2); i2++ {
 			lp2 := p2[i2]
-			pr2 := lp2.pi.ProjectRoot
+			pr2 := lp2.Ident().ProjectRoot
 
 			switch strings.Compare(string(pr1), string(pr2)) {
 			case 0: // Found a matching project
@@ -128,15 +122,15 @@ func DiffLocks(l1 Lock, l2 Lock) *LockDiff {
 		diff.Add = append(diff.Add, add)
 	}
 
-	if diff.HashDiff == nil && len(diff.Add) == 0 && len(diff.Remove) == 0 && len(diff.Modify) == 0 {
+	if len(diff.Add) == 0 && len(diff.Remove) == 0 && len(diff.Modify) == 0 {
 		return nil // The locks are the equivalent
 	}
 	return &diff
 }
 
-func buildLockedProjectDiff(lp LockedProject) LockedProjectDiff {
-	s2 := lp.pi.Source
-	r2, b2, v2 := VersionComponentStrings(lp.Version())
+func buildLockedProjectDiff(lp gps.LockedProject) LockedProjectDiff {
+	s2 := lp.Ident().Source
+	r2, b2, v2 := gps.VersionComponentStrings(lp.Version())
 
 	var rev, version, branch, source *StringDiff
 	if s2 != "" {
@@ -153,7 +147,7 @@ func buildLockedProjectDiff(lp LockedProject) LockedProjectDiff {
 	}
 
 	add := LockedProjectDiff{
-		Name:     lp.pi.ProjectRoot,
+		Name:     lp.Ident().ProjectRoot,
 		Source:   source,
 		Revision: rev,
 		Version:  version,
@@ -168,17 +162,17 @@ func buildLockedProjectDiff(lp LockedProject) LockedProjectDiff {
 
 // DiffProjects compares two projects and identifies the differences between them.
 // Returns nil if there are no differences.
-func DiffProjects(lp1 LockedProject, lp2 LockedProject) *LockedProjectDiff {
-	diff := LockedProjectDiff{Name: lp1.pi.ProjectRoot}
+func DiffProjects(lp1, lp2 gps.LockedProject) *LockedProjectDiff {
+	diff := LockedProjectDiff{Name: lp1.Ident().ProjectRoot}
 
-	s1 := lp1.pi.Source
-	s2 := lp2.pi.Source
+	s1 := lp1.Ident().Source
+	s2 := lp2.Ident().Source
 	if s1 != s2 {
 		diff.Source = &StringDiff{Previous: s1, Current: s2}
 	}
 
-	r1, b1, v1 := VersionComponentStrings(lp1.Version())
-	r2, b2, v2 := VersionComponentStrings(lp2.Version())
+	r1, b1, v1 := gps.VersionComponentStrings(lp1.Version())
+	r2, b2, v2 := gps.VersionComponentStrings(lp2.Version())
 	if r1 != r2 {
 		diff.Revision = &StringDiff{Previous: r1, Current: r2}
 	}
@@ -242,4 +236,21 @@ func DiffProjects(lp1 LockedProject, lp2 LockedProject) *LockedProjectDiff {
 		return nil // The projects are equivalent
 	}
 	return &diff
+}
+
+// sortLockedProjects returns a sorted copy of lps, or itself if already sorted.
+func sortLockedProjects(lps []gps.LockedProject) []gps.LockedProject {
+	if len(lps) <= 1 || sort.SliceIsSorted(lps, func(i, j int) bool {
+		return lps[i].Ident().Less(lps[j].Ident())
+	}) {
+		return lps
+	}
+
+	cp := make([]gps.LockedProject, len(lps))
+	copy(cp, lps)
+
+	sort.Slice(cp, func(i, j int) bool {
+		return cp[i].Ident().Less(cp[j].Ident())
+	})
+	return cp
 }

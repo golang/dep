@@ -31,14 +31,14 @@ type Solution interface {
 }
 
 type solution struct {
-	// A list of the projects selected by the solver.
+	// The projects selected by the solver.
 	p []LockedProject
+
+	// The import inputs that created this solution (including requires).
+	i []string
 
 	// The number of solutions that were attempted
 	att int
-
-	// The hash digest of the input opts
-	hd []byte
 
 	// The analyzer info
 	analyzerInfo ProjectAnalyzerInfo
@@ -153,12 +153,12 @@ func (r solution) Projects() []LockedProject {
 	return r.p
 }
 
-func (r solution) Attempts() int {
-	return r.att
+func (r solution) InputImports() []string {
+	return r.i
 }
 
-func (r solution) InputsDigest() []byte {
-	return r.hd
+func (r solution) Attempts() int {
+	return r.att
 }
 
 func (r solution) AnalyzerName() string {

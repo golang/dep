@@ -9,10 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"github.com/golang/dep/gps"
-	"github.com/golang/dep/gps/paths"
 	"github.com/golang/dep/gps/pkgtree"
+	"github.com/golang/dep/gps/verify"
 	"github.com/golang/dep/internal/fs"
 	"github.com/pkg/errors"
 )
@@ -101,10 +102,59 @@ type Project struct {
 	// If AbsRoot is not a symlink, then ResolvedAbsRoot should equal AbsRoot.
 	ResolvedAbsRoot string
 	// ImportRoot is the import path of the project's root directory.
-	ImportRoot      gps.ProjectRoot
-	Manifest        *Manifest
-	Lock            *Lock // Optional
+	ImportRoot gps.ProjectRoot
+	// The Manifest, as read from Gopkg.toml on disk.
+	Manifest *Manifest
+	// The Lock, as read from Gopkg.lock on disk.
+	Lock *Lock // Optional
+	// The above Lock, with changes applied to it. There are two possible classes of
+	// changes:
+	//  1. Changes to InputImports
+	//  2. Changes to per-project prune options
+	ChangedLock *Lock
+	// The PackageTree representing the project, with hidden and ignored
+	// packages already trimmed.
 	RootPackageTree pkgtree.PackageTree
+	// Oncer to manage access to initial check of vendor.
+	CheckVendor sync.Once
+	// The result of calling verify.CheckDepTree against the current lock and
+	// vendor dir.
+	VendorStatus map[string]verify.VendorStatus
+	// The error, if any, from checking vendor.
+	CheckVendorErr error
+}
+
+// VerifyVendor checks the vendor directory against the hash digests in
+// Gopkg.lock.
+//
+// This operation is overseen by the sync.Once in CheckVendor. This is intended
+// to facilitate running verification in the background while solving, then
+// having the results ready later.
+func (p *Project) VerifyVendor() (map[string]verify.VendorStatus, error) {
+	p.CheckVendor.Do(func() {
+		p.VendorStatus = make(map[string]verify.VendorStatus)
+		vendorDir := filepath.Join(p.AbsRoot, "vendor")
+
+		var lps []gps.LockedProject
+		if p.Lock != nil {
+			lps = p.Lock.Projects()
+		}
+
+		err := os.MkdirAll(vendorDir, os.FileMode(0777))
+		if err != nil {
+			p.CheckVendorErr = err
+			return
+		}
+
+		sums := make(map[string]verify.VersionedDigest)
+		for _, lp := range lps {
+			sums[string(lp.Ident().ProjectRoot)] = lp.(verify.VerifiableProject).Digest
+		}
+
+		p.VendorStatus, p.CheckVendorErr = verify.CheckDepTree(vendorDir, sums)
+	})
+
+	return p.VendorStatus, p.CheckVendorErr
 }
 
 // SetRoot sets the project AbsRoot and ResolvedAbsRoot. If root is not a symlink, ResolvedAbsRoot will be set to root.
@@ -124,25 +174,28 @@ func (p *Project) MakeParams() gps.SolveParameters {
 	params := gps.SolveParameters{
 		RootDir:         p.AbsRoot,
 		ProjectAnalyzer: Analyzer{},
+		RootPackageTree: p.RootPackageTree,
 	}
 
 	if p.Manifest != nil {
 		params.Manifest = p.Manifest
 	}
 
-	if p.Lock != nil {
-		params.Lock = p.Lock
+	// It should be impossible for p.ChangedLock to be nil if p.Lock is non-nil;
+	// we always want to use the former for solving.
+	if p.ChangedLock != nil {
+		params.Lock = p.ChangedLock
 	}
 
 	return params
 }
 
-// ParseRootPackageTree analyzes the root project's disk contents to create a
+// parseRootPackageTree analyzes the root project's disk contents to create a
 // PackageTree, trimming out packages that are not relevant for root projects
 // along the way.
 //
 // The resulting tree is cached internally at p.RootPackageTree.
-func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
+func (p *Project) parseRootPackageTree() (pkgtree.PackageTree, error) {
 	if p.RootPackageTree.Packages == nil {
 		ptree, err := pkgtree.ListPackages(p.ResolvedAbsRoot, string(p.ImportRoot))
 		if err != nil {
@@ -162,7 +215,7 @@ func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
 // GetDirectDependencyNames returns the set of unique Project Roots that are the
 // direct dependencies of this Project.
 //
-// A project is considered a direct dependency if at least one of packages in it
+// A project is considered a direct dependency if at least one of its packages
 // is named in either this Project's required list, or if there is at least one
 // non-ignored import statement from a non-ignored package in the current
 // project's package tree.
@@ -174,49 +227,28 @@ func (p *Project) ParseRootPackageTree() (pkgtree.PackageTree, error) {
 // This function will correctly utilize ignores and requireds from an existing
 // manifest, if one is present, but will also do the right thing without a
 // manifest.
-func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (pkgtree.PackageTree, map[gps.ProjectRoot]bool, error) {
-	ptree, err := p.ParseRootPackageTree()
-	if err != nil {
-		return pkgtree.PackageTree{}, nil, err
-	}
-
-	var ig *pkgtree.IgnoredRuleset
-	var req map[string]bool
-	if p.Manifest != nil {
-		ig = p.Manifest.IgnoredPackages()
-		req = p.Manifest.RequiredPackages()
-	}
-
-	rm, _ := ptree.ToReachMap(true, true, false, ig)
-	reach := rm.FlattenFn(paths.IsStandardImportPath)
-
-	if len(req) > 0 {
-		// Make a map of imports that are both in the import path list and the
-		// required list to avoid duplication.
-		skip := make(map[string]bool, len(req))
-		for _, r := range reach {
-			if req[r] {
-				skip[r] = true
-			}
+func (p *Project) GetDirectDependencyNames(sm gps.SourceManager) (map[gps.ProjectRoot]bool, error) {
+	var reach []string
+	if p.ChangedLock != nil {
+		reach = p.ChangedLock.InputImports()
+	} else {
+		ptree, err := p.parseRootPackageTree()
+		if err != nil {
+			return nil, err
 		}
-
-		for r := range req {
-			if !skip[r] {
-				reach = append(reach, r)
-			}
-		}
+		reach = externalImportList(ptree, p.Manifest)
 	}
 
 	directDeps := map[gps.ProjectRoot]bool{}
 	for _, ip := range reach {
 		pr, err := sm.DeduceProjectRoot(ip)
 		if err != nil {
-			return pkgtree.PackageTree{}, nil, err
+			return nil, err
 		}
 		directDeps[pr] = true
 	}
 
-	return ptree, directDeps, nil
+	return directDeps, nil
 }
 
 // FindIneffectualConstraints looks for constraint rules expressed in the
@@ -230,7 +262,7 @@ func (p *Project) FindIneffectualConstraints(sm gps.SourceManager) []gps.Project
 		return nil
 	}
 
-	_, dd, err := p.GetDirectDependencyNames(sm)
+	dd, err := p.GetDirectDependencyNames(sm)
 	if err != nil {
 		return nil
 	}

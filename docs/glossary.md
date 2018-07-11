@@ -69,7 +69,7 @@ An `import` statement that points to a package in a project other than the one i
 
 ### GPS
 
-Stands for "Go packaging solver", it is [a subtree of library-style packages within dep](https://godoc.org/github.com/golang/dep/gps), and is the engine around which dep is built. Most commonly referred to as "gps."
+Acronym for "Go packaging solver", it is [a subtree of library-style packages within dep](https://godoc.org/github.com/golang/dep/gps), and is the engine around which dep is built. Most commonly referred to as "gps."
 
 ### Local cache
 
