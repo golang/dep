@@ -17,8 +17,6 @@ everything here and write out the request, providing as much context as you can.
 
 Paste the output of the commands you ran in here, making sure to pass -v for maximum context.
 
-The output of `dep hash-inputs` may also be helpful to include.
-
 -->
 
 ### What did you expect to see?
