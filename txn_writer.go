@@ -697,11 +697,10 @@ func (dw *DeltaWriter) PrintPreparedActions(output *log.Logger, verbose bool) er
 		i := 0
 		for pr, reason := range dw.changed {
 			lpd := dw.lockDiff.ProjectDeltas[pr]
-			v, id := projs[pr].Version(), projs[pr].Ident()
 			if reason == projectRemoved {
-				output.Printf("(%d/%d) Would have removed %s", i, tot, id)
+				output.Printf("(%d/%d) Would have removed %s", i, tot, pr)
 			} else {
-				output.Printf("(%d/%d) Would hae written %s@%s: %s", i, tot, id, v, changeExplanation(reason, lpd))
+				output.Printf("(%d/%d) Would have written %s@%s: %s", i, tot, projs[pr].Ident(), projs[pr].Version(), changeExplanation(reason, lpd))
 			}
 		}
 	}
