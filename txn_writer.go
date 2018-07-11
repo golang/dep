@@ -637,7 +637,7 @@ func changeExplanation(c changeType, lpd verify.LockedProjectDelta) string {
 			if lpd.VersionBefore == nil {
 				return fmt.Sprintf("version changed (was a bare revision)")
 			}
-			return fmt.Sprintf("version changed (was %s)", lpd.VersionAfter.String())
+			return fmt.Sprintf("version changed (was %s)", lpd.VersionBefore.String())
 		} else if lpd.RevisionChanged() {
 			return fmt.Sprintf("revision changed (%s -> %s)", trimSHA(lpd.RevisionBefore), trimSHA(lpd.RevisionAfter))
 		} else if lpd.PackagesChanged() {
