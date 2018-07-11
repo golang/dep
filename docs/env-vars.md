@@ -8,6 +8,7 @@ dep's behavior can be modified by some environment variables:
 * [`DEPCACHEDIR`](#depcachedir)
 * [`DEPPROJECTROOT`](#depprojectroot)
 * [`DEPNOLOCK`](#depnolock)
+* [`DEPCACHEAGE`](#depcacheage)
 
 Environment variables are passed through to subcommands, and therefore can be used to affect vcs (e.g. `git`) behavior.
 
@@ -26,3 +27,7 @@ This is primarily useful if you're not using the standard `go` toolchain as a co
 ### `DEPNOLOCK`
 
 By default, dep creates an `sm.lock` file at `$DEPCACHEDIR/sm.lock` in order to prevent multiple dep processes from interacting with the [local cache](glossary.md#local-cache) simultaneously. Setting this variable will bypass that protection; no file will be created. This can be useful on certain filesystems; VirtualBox shares in particular are known to misbehave.
+
+### `DEPCACHEAGE`
+
+If set, enables persistent source caching. By setting a [duration](https://golang.org/pkg/time/#ParseDuration) (e.g. `24h`), source info written to the cache since `<duration>` ago will be accepted. Sources are cached under the dep cache directory as `bolt-v1.db` - this can be removed if necessary.
