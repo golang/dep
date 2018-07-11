@@ -386,11 +386,23 @@ func ParseVersionedDigest(input string) (VersionedDigest, error) {
 func CheckDepTree(osDirname string, wantDigests map[string]VersionedDigest) (map[string]VendorStatus, error) {
 	osDirname = filepath.Clean(osDirname)
 
+	// Create associative array to store the results of calling this function.
+	slashStatus := make(map[string]VendorStatus)
+
 	// Ensure top level pathname is a directory
 	fi, err := os.Stat(osDirname)
 	if err != nil {
+		// If the dir doesn't exist at all, that's OK - just consider all the
+		// wanted paths absent.
+		if os.IsNotExist(err) {
+			for path := range wantDigests {
+				slashStatus[path] = NotInTree
+			}
+			return slashStatus, nil
+		}
 		return nil, errors.Wrap(err, "cannot Stat")
 	}
+
 	if !fi.IsDir() {
 		return nil, errors.Errorf("cannot verify non directory: %q", osDirname)
 	}
@@ -437,9 +449,6 @@ func CheckDepTree(osDirname string, wantDigests map[string]VersionedDigest) (map
 	// which are not required but have a required parent will be marked as
 	// `NotInLock`.
 	nodes := []*fsnode{currentNode}
-
-	// Create associative array to store the results of calling this function.
-	slashStatus := make(map[string]VendorStatus)
 
 	// Mark directories of expected projects as required. When each respective
 	// project is later found while traversing the vendor root hierarchy, its

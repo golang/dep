@@ -527,7 +527,7 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	i := 0
 	tot := len(dw.changed)
 	if len(dw.changed) > 0 {
-		logger.Println("\n# Bringing vendor into sync")
+		logger.Println("# Bringing vendor into sync")
 	}
 	for pr, reason := range dw.changed {
 		if reason == projectRemoved {
@@ -604,7 +604,16 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 
 	for i, pr := range dropped {
 		// Kind of a lie to print this. ¯\_(ツ)_/¯
-		logger.Printf("(%d/%d) Removed unused project %s", tot-(len(dropped)-i-1), tot, pr)
+		fi, err := os.Stat(filepath.Join(vpath, string(pr)))
+		if err != nil {
+			return errors.Wrap(err, "could not stat file that VerifyVendor claimed existed")
+		}
+
+		if fi.IsDir() {
+			logger.Printf("(%d/%d) Removed unused project %s", tot-(len(dropped)-i-1), tot, pr)
+		} else {
+			logger.Printf("(%d/%d) Removed orphaned file %s", tot-(len(dropped)-i-1), tot, pr)
+		}
 	}
 
 	// Ensure vendor/.git is preserved if present
