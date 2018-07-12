@@ -41,6 +41,12 @@ type command interface {
 
 func main() {
 	p := &profile{}
+
+	// Redefining Usage() customizes the output of `dep -h`
+	flag.CommandLine.Usage = func() {
+		fprintUsage(os.Stderr)
+	}
+
 	flag.StringVar(&p.cpuProfile, "cpuprofile", "", "Writes a CPU profile to the specified file before exiting.")
 	flag.StringVar(&p.memProfile, "memprofile", "", "Writes a memory profile to the specified file before exiting.")
 	flag.IntVar(&p.memProfileRate, "memprofilerate", 0, "Enable more precise memory profiles by setting runtime.MemProfileRate.")
@@ -85,61 +91,11 @@ type Config struct {
 
 // Run executes a configuration and returns an exit code.
 func (c *Config) Run() int {
-	// Build the list of available commands.
-	commands := [...]command{
-		&initCommand{},
-		&statusCommand{},
-		&ensureCommand{},
-		&pruneCommand{},
-		&versionCommand{},
-	}
-
-	examples := [...][2]string{
-		{
-			"dep init",
-			"set up a new project",
-		},
-		{
-			"dep ensure",
-			"install the project's dependencies",
-		},
-		{
-			"dep ensure -update",
-			"update the locked versions of all dependencies",
-		},
-		{
-			"dep ensure -add github.com/pkg/errors",
-			"add a dependency to the project",
-		},
-	}
-
-	usage := func(w io.Writer) {
-		fmt.Fprintln(w, "Dep is a tool for managing dependencies for Go projects")
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Usage: \"dep [command]\"")
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Commands:")
-		fmt.Fprintln(w)
-		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		for _, cmd := range commands {
-			if !cmd.Hidden() {
-				fmt.Fprintf(tw, "\t%s\t%s\n", cmd.Name(), cmd.ShortHelp())
-			}
-		}
-		tw.Flush()
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Examples:")
-		for _, example := range examples {
-			fmt.Fprintf(tw, "\t%s\t%s\n", example[0], example[1])
-		}
-		tw.Flush()
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Use \"dep help [command]\" for more information about a command.")
-	}
+	commands := commandList()
 
 	cmdName, printCommandHelp, exit := parseArgs(c.Args)
 	if exit {
-		usage(c.Stderr)
+		fprintUsage(c.Stderr)
 		return errorExitCode
 	}
 
@@ -154,7 +110,7 @@ func (c *Config) Run() int {
 		fmt.Println()
 
 		var cw io.Writer = &commentWriter{W: c.Stdout}
-		usage(cw)
+		fprintUsage(cw)
 		for _, cmd := range commands {
 			if !cmd.Hidden() {
 				fmt.Fprintln(cw)
@@ -251,8 +207,67 @@ func (c *Config) Run() int {
 	}
 
 	errLogger.Printf("dep: %s: no such command\n", cmdName)
-	usage(c.Stderr)
+	fprintUsage(c.Stderr)
 	return errorExitCode
+}
+
+// Build the list of available commands.
+//
+// Note that these commands are mutable, but parts of this file
+// use them for their immutable characteristics (help strings, etc).
+func commandList() []command {
+	return []command{
+		&initCommand{},
+		&statusCommand{},
+		&ensureCommand{},
+		&pruneCommand{},
+		&versionCommand{},
+	}
+}
+
+var examples = [...][2]string{
+	{
+		"dep init",
+		"set up a new project",
+	},
+	{
+		"dep ensure",
+		"install the project's dependencies",
+	},
+	{
+		"dep ensure -update",
+		"update the locked versions of all dependencies",
+	},
+	{
+		"dep ensure -add github.com/pkg/errors",
+		"add a dependency to the project",
+	},
+}
+
+func fprintUsage(w io.Writer) {
+	fmt.Fprintln(w, "Dep is a tool for managing dependencies for Go projects")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Usage: \"dep [command]\"")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Commands:")
+	fmt.Fprintln(w)
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+
+	commands := commandList()
+	for _, cmd := range commands {
+		if !cmd.Hidden() {
+			fmt.Fprintf(tw, "\t%s\t%s\n", cmd.Name(), cmd.ShortHelp())
+		}
+	}
+	tw.Flush()
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Examples:")
+	for _, example := range examples {
+		fmt.Fprintf(tw, "\t%s\t%s\n", example[0], example[1])
+	}
+	tw.Flush()
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Use \"dep help [command]\" for more information about a command.")
 }
 
 func resetUsage(logger *log.Logger, fs *flag.FlagSet, name, args, longHelp string) {
