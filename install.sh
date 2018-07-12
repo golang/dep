@@ -66,7 +66,7 @@ downloadFile() {
 
 findGoBinDirectory() {
     EFFECTIVE_GOPATH=$(go env GOPATH)
-    # CYGWIN: Convert Windows-style path into sh-compatible style paths
+    # CYGWIN: Convert Windows-style path into sh-compatible path
     if [ "$OS_CYGWIN" = "1" ]; then
 	EFFECTIVE_GOPATH=$(cygpath "$EFFECTIVE_GOPATH")
     fi
@@ -75,7 +75,6 @@ findGoBinDirectory() {
         exit 1
     fi
     if [ -z "$GOBIN" ]; then
-	echo "${EFFECTIVE_GOPATH%%:*}/bin" | sed s#//*#/#g
         GOBIN=$(echo "${EFFECTIVE_GOPATH%%:*}/bin" | sed s#//*#/#g)
     fi
     if [ ! -d "$GOBIN" ]; then
