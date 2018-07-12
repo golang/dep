@@ -27,7 +27,7 @@ $ brew upgrade dep
 On other platforms you can use the `install.sh` script:
 
 ```sh
-$ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+$ curl -L https://git.io/dep | sh
 ```
 
 It will install into your `$GOPATH/bin` directory by default or any other directory you specify using the `INSTALL_DIRECTORY` environment variable.
