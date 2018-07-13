@@ -32,7 +32,7 @@ We can represent these two functions visually:
 
 This is `dep ensure` - the typical flow, used when a `Gopkg.toml` already exists. When a project does not yet have a `Gopkg.toml`, `dep init` can generate one. The essential flow remains the same, but with changed inputs: instead of reading from an existing `Gopkg.toml` file, `dep init` constructs one out of data inferred from the user's GOPATH, and/or [a metadata file from another tool](). (In other words, `dep init` automatically migrates a project from other approaches to organizing dependencies.)
 
-This diagram directly corresponds directly to code, as well. The solving function is actually split into a constructor and a method - we first create a [`Solver`](https://godoc.org/github.com/golang/dep/gps#Solver) type, then call its `Solve()` method. The inputs to the constructor are wrapped up in a [`SolveParameters`](https://godoc.org/github.com/golang/dep/gps#SolveParameters), which should look familiar:
+This diagram directly corresponds to code as well. The solving function is actually split into a constructor and a method - we first create a [`Solver`](https://godoc.org/github.com/golang/dep/gps#Solver) type, then call its `Solve()` method. The inputs to the constructor are wrapped up in a [`SolveParameters`](https://godoc.org/github.com/golang/dep/gps#SolveParameters), which should look familiar:
 
 ```go
 type SolveParameters struct {
