@@ -47,12 +47,19 @@ func TestHasFilepathPrefix(t *testing.T) {
 		dir2 = dir
 	}
 
+	// For testing trailing and repeated separators
+	sep := string(os.PathSeparator)
+
 	cases := []struct {
 		path   string
 		prefix string
 		want   bool
 	}{
 		{filepath.Join(dir, "a", "b"), filepath.Join(dir2), true},
+		{filepath.Join(dir, "a", "b"), dir2 + sep + sep + "a", true},
+		{filepath.Join(dir, "a", "b"), filepath.Join(dir2, "a") + sep, true},
+		{filepath.Join(dir, "a", "b") + sep, filepath.Join(dir2), true},
+		{dir + sep + sep + filepath.Join("a", "b"), filepath.Join(dir2, "a"), true},
 		{filepath.Join(dir, "a", "b"), filepath.Join(dir2, "a"), true},
 		{filepath.Join(dir, "a", "b"), filepath.Join(dir2, "a", "b"), true},
 		{filepath.Join(dir, "a", "b"), filepath.Join(dir2, "c"), false},

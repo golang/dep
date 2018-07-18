@@ -61,8 +61,8 @@ func HasFilepathPrefix(path, prefix string) (bool, error) {
 		dn = filepath.Dir(path)
 	}
 
-	dn = strings.TrimSuffix(dn, string(os.PathSeparator))
-	prefix = strings.TrimSuffix(prefix, string(os.PathSeparator))
+	dn = filepath.Clean(dn)
+	prefix = filepath.Clean(prefix)
 
 	// [1:] in the lines below eliminates empty string on *nix and volume name on Windows
 	dirs := strings.Split(dn, string(os.PathSeparator))[1:]
