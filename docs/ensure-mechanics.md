@@ -48,16 +48,30 @@ The four state system, and these functional flows through it, are the foundation
 
 ### Staying in sync
 
-One of dep's design goals is that both of its "functions" minimize both the work they do, and the change they induce in their respective results. (Note: "minimize" is not currently formally defined with respect to a cost function.) Consequently, both functions peek ahead at the pre-existing result to understand what work actually needs to be done:
+One of dep's design goals is that both of its "functions" minimize both the work they do, and the change they induce in their respective outputs. Consequently, both functions peek ahead at the pre-existing output to understand what work actually needs to be done:
 
-* The solving function checks the existing `Gopkg.lock` to determine if all of its inputs (project import statements + `Gopkg.toml` rules) are satisfied. If they are, the solving function can be bypassed entirely. If not, the solving function proceeds, but attempts to change as few of the selections in `Gopkg.lock` as possible.
-* The vendoring function hashes each discrete project already in `vendor/` to see if the code present on disk is what `Gopkg.lock` indicates it should be. Only projects that deviate from expectations are written out.
+* The solving function checks the existing `Gopkg.lock` to determine if all of its inputs are satisfied. If they are, the solving function can be bypassed entirely. If not, the solving function proceeds, but attempts to change as few of the selections in `Gopkg.lock` as possible.
+* The vendoring function hashes each discrete project already in `vendor/` to see if the code present on disk is what `Gopkg.lock` indicates it should be. Only projects with hash mismatches are rewritten.
 
-Of course, it's possible that, in peeking ahead, either function might discover that the pre-existing result is already correct - so no work need be done at all. Either way, when each function completes, we can be sure that the output, changed or not, is correct with respect to the inputs. In other words, the inputs and outputs are "in sync." Indeed, being in sync is the "known good state" of dep; `dep ensure` (without flags) guarantees that if it exits 0, all four states in the project are in sync.
+Specifically, dep defines a number of invariants that must be met:
+
+| Sync invariant                                               | Resolution when desynced                                     | Func       |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ---------- |
+| All [`required`](Gopkg.toml.md#required) statements in `Gopkg.toml` must be present in the [`input-imports`](Gopkg.lock.md#input-imports) list in `Gopkg.lock`. | Re-solve, update `Gopkg.lock` and `vendor/` for projects that changed | Solving    |
+| All `import` statements in the current project's non-[`ignored`]((Gopkg.toml.md#ignored)), non-hidden packages must be present in [`input-imports`](Gopkg.lock.md#input-imports) list in `Gopkg.lock`. | Re-solve, update `Gopkg.lock` and `vendor/` for projects that changed | Solving    |
+| All [versions in `Gopkg.lock`](Gopkg.lock.md#version-information-revision-version-and-branch) must be acceptable with respect to the `[[constraint]]` or `[[override]]` declarations made in `Gopkg.toml`. | Re-solve, update `Gopkg.lock` and `vendor/` for projects that changed | Solving    |
+| The [`pruneopts`](Gopkg.lock.md#pruneopts) of each `[[project]]` in `Gopkg.lock` must equal the declaration in `Gopkg.toml`. | Update `Gopkg.lock` and `vendor/`                            | Vendoring* |
+| The [`digest`](Gopkg.lock.md#digest) of each `[[project]]` in `Gopkg.lock` must equal the value derived from hashing the current contents of `vendor/` | Regenerate the projects in `vendor/ `, and update `Gopkg.lock` with the new hash digest if necessary | Vendoring  |
+
+(*`pruneopts` is a little weird, because the desync is between `Gopkg.toml` and `Gopkg.lock`, but it doesn't trigger a solve.)
+
+If peeking ahead reveals that the sync invariants are already met, then the corresponding function needn't do any work; if they don't, then dep takes the resolution step. Either way, when `dep ensure` finishes, we can be sure that we're in the "known good state" of where all sync invariants are maintained.
+
+`dep check` will evaluate all of the above relations, and if any invariants do not hold, it will print a description of the desync and exit 1.
 
 ## `dep ensure` flags and behavior variations
 
-Each of `dep ensure`'s various flags affects the behavior of the solving and vendoring functions - or even whether they run at all. Some flags can also marginally push the project out of sync, temporarily. Thinking about these effects in the context of dep's basic model is the fastest path to understanding.
+Each of `dep ensure`'s various flags affects the behavior of the solving and vendoring functions - or even whether they run at all. Some flags can also temporarily result in the project being out of sync. Thinking about these effects in the context of dep's basic model is the fastest path to understanding what's going on.
 
 ### `-no-vendor` and `-vendor-only`
 

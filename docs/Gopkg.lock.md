@@ -86,7 +86,7 @@ By bumping versions only on solution set contractions, but not expansions, it al
 
 ### `input-imports`
 
-A sorted list of all the import inputs that were present at the time the `Gopkg.lock` was computed. This list includes both actual `import` statements from the project, as well as any `required` import paths listed in `Gopkg.toml`.
+A sorted list of all the import inputs that were present at the time the `Gopkg.lock` was computed. This list includes both actual `import` statements from the project, as well as any `required` import paths listed in `Gopkg.toml`, excluding any that were `ignored`.
 
 ### `analyzer-name` and `analyzer-version`
 

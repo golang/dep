@@ -128,9 +128,16 @@ The portion of an import path that corresponds to the network location of a sour
 
 ### Sync
 
-Dep's interaction model is based around the idea of maintaining a well-defined relationship between your project's import statements and `Gopkg.toml`, and your project's `Gopkg.lock` - keeping them "in sync". When the `Gopkg.lock` has more or fewer entries than are necessary, or entries that are incompatible with constraint rules established in `Gopkg.toml`, your project is "out of sync".
+Dep is designed around a well-defined relationship between four states:
 
-This concept is explored in detail on [the ensure mechanics reference page](ensure-mechanics.md#staying-in-sync).
+1. `import` statements in `.go` files
+2. `Gopkg.toml`
+3. `Gopkg.lock`
+4. The `vendor` directory
+
+If any aspect of the relationship is unfulfilled (e.g., there is an `import` not reflected in `Gopkg.lock`, or a project that's missing from `vendor`), then dep considers the project to be "out of sync."
+
+This concept is explored in detail in [ensure mechanics](ensure-mechanics.md#staying-in-sync).
 
 ### Transitive Dependency
 
