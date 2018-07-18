@@ -547,7 +547,7 @@ func TestDetectGOPATH(t *testing.T) {
 			t.Error("expected error but got none")
 		}
 		if GOPATH != tc.GOPATH {
-			t.Errorf("expected GOPATH to be %s, got %s", GOPATH, tc.GOPATH)
+			t.Errorf("expected GOPATH to be %s, got %s", tc.GOPATH, GOPATH)
 		}
 	}
 }
