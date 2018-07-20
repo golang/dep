@@ -1,0 +1,23 @@
+digraph {
+	node [shape=box];
+	compound=true;
+	edge [minlen=2];
+	2062426895 [label="ProjectB/pkgX"];
+	2045649276 [label="ProjectB/pkgY"];
+	2095982133 [label="ProjectB/pkgZ"];
+	990902230 [label="ProjectC/pkgX"];
+	1007679849 [label="ProjectC/pkgY"];
+	957346992 [label="ProjectC/pkgZ"];
+	subgraph cluster_0 {
+		label = "ProjectB";
+		2062426895 2045649276 2095982133;
+	}
+	subgraph cluster_1 {
+		label = "ProjectC";
+		990902230 1007679849 957346992;
+	}
+	2045649276 -> 957346992;
+	2095982133 -> 990902230 [lhead=cluster_1];
+	2062426895 -> 990902230 [ltail=cluster_0];
+	2062426895 -> 990902230 [ltail=cluster_0 lhead=cluster_1];
+}

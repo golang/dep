@@ -1,0 +1,15 @@
+digraph {
+	node [shape=box];
+	compound=true;
+	edge [minlen=2];
+	2062426895 [label="ProjectB/pkgX"];
+	2045649276 [label="ProjectB/pkgY"];
+	2095982133 [label="ProjectB/pkgZ"];
+	1459457741 [label="ProjectA"];
+	subgraph cluster_0 {
+		label = "ProjectB";
+		2062426895 2045649276 2095982133;
+	}
+	2045649276 -> 1459457741;
+	2062426895 -> 1459457741 [ltail=cluster_0];
+}

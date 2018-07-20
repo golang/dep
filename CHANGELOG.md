@@ -24,6 +24,7 @@ IMPROVEMENTS:
 * Update our dependency on Masterminds/semver to follow upstream again now that [Masterminds/semver#67](https://github.com/Masterminds/semver/pull/67) is merged([#1792](https://github.com/golang/dep/pull/1792)).
 * `inputs-digest` was removed from `Gopkg.lock` ([#1912](https://github.com/golang/dep/pull/1912)).
 * Don't exclude `Godeps` folder ([#1822](https://github.com/golang/dep/issues/1822)).
+* Add project-package relationship graph support in graphviz ([#1588](https://github.com/golang/dep/pull/1588)).
 
 WIP:
 * Enable importing external configuration from dependencies during init (#1277). This is feature flagged and disabled by default.
