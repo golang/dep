@@ -175,7 +175,11 @@ func (p *TestProject) DoRun(args []string) error {
 		p.t.Logf("running testdep %v", args)
 	}
 	prog := filepath.Join(p.origWd, "testdep"+test.ExeSuffix)
-	newargs := append([]string{args[0], "-v"}, args[1:]...)
+
+	newargs := args
+	if args[0] != "check" {
+		newargs = append([]string{args[0], "-v"}, args[1:]...)
+	}
 
 	p.stdout.Reset()
 	p.stderr.Reset()
