@@ -108,7 +108,7 @@ The root import path for a project. A project root is defined as:
 * For the current project, the location of the `Gopkg.toml` file defines the project root
 * For dependencies, the root of the network [source](#source) (VCS repository) is treated as the project root
 
-These are generally one and the same, though not always. When using dep inside a monorepo, multiple `Gopkg.toml` files may exist at subpaths for discrete projects, designating each of those import paths as Project Roots. This works fine when working directly on those projects. If, however, any project not in the repository seeks to import the monorepo, dep will treat the monorepo's as one big Project, with the root directory being the Project Root; it will disregard any and all `Gopkg.toml` files in subdirectories.
+These are generally one and the same, though not always. When using dep inside a monorepo, multiple `Gopkg.toml` files may exist at subpaths for discrete projects, designating each of those import paths as Project Roots. This works fine when working directly on those projects. If, however, any project not in the repository seeks to import the monorepo, dep will treat the monorepo as one big Project, with the root directory being the Project Root; it will disregard any and all `Gopkg.toml` files in subdirectories.
 
 This may also be referred to as the "import root" or "root import path."
 

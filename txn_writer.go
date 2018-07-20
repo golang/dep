@@ -536,7 +536,15 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 		}
 
 		to := filepath.FromSlash(filepath.Join(vnewpath, string(pr)))
-		po := projs[pr].(verify.VerifiableProject).PruneOpts
+		po, has := projs[pr].(verify.VerifiableProject).PruneOpts
+		if !has {
+			// This shouldn't be reachable, but it's preferable to print an
+			// error and continue rather than panic. https://github.com/golang/dep/issues/1945
+			// TODO(sdboyer) remove this once we've increased confidence around
+			// this case.
+			fmt.Fprintf(os.Stderr, "Internal error - %s had change code %v but was not in new Gopkg.lock. Re-running dep ensure should fix this. Please file a bug!\n", pr, reason)
+			continue
+		}
 		if err := sm.ExportPrunedProject(context.TODO(), projs[pr], po, to); err != nil {
 			return errors.Wrapf(err, "failed to export %s", pr)
 		}
