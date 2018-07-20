@@ -5,14 +5,22 @@ title: Environment Variables
 
 dep's behavior can be modified by some environment variables:
 
+* [`DEPCACHEAGE`](#depcacheage)
 * [`DEPCACHEDIR`](#depcachedir)
 * [`DEPPROJECTROOT`](#depprojectroot)
 * [`DEPNOLOCK`](#depnolock)
-* [`DEPCACHEAGE`](#depcacheage)
 
 Environment variables are passed through to subcommands, and therefore can be used to affect vcs (e.g. `git`) behavior.
 
 ---
+
+### `DEPCACHEAGE`
+
+If set to a [duration](https://golang.org/pkg/time/#ParseDuration) (e.g. `24h`), it will enable caching of metadata from source repositories: lists of published versions, the contents of a project's `Gopkg.toml` file at a particular version, sets of packages and imports at a particular version.
+
+A duration must be set to enable caching (in future versions of dep, it will be on by default), but it is only used for mutable information, like version lists. Information associated with an immutable VCS revision (packages and imports; `Gopkg.toml` declarations) is cached indefinitely.
+
+The cache lives in `$DEPCACHEDIR/bolt-v1.db`, where the version number is an internal number indicating associated with a particular data schema dep uses. The file can be removed safely; the database will be rebuilt as needed.
 
 ### `DEPCACHEDIR`
 
@@ -27,7 +35,3 @@ This is primarily useful if you're not using the standard `go` toolchain as a co
 ### `DEPNOLOCK`
 
 By default, dep creates an `sm.lock` file at `$DEPCACHEDIR/sm.lock` in order to prevent multiple dep processes from interacting with the [local cache](glossary.md#local-cache) simultaneously. Setting this variable will bypass that protection; no file will be created. This can be useful on certain filesystems; VirtualBox shares in particular are known to misbehave.
-
-### `DEPCACHEAGE`
-
-If set, enables persistent source caching. By setting a [duration](https://golang.org/pkg/time/#ParseDuration) (e.g. `24h`), source info written to the cache since `<duration>` ago will be accepted. Sources are cached under the dep cache directory as `bolt-v1.db` - this can be removed if necessary.
