@@ -8,5 +8,6 @@
 set -e
 
 go build -o licenseok ./hack/licenseok/main.go
-find . -path ./vendor -prune -o -regex ".+\.pb\.go$" -prune -o -type f -regex ".*\.\(go\|proto\)$"\
- -printf '%P\n' | xargs ./licenseok
+find . -path ./vendor -prune -o -path ./cmd/dep/testdata -prune\
+    -o -regex ".+\.pb\.go$" -prune -o -type f -regex ".*\.\(go\|proto\)$"\
+    -printf '%P\n' | xargs ./licenseok

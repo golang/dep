@@ -18,8 +18,8 @@ licenseok:
 	go build -o licenseok ./hack/licenseok/main.go
 
 validate: build licenseok
+	./dep check
 	./hack/lint.bash
-	./hack/validate-vendor.bash
 	./hack/validate-licence.bash
 
 test: build

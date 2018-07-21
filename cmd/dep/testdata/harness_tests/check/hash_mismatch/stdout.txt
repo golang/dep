@@ -1,0 +1,2 @@
+# vendor is out of sync:
+github.com/sdboyer/deptest: hash of vendored tree didn't match digest in Gopkg.lock

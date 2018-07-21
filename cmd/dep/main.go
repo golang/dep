@@ -39,6 +39,14 @@ type command interface {
 	Run(*dep.Ctx, []string) error
 }
 
+// Helper type so that commands can fail without generating any additional
+// ouptut.
+type silentfail struct{}
+
+func (silentfail) Error() string {
+	return ""
+}
+
 func main() {
 	p := &profile{}
 
@@ -139,7 +147,12 @@ func (c *Config) Run() int {
 			// Build flag set with global flags in there.
 			flags := flag.NewFlagSet(cmdName, flag.ContinueOnError)
 			flags.SetOutput(c.Stderr)
-			verbose := flags.Bool("v", false, "enable verbose logging")
+
+			var verbose bool
+			// No verbose for verify
+			if cmdName != "check" {
+				flags.BoolVar(&verbose, "v", false, "enable verbose logging")
+			}
 
 			// Register the subcommand flags in there, too.
 			cmd.Register(flags)
@@ -186,7 +199,7 @@ func (c *Config) Run() int {
 			ctx := &dep.Ctx{
 				Out:            outLogger,
 				Err:            errLogger,
-				Verbose:        *verbose,
+				Verbose:        verbose,
 				DisableLocking: getEnv(c.Env, "DEPNOLOCK") != "",
 				Cachedir:       cachedir,
 				CacheAge:       cacheAge,
@@ -197,7 +210,9 @@ func (c *Config) Run() int {
 
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(ctx, flags.Args()); err != nil {
-				errLogger.Printf("%v\n", err)
+				if _, ok := err.(silentfail); !ok {
+					errLogger.Printf("%v\n", err)
+				}
 				return errorExitCode
 			}
 
@@ -222,6 +237,7 @@ func commandList() []command {
 		&ensureCommand{},
 		&pruneCommand{},
 		&versionCommand{},
+		&checkCommand{},
 	}
 }
 

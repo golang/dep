@@ -1,0 +1,2 @@
+# vendor is out of sync:
+github.com/sdboyer/deptest: hash algorithm mismatch, want version 1

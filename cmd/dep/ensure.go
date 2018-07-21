@@ -261,20 +261,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)
 		if !lsat.Satisfied() {
 			if ctx.Verbose {
-				ctx.Out.Println("# Gopkg.lock is out of sync with Gopkg.toml and project code:")
-				for _, missing := range lsat.MissingImports {
-					ctx.Out.Printf("%s: missing from input-imports\n", missing)
-				}
-				for _, excess := range lsat.ExcessImports {
-					ctx.Out.Printf("%s: in input-imports, but isn't imported\n", excess)
-				}
-				for pr, unmatched := range lsat.UnmetOverrides {
-					ctx.Out.Printf("%s@%s: not allowed by override %s\n", pr, unmatched.V, unmatched.C)
-				}
-				for pr, unmatched := range lsat.UnmetConstraints {
-					ctx.Out.Printf("%s@%s: not allowed by constraint %s\n", pr, unmatched.V, unmatched.C)
-				}
-				ctx.Out.Println()
+				ctx.Out.Printf("# Gopkg.lock is out of sync with Gopkg.toml and project imports:\n%s\n\n", sprintLockUnsat(lsat))
 			}
 			solve = true
 		} else if cmd.noVendor {
@@ -329,7 +316,7 @@ func (cmd *ensureCommand) runVendorOnly(ctx *dep.Ctx, args []string, p *dep.Proj
 
 	// Pass the same lock as old and new so that the writer will observe no
 	// difference, and write out only ncessary vendor/ changes.
-	dw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways, p.Manifest.PruneOptions)
+	dw, err := dep.NewSafeWriter(nil, p.Lock, p.Lock, dep.VendorAlways, p.Manifest.PruneOptions, nil)
 	//dw, err := dep.NewDeltaWriter(p.Lock, p.Lock, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), dep.VendorAlways)
 	if err != nil {
 		return err

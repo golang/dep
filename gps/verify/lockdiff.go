@@ -53,12 +53,13 @@ type LockedProjectDelta struct {
 // properties of two LockedProjects. It can represent deltas for
 // VerifiableProject properties, as well.
 type LockedProjectPropertiesDelta struct {
-	PackagesAdded, PackagesRemoved  []string
-	VersionBefore, VersionAfter     gps.UnpairedVersion
-	RevisionBefore, RevisionAfter   gps.Revision
-	SourceBefore, SourceAfter       string
-	PruneOptsBefore, PruneOptsAfter gps.PruneOptions
-	HashChanged, HashVersionChanged bool
+	PackagesAdded, PackagesRemoved      []string
+	VersionBefore, VersionAfter         gps.UnpairedVersion
+	RevisionBefore, RevisionAfter       gps.Revision
+	SourceBefore, SourceAfter           string
+	PruneOptsBefore, PruneOptsAfter     gps.PruneOptions
+	HashVersionBefore, HashVersionAfter int
+	HashChanged                         bool
 }
 
 // DiffLocks compares two locks and computes a semantically rich delta between
@@ -200,20 +201,18 @@ func DiffLockedProjectProperties(lp1, lp2 gps.LockedProject) LockedProjectProper
 
 	if ok1 && ok2 {
 		ld.PruneOptsBefore, ld.PruneOptsAfter = vp1.PruneOpts, vp2.PruneOpts
+		ld.HashVersionBefore, ld.HashVersionAfter = vp1.Digest.HashVersion, vp2.Digest.HashVersion
 
-		if vp1.Digest.HashVersion != vp2.Digest.HashVersion {
-			ld.HashVersionChanged = true
-		}
 		if !bytes.Equal(vp1.Digest.Digest, vp2.Digest.Digest) {
 			ld.HashChanged = true
 		}
 	} else if ok1 {
 		ld.PruneOptsBefore = vp1.PruneOpts
-		ld.HashVersionChanged = true
+		ld.HashVersionBefore = vp1.Digest.HashVersion
 		ld.HashChanged = true
 	} else if ok2 {
 		ld.PruneOptsAfter = vp2.PruneOpts
-		ld.HashVersionChanged = true
+		ld.HashVersionAfter = vp2.Digest.HashVersion
 		ld.HashChanged = true
 	}
 
@@ -322,7 +321,7 @@ func (ld LockedProjectPropertiesDelta) Changed(dims DeltaDimension) bool {
 	if dims&HashChanged != 0 && ld.HashChanged {
 		return true
 	}
-	if dims&HashVersionChanged != 0 && ld.HashVersionChanged {
+	if dims&HashVersionChanged != 0 && ld.HashVersionChanged() {
 		return true
 	}
 	if dims&VersionChanged != 0 && ld.VersionChanged() {
@@ -351,7 +350,7 @@ func (ld LockedProjectPropertiesDelta) Changes() DeltaDimension {
 	if ld.HashChanged {
 		dd |= HashChanged
 	}
-	if ld.HashVersionChanged {
+	if ld.HashVersionChanged() {
 		dd |= HashVersionChanged
 	}
 	if ld.VersionChanged() {
@@ -400,9 +399,21 @@ func (ld LockedProjectPropertiesDelta) PackagesChanged() bool {
 }
 
 // PruneOptsChanged returns true if the pruning flags for the project changed
-// between teh first and second locks.
+// between the first and second locks.
 func (ld LockedProjectPropertiesDelta) PruneOptsChanged() bool {
 	return ld.PruneOptsBefore != ld.PruneOptsAfter
+}
+
+// HashVersionChanged returns true if the version of the hashing algorithm
+// changed between the first and second locks.
+func (ld LockedProjectPropertiesDelta) HashVersionChanged() bool {
+	return ld.HashVersionBefore != ld.HashVersionAfter
+}
+
+// HashVersionWasZero returns true if the first lock had a zero hash version,
+// which can only mean it was uninitialized.
+func (ld LockedProjectPropertiesDelta) HashVersionWasZero() bool {
+	return ld.HashVersionBefore == 0
 }
 
 // sortLockedProjects returns a sorted copy of lps, or itself if already sorted.

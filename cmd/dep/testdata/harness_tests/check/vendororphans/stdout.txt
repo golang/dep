@@ -1,0 +1,3 @@
+# vendor is out of sync:
+foo: orphaned file
+orphdir: unused project

@@ -90,7 +90,7 @@ type SafeWriter struct {
 // - If oldLock is provided without newLock, error.
 //
 // - If vendor is VendorAlways without a newLock, error.
-func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior, prune gps.CascadingPruneOptions) (*SafeWriter, error) {
+func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBehavior, prune gps.CascadingPruneOptions, status map[string]verify.VendorStatus) (*SafeWriter, error) {
 	sw := &SafeWriter{
 		Manifest:     manifest,
 		lock:         newLock,
@@ -114,7 +114,18 @@ func NewSafeWriter(manifest *Manifest, oldLock, newLock *Lock, vendor VendorBeha
 	case VendorAlways:
 		sw.writeVendor = true
 	case VendorOnChanged:
-		sw.writeVendor = sw.lockDiff.Changed(anyExceptHash & ^verify.InputImportsChanged) || (newLock != nil && oldLock == nil)
+		if newLock != nil && oldLock == nil {
+			sw.writeVendor = true
+		} else if sw.lockDiff.Changed(anyExceptHash & ^verify.InputImportsChanged) {
+			sw.writeVendor = true
+		} else {
+			for _, stat := range status {
+				if stat != verify.NoMismatch {
+					sw.writeVendor = true
+					break
+				}
+			}
+		}
 	}
 
 	if sw.writeVendor && newLock == nil {
@@ -442,7 +453,7 @@ func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatu
 	if err != nil && os.IsNotExist(err) {
 		// Provided dir does not exist, so there's no disk contents to compare
 		// against. Fall back to the old SafeWriter.
-		return NewSafeWriter(nil, oldLock, newLock, behavior, prune)
+		return NewSafeWriter(nil, oldLock, newLock, behavior, prune, status)
 	}
 
 	sw.lockDiff = verify.DiffLocks(oldLock, newLock)
@@ -527,7 +538,7 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 	i := 0
 	tot := len(dw.changed)
 	if len(dw.changed) > 0 {
-		logger.Println("\n# Bringing vendor into sync")
+		logger.Println("# Bringing vendor into sync")
 	}
 	for pr, reason := range dw.changed {
 		if reason == projectRemoved {
@@ -613,7 +624,16 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 
 	for i, pr := range dropped {
 		// Kind of a lie to print this. ¯\_(ツ)_/¯
-		logger.Printf("(%d/%d) Removed unused project %s", tot-(len(dropped)-i-1), tot, pr)
+		fi, err := os.Stat(filepath.Join(vpath, string(pr)))
+		if err != nil {
+			return errors.Wrap(err, "could not stat file that VerifyVendor claimed existed")
+		}
+
+		if fi.IsDir() {
+			logger.Printf("(%d/%d) Removed unused project %s", tot-(len(dropped)-i-1), tot, pr)
+		} else {
+			logger.Printf("(%d/%d) Removed orphaned file %s", tot-(len(dropped)-i-1), tot, pr)
+		}
 	}
 
 	// Ensure vendor/.git is preserved if present

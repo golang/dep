@@ -1,0 +1,3 @@
+# Gopkg.lock is out of sync:
+github.com/sdboyer/deptestdos: missing from input-imports
+

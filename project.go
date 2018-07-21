@@ -140,12 +140,6 @@ func (p *Project) VerifyVendor() (map[string]verify.VendorStatus, error) {
 			lps = p.Lock.Projects()
 		}
 
-		err := os.MkdirAll(vendorDir, os.FileMode(0777))
-		if err != nil {
-			p.CheckVendorErr = err
-			return
-		}
-
 		sums := make(map[string]verify.VersionedDigest)
 		for _, lp := range lps {
 			sums[string(lp.Ident().ProjectRoot)] = lp.(verify.VerifiableProject).Digest

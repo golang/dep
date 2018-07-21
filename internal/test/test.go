@@ -171,8 +171,11 @@ func (h *Helper) DoRun(args []string) error {
 	} else {
 		prog = filepath.Join(h.wd, "testdep"+ExeSuffix)
 	}
-	newargs := []string{args[0], "-v"}
-	newargs = append(newargs, args[1:]...)
+	newargs := args
+	if args[0] != "check" {
+		newargs = append([]string{args[0], "-v"}, args[1:]...)
+	}
+
 	cmd := exec.Command(prog, newargs...)
 	h.stdout.Reset()
 	h.stderr.Reset()
