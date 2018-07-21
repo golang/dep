@@ -1,0 +1,9 @@
+{
+  "commands": [
+    ["check"]
+  ],
+  "exit-code": 1,
+  "vendor-final": [
+    "github.com/sdboyer/deptest"
+  ]
+}

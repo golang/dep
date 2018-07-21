@@ -1,0 +1,7 @@
+{
+  "commands": [
+    ["check"]
+  ],
+  "exit-code": 1,
+  "vendor-final": []
+}

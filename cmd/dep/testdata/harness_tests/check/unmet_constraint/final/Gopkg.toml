@@ -1,0 +1,3 @@
+[[constraint]]
+  name = "github.com/sdboyer/deptest"
+  branch = "master"
