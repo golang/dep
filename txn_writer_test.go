@@ -33,7 +33,7 @@ func TestSafeWriter_BadInput_MissingRoot(t *testing.T) {
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
 
-	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged, defaultCascadingPruneOptions(), nil)
 	err := sw.Write("", pc.SourceManager, true, nil)
 
 	if err == nil {
@@ -51,7 +51,7 @@ func TestSafeWriter_BadInput_MissingSourceManager(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(nil, nil, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(nil, nil, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions(), nil)
 	err := sw.Write(pc.Project.AbsRoot, nil, true, nil)
 
 	if err == nil {
@@ -67,7 +67,7 @@ func TestSafeWriter_BadInput_ForceVendorMissingLock(t *testing.T) {
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
 
-	_, err := NewSafeWriter(nil, nil, nil, VendorAlways, defaultCascadingPruneOptions())
+	_, err := NewSafeWriter(nil, nil, nil, VendorAlways, defaultCascadingPruneOptions(), nil)
 	if err == nil {
 		t.Fatal("should have errored without a lock when forceVendor is true, but did not")
 	} else if !strings.Contains(err.Error(), "newLock") {
@@ -83,7 +83,7 @@ func TestSafeWriter_BadInput_OldLockOnly(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	_, err := NewSafeWriter(nil, pc.Project.Lock, nil, VendorAlways, defaultCascadingPruneOptions())
+	_, err := NewSafeWriter(nil, pc.Project.Lock, nil, VendorAlways, defaultCascadingPruneOptions(), nil)
 	if err == nil {
 		t.Fatal("should have errored with only an old lock, but did not")
 	} else if !strings.Contains(err.Error(), "oldLock") {
@@ -97,7 +97,7 @@ func TestSafeWriter_BadInput_NonexistentRoot(t *testing.T) {
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
 
-	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged, defaultCascadingPruneOptions(), nil)
 
 	missingroot := filepath.Join(pc.Project.AbsRoot, "nonexistent")
 	err := sw.Write(missingroot, pc.SourceManager, true, nil)
@@ -115,7 +115,7 @@ func TestSafeWriter_BadInput_RootIsFile(t *testing.T) {
 	pc := NewTestProjectContext(h, safeWriterProject)
 	defer pc.Release()
 
-	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(nil, nil, nil, VendorOnChanged, defaultCascadingPruneOptions(), nil)
 
 	fileroot := pc.CopyFile("fileroot", "txn_writer/badinput_fileroot")
 	err := sw.Write(fileroot, pc.SourceManager, true, nil)
@@ -139,7 +139,7 @@ func TestSafeWriter_Manifest(t *testing.T) {
 	pc.CopyFile(ManifestName, safeWriterGoldenManifest)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(pc.Project.Manifest, nil, nil, VendorOnChanged, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(pc.Project.Manifest, nil, nil, VendorOnChanged, defaultCascadingPruneOptions(), nil)
 
 	// Verify prepared actions
 	if !sw.HasManifest() {
@@ -181,7 +181,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLock(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorOnChanged, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorOnChanged, defaultCascadingPruneOptions(), nil)
 
 	// Verify prepared actions
 	if !sw.HasManifest() {
@@ -226,7 +226,7 @@ func TestSafeWriter_ManifestAndUnmodifiedLockWithForceVendor(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions(), nil)
 
 	// Verify prepared actions
 	if !sw.HasManifest() {
@@ -273,12 +273,12 @@ func TestSafeWriter_ForceVendorWhenVendorAlreadyExists(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(nil, pc.Project.Lock, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(nil, pc.Project.Lock, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions(), nil)
 	err := sw.Write(pc.Project.AbsRoot, pc.SourceManager, true, nil)
 	h.Must(errors.Wrap(err, "SafeWriter.Write failed"))
 
 	// Verify prepared actions
-	sw, _ = NewSafeWriter(nil, nil, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions())
+	sw, _ = NewSafeWriter(nil, nil, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions(), nil)
 	if sw.HasManifest() {
 		t.Fatal("Did not expect the payload to contain the manifest")
 	}
@@ -325,7 +325,7 @@ func TestSafeWriter_NewLock(t *testing.T) {
 	defer lf.Close()
 	newLock, err := readLock(lf)
 	h.Must(err)
-	sw, _ := NewSafeWriter(nil, nil, newLock, VendorOnChanged, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(nil, nil, newLock, VendorOnChanged, defaultCascadingPruneOptions(), nil)
 
 	// Verify prepared actions
 	if sw.HasManifest() {
@@ -372,7 +372,7 @@ func TestSafeWriter_NewLockSkipVendor(t *testing.T) {
 	defer lf.Close()
 	newLock, err := readLock(lf)
 	h.Must(err)
-	sw, _ := NewSafeWriter(nil, nil, newLock, VendorNever, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(nil, nil, newLock, VendorNever, defaultCascadingPruneOptions(), nil)
 
 	// Verify prepared actions
 	if sw.HasManifest() {
@@ -433,7 +433,7 @@ func TestSafeWriter_VendorDotGitPreservedWithForceVendor(t *testing.T) {
 	pc.CopyFile(LockName, safeWriterGoldenLock)
 	pc.Load()
 
-	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions())
+	sw, _ := NewSafeWriter(pc.Project.Manifest, pc.Project.Lock, pc.Project.Lock, VendorAlways, defaultCascadingPruneOptions(), nil)
 
 	// Verify prepared actions
 	if !sw.HasManifest() {
