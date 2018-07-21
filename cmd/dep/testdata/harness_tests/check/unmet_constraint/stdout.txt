@@ -2,4 +2,4 @@
 github.com/sdboyer/deptest@v1.0.0: not allowed by constraint master
 
 # vendor is out of sync:
-vendor/github.com/sdboyer/deptest: missing from vendor
+github.com/sdboyer/deptest: missing from vendor

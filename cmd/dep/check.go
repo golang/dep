@@ -132,28 +132,27 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 
 		for pr, status := range statuses {
-			vpr := filepath.Join("vendor", string(pr))
 			switch status {
 			case verify.NotInTree:
-				logger.Printf("%s: missing from vendor\n", vpr)
+				logger.Printf("%s: missing from vendor\n", pr)
 			case verify.NotInLock:
-				fi, err := os.Stat(filepath.Join(p.AbsRoot, vpr))
+				fi, err := os.Stat(filepath.Join(p.AbsRoot, "vendor", pr))
 				if err != nil {
 					return errors.Wrap(err, "could not stat file that VerifyVendor claimed existed")
 				}
 
 				if fi.IsDir() {
-					logger.Printf("%s: unused project\n", vpr)
+					logger.Printf("%s: unused project\n", pr)
 				} else {
-					logger.Printf("%s: orphaned file\n", vpr)
+					logger.Printf("%s: orphaned file\n", pr)
 				}
 			case verify.DigestMismatchInLock:
-				logger.Printf("%s: hash of vendored tree didn't match digest in Gopkg.lock\n", vpr)
+				logger.Printf("%s: hash of vendored tree didn't match digest in Gopkg.lock\n", pr)
 			case verify.HashVersionMismatch:
 				// This will double-print if the hash version is zero, but
 				// that's a rare case that really only occurs before the first
 				// run with a version of dep >=0.5.0, so it's fine.
-				logger.Printf("%s: hash algorithm mismatch, want version %v\n", vpr, verify.HashVersion)
+				logger.Printf("%s: hash algorithm mismatch, want version %v\n", pr, verify.HashVersion)
 			}
 		}
 	}
