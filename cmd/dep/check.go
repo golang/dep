@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/golang/dep"
@@ -89,7 +90,15 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 				logger.Printf("%s\n", sprintLockUnsat(lsat))
 			}
 			if changed {
-				for pr, lpd := range delta.ProjectDeltas {
+				// Sort, for deterministic output.
+				var ordered []string
+				for pr := range delta.ProjectDeltas {
+					ordered = append(ordered, string(pr))
+				}
+				sort.Strings(ordered)
+
+				for _, pr := range ordered {
+					lpd := delta.ProjectDeltas[gps.ProjectRoot(pr)]
 					// Only two possible changes right now are prune opts
 					// changing or a missing hash digest (for old Gopkg.lock
 					// files)
@@ -122,16 +131,25 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 		if fail {
 			logger.Println()
 		}
-		// One full pass through, to see if we need to print the header.
-		for _, status := range statuses {
+
+		var vendorfail bool
+		// One full pass through, to see if we need to print the header, and to
+		// create an array of names to sort for deterministic output.
+		var ordered []string
+		for path, status := range statuses {
+			ordered = append(ordered, path)
 			if status != verify.NoMismatch {
 				fail = true
-				logger.Println("# vendor is out of sync:")
-				break
+				if !vendorfail {
+					vendorfail = true
+					logger.Println("# vendor is out of sync:")
+				}
 			}
 		}
+		sort.Strings(ordered)
 
-		for pr, status := range statuses {
+		for _, pr := range ordered {
+			status := statuses[pr]
 			switch status {
 			case verify.NotInTree:
 				logger.Printf("%s: missing from vendor\n", pr)
@@ -165,16 +183,33 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 
 func sprintLockUnsat(lsat verify.LockSatisfaction) string {
 	var buf bytes.Buffer
+	sort.Strings(lsat.MissingImports)
 	for _, missing := range lsat.MissingImports {
 		fmt.Fprintf(&buf, "%s: missing from input-imports\n", missing)
 	}
+
+	sort.Strings(lsat.ExcessImports)
 	for _, excess := range lsat.ExcessImports {
 		fmt.Fprintf(&buf, "%s: in input-imports, but not imported\n", excess)
 	}
-	for pr, unmatched := range lsat.UnmetOverrides {
+
+	var ordered []string
+	for pr := range lsat.UnmetOverrides {
+		ordered = append(ordered, string(pr))
+	}
+	sort.Strings(ordered)
+	for _, pr := range ordered {
+		unmatched := lsat.UnmetOverrides[gps.ProjectRoot(pr)]
 		fmt.Fprintf(&buf, "%s@%s: not allowed by override %s\n", pr, unmatched.V, unmatched.C)
 	}
-	for pr, unmatched := range lsat.UnmetConstraints {
+
+	ordered = ordered[:0]
+	for pr := range lsat.UnmetConstraints {
+		ordered = append(ordered, string(pr))
+	}
+	sort.Strings(ordered)
+	for _, pr := range ordered {
+		unmatched := lsat.UnmetConstraints[gps.ProjectRoot(pr)]
 		fmt.Fprintf(&buf, "%s@%s: not allowed by constraint %s\n", pr, unmatched.V, unmatched.C)
 	}
 	return strings.TrimSpace(buf.String())
