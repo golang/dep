@@ -2,7 +2,7 @@
 title: The Solver
 ---
 
-At the heart of dep is a constraint solving engine - a [CDCL]()-style [SMT]() solver, tailored specifically to the domain of Go package management. It lives in the `github.com/golang/dep/gps` package, and is where the work of determining a valid, transitively complete dependency graph (aka, the contents of `Gopkg.lock`) is performed.
+At the heart of dep is a constraint solving engine - a [CDCL](<https://en.wikipedia.org/wiki/Conflict-Driven_Clause_Learning>)-style [SMT]() solver, tailored specifically to the domain of Go package management. It lives in the `github.com/golang/dep/gps` package, and is where the work of determining a valid, transitively complete dependency graph (aka, the contents of `Gopkg.lock`) is performed.
 
 This page will eventually detail the solver's mechanics, but in the meantime, there are [docs for an older version of the solver](https://github.com/sdboyer/gps/wiki/gps-for-Contributors) that are still accurate enough to provide a rough picture of its behavior.
 
