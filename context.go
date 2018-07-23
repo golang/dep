@@ -302,7 +302,7 @@ func (c *Ctx) detectGOPATH(path string) (string, error) {
 			return "", errors.Wrap(err, "failed to detect GOPATH")
 		}
 		if isPrefix {
-			return gp, nil
+			return filepath.Clean(gp), nil
 		}
 	}
 	return "", errors.Errorf("%s is not within a known GOPATH/src", path)

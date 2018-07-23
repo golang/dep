@@ -524,10 +524,14 @@ func TestDetectGOPATH(t *testing.T) {
 	th.TempDir(filepath.Join("code", "src", "github.com", "username", "package"))
 	th.TempDir(filepath.Join("go", "src", "github.com", "username", "package"))
 	th.TempDir(filepath.Join("gotwo", "src", "github.com", "username", "package"))
+	th.TempDir(filepath.Join("gothree", "sep", "src", "github.com", "username", "package"))
+
+	sep := string(os.PathSeparator)
 
 	ctx := &Ctx{GOPATHs: []string{
 		th.Path("go"),
 		th.Path("gotwo"),
+		th.Path("gothree") + sep + sep + "sep",
 	}}
 
 	testcases := []struct {
@@ -538,6 +542,8 @@ func TestDetectGOPATH(t *testing.T) {
 		{th.Path("go"), th.Path(filepath.Join("go", "src", "github.com", "username", "package")), false},
 		{th.Path("go"), th.Path(filepath.Join("go", "src", "github.com", "username", "package")), false},
 		{th.Path("gotwo"), th.Path(filepath.Join("gotwo", "src", "github.com", "username", "package")), false},
+		{th.Path(filepath.Join("gothree", "sep")),
+			th.Path(filepath.Join("gothree", "sep", "src", "github.com", "username", "package")), false},
 		{"", th.Path(filepath.Join("code", "src", "github.com", "username", "package")), true},
 	}
 
@@ -547,7 +553,7 @@ func TestDetectGOPATH(t *testing.T) {
 			t.Error("expected error but got none")
 		}
 		if GOPATH != tc.GOPATH {
-			t.Errorf("expected GOPATH to be %s, got %s", GOPATH, tc.GOPATH)
+			t.Errorf("expected GOPATH to be %s, got %s", tc.GOPATH, GOPATH)
 		}
 	}
 }
