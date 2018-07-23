@@ -30,6 +30,8 @@ the test case directory itself.  In the above example, the test name would be
 `category1/subcategory1/case1`, and could be singled out with the `-run` option
 of `go test` (i.e.
 `go test github.com/golang/dep/cmd/dep -run Integration/category1/subcategory1/case1`).
+`dlv` can also be used when explicitly setting the right directory
+(`dlv test --wd cmd/dep ./cmd/dep -test.run Integration/category1/subcategory1/case1`).
 New tests can be added simply by adding a new directory with the json file to
 the `testdata` tree.  There is no need for code modification - the new test
 will be included automatically.
