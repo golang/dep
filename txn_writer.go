@@ -423,10 +423,11 @@ type DeltaWriter struct {
 type changeType uint8
 
 const (
-	solveChanged changeType = iota + 1
-	hashMismatch
+	hashMismatch changeType = iota + 1
 	hashVersionMismatch
 	hashAbsent
+	noVerify
+	solveChanged
 	pruneOptsChanged
 	missingFromTree
 	projectAdded
@@ -437,10 +438,10 @@ const (
 // directory by writing out only those projects that actually need to be written
 // out - they have changed in some way, or they lack the necessary hash
 // information to be verified.
-func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatus, prune gps.CascadingPruneOptions, vendorDir string, behavior VendorBehavior) (TreeWriter, error) {
-	sw := &DeltaWriter{
+func NewDeltaWriter(p *Project, newLock *Lock, behavior VendorBehavior) (TreeWriter, error) {
+	dw := &DeltaWriter{
 		lock:      newLock,
-		vendorDir: vendorDir,
+		vendorDir: filepath.Join(p.AbsRoot, "vendor"),
 		changed:   make(map[gps.ProjectRoot]changeType),
 		behavior:  behavior,
 	}
@@ -449,27 +450,35 @@ func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatu
 		return nil, errors.New("must provide a non-nil newlock")
 	}
 
-	_, err := os.Stat(vendorDir)
-	if err != nil && os.IsNotExist(err) {
-		// Provided dir does not exist, so there's no disk contents to compare
-		// against. Fall back to the old SafeWriter.
-		return NewSafeWriter(nil, oldLock, newLock, behavior, prune, status)
+	status, err := p.VerifyVendor()
+	if err != nil {
+		return nil, err
 	}
 
-	sw.lockDiff = verify.DiffLocks(oldLock, newLock)
+	_, err = os.Stat(dw.vendorDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Provided dir does not exist, so there's no disk contents to compare
+			// against. Fall back to the old SafeWriter.
+			return NewSafeWriter(nil, p.Lock, newLock, behavior, p.Manifest.PruneOptions, status)
+		}
+		return nil, err
+	}
 
-	for pr, lpd := range sw.lockDiff.ProjectDeltas {
+	dw.lockDiff = verify.DiffLocks(p.Lock, newLock)
+
+	for pr, lpd := range dw.lockDiff.ProjectDeltas {
 		// Hash changes aren't relevant at this point, as they could be empty
 		// in the new lock, and therefore a symptom of a solver change.
 		if lpd.Changed(anyExceptHash) {
 			if lpd.WasAdded() {
-				sw.changed[pr] = projectAdded
+				dw.changed[pr] = projectAdded
 			} else if lpd.WasRemoved() {
-				sw.changed[pr] = projectRemoved
+				dw.changed[pr] = projectRemoved
 			} else if lpd.PruneOptsChanged() {
-				sw.changed[pr] = pruneOptsChanged
+				dw.changed[pr] = pruneOptsChanged
 			} else {
-				sw.changed[pr] = solveChanged
+				dw.changed[pr] = solveChanged
 			}
 		}
 	}
@@ -478,23 +487,44 @@ func NewDeltaWriter(oldLock, newLock *Lock, status map[string]verify.VendorStatu
 		pr := gps.ProjectRoot(spr)
 		// These cases only matter if there was no change already recorded via
 		// the differ.
-		if _, has := sw.changed[pr]; !has {
+		if _, has := dw.changed[pr]; !has {
 			switch stat {
 			case verify.NotInTree:
-				sw.changed[pr] = missingFromTree
+				dw.changed[pr] = missingFromTree
 			case verify.NotInLock:
-				sw.changed[pr] = projectRemoved
+				dw.changed[pr] = projectRemoved
 			case verify.DigestMismatchInLock:
-				sw.changed[pr] = hashMismatch
+				dw.changed[pr] = hashMismatch
 			case verify.HashVersionMismatch:
-				sw.changed[pr] = hashVersionMismatch
+				dw.changed[pr] = hashVersionMismatch
 			case verify.EmptyDigestInLock:
-				sw.changed[pr] = hashAbsent
+				dw.changed[pr] = hashAbsent
 			}
 		}
 	}
 
-	return sw, nil
+	// Apply noverify last, as it should only supersede changeTypes with lower
+	// values. It is NOT applied if no existing change is registered.
+	for _, spr := range p.Manifest.NoVerify {
+		pr := gps.ProjectRoot(spr)
+		// We don't validate this field elsewhere as it can be difficult to know
+		// at the beginning of a dep ensure command whether or not the noverify
+		// project actually will exist as part of the Lock by the end of the
+		// run. So, only apply if it's in the lockdiff, and isn't a removal.
+		if _, has := dw.lockDiff.ProjectDeltas[pr]; has {
+			if typ, has := dw.changed[pr]; has && typ < noVerify {
+				// Avoid writing noverify projects at all for the lower change
+				// types.
+				delete(dw.changed, pr)
+
+				// Uncomment this if we want to switch to the safer behavior,
+				// where we ALWAYS write noverify projects.
+				//dw.changed[pr] = noVerify
+			}
+		}
+	}
+
+	return dw, nil
 }
 
 // Write executes the planned changes.
@@ -659,6 +689,8 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 // possible changeType.
 func changeExplanation(c changeType, lpd verify.LockedProjectDelta) string {
 	switch c {
+	case noVerify:
+		return "verification is disabled"
 	case solveChanged:
 		if lpd.SourceChanged() {
 			return fmt.Sprintf("source changed (%s -> %s)", lpd.SourceBefore, lpd.SourceAfter)
@@ -675,9 +707,8 @@ func changeExplanation(c changeType, lpd verify.LockedProjectDelta) string {
 				return fmt.Sprintf("packages changed (%v added, %v removed)", la, lr)
 			} else if la > 0 {
 				return fmt.Sprintf("packages changed (%v added)", la)
-			} else {
-				return fmt.Sprintf("packages changed (%v removed)", lr)
 			}
+			return fmt.Sprintf("packages changed (%v removed)", lr)
 		}
 	case pruneOptsChanged:
 		// Override what's on the lockdiff with the extra info we have;

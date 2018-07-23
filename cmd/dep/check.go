@@ -132,18 +132,32 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 			logger.Println()
 		}
 
+		noverify := make(map[string]bool)
+		for _, skip := range p.Manifest.NoVerify {
+			noverify[skip] = true
+		}
+
 		var vendorfail bool
 		// One full pass through, to see if we need to print the header, and to
 		// create an array of names to sort for deterministic output.
 		var ordered []string
 		for path, status := range statuses {
 			ordered = append(ordered, path)
-			if status != verify.NoMismatch {
+
+			switch status {
+			case verify.DigestMismatchInLock, verify.HashVersionMismatch, verify.EmptyDigestInLock:
+				// NoVerify applies only to these three cases.
+				if noverify[path] {
+					continue
+				}
+				fallthrough
+			case verify.NotInTree, verify.NotInLock:
 				fail = true
 				if !vendorfail {
 					vendorfail = true
 					logger.Println("# vendor is out of sync:")
 				}
+
 			}
 		}
 		sort.Strings(ordered)
@@ -158,19 +172,26 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 				if err != nil {
 					return errors.Wrap(err, "could not stat file that VerifyVendor claimed existed")
 				}
-
 				if fi.IsDir() {
 					logger.Printf("%s: unused project\n", pr)
 				} else {
 					logger.Printf("%s: orphaned file\n", pr)
 				}
-			case verify.DigestMismatchInLock:
-				logger.Printf("%s: hash of vendored tree didn't match digest in Gopkg.lock\n", pr)
-			case verify.HashVersionMismatch:
-				// This will double-print if the hash version is zero, but
-				// that's a rare case that really only occurs before the first
-				// run with a version of dep >=0.5.0, so it's fine.
-				logger.Printf("%s: hash algorithm mismatch, want version %v\n", pr, verify.HashVersion)
+			case verify.DigestMismatchInLock, verify.HashVersionMismatch, verify.EmptyDigestInLock:
+				// NoVerify applies only to these three cases.
+				if !noverify[pr] {
+					switch status {
+					case verify.DigestMismatchInLock:
+						logger.Printf("%s: hash of vendored tree not equal to digest in Gopkg.lock\n", pr)
+					case verify.EmptyDigestInLock:
+						logger.Printf("%s: no digest in Gopkg.lock to compare against hash of vendored tree\n", pr)
+					case verify.HashVersionMismatch:
+						// This will double-print if the hash version is zero, but
+						// that's a rare case that really only occurs before the first
+						// run with a version of dep >=0.5.0, so it's fine.
+						logger.Printf("%s: hash algorithm mismatch, want version %v\n", pr, verify.HashVersion)
+					}
+				}
 			}
 		}
 	}
@@ -185,12 +206,12 @@ func sprintLockUnsat(lsat verify.LockSatisfaction) string {
 	var buf bytes.Buffer
 	sort.Strings(lsat.MissingImports)
 	for _, missing := range lsat.MissingImports {
-		fmt.Fprintf(&buf, "%s: missing from input-imports\n", missing)
+		fmt.Fprintf(&buf, "%s: imported or required, but missing from Gopkg.lock's input-imports\n", missing)
 	}
 
 	sort.Strings(lsat.ExcessImports)
 	for _, excess := range lsat.ExcessImports {
-		fmt.Fprintf(&buf, "%s: in input-imports, but not imported\n", excess)
+		fmt.Fprintf(&buf, "%s: in Gopkg.lock's input-imports, but neither imported nor required\n", excess)
 	}
 
 	var ordered []string
