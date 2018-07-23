@@ -1,4 +1,4 @@
 # Gopkg.lock is out of sync:
-github.com/sdboyer/deptestdos: missing from input-imports
-github.com/sdboyer/deptest: in input-imports, but not imported
+github.com/sdboyer/deptestdos: imported or required, but missing from Gopkg.lock's input-imports
+github.com/sdboyer/deptest: in Gopkg.lock's input-imports, but neither imported nor required
 
