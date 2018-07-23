@@ -44,7 +44,12 @@ func TestIntegration(t *testing.T) {
 		parse := strings.Split(path, string(filepath.Separator))
 		testName := strings.Join(parse[2:len(parse)-1], "/")
 		t.Run(testName, func(t *testing.T) {
-			t.Parallel()
+			// When updating test case files we can't run in parallel, because then
+			// we would have a race condition (each test case is used twice, once
+			// for "internal" and again for "external").
+			if !*test.UpdateGolden {
+				t.Parallel()
+			}
 
 			t.Run("external", testIntegration(testName, relPath, wd, execCmd))
 			t.Run("internal", testIntegration(testName, relPath, wd, runMain))
