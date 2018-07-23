@@ -65,6 +65,11 @@ func (tc *TestCase) InitialPath() string {
 	return tc.initialPath
 }
 
+// FinalPath represents the final set of files in a project.
+func (tc *TestCase) FinalPath() string {
+	return tc.finalPath
+}
+
 // UpdateFile updates the golden file with the working result.
 func (tc *TestCase) UpdateFile(goldenPath, workingPath string) {
 	exists, working, err := getFile(workingPath)

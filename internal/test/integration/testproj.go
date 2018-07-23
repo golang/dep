@@ -187,7 +187,7 @@ func (p *TestProject) GetVendorGit(ip string) {
 // DoRun executes the integration test command against the test project.
 func (p *TestProject) DoRun(args []string) error {
 	if *test.PrintLogs {
-		p.t.Logf("running testdep %v", args)
+		p.t.Logf("running testdep %v in %s", args, p.ProjPath(""))
 	}
 	prog := filepath.Join(p.origWd, "testdep"+test.ExeSuffix)
 

@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/test"
 	"github.com/golang/dep/internal/test/integration"
 )
@@ -215,18 +216,66 @@ func testIntegration(name, relPath, wd string, run integration.RunFunc) func(t *
 			testCase.CompareOutput(testProj.GetStdout())
 		}
 
+		// Determine how the test case specifies the expected
+		// content: either it lists just some projects, or it
+		// provides a complete reference directory.
+		reference := len(testCase.VendorFinal) == 1 && testCase.VendorFinal[0] == "compare"
+
 		// Check vendor paths
 		testProj.CompareImportPaths()
-		testCase.CompareVendorPaths(testProj.GetVendorPaths())
+		if !reference {
+			testCase.CompareVendorPaths(testProj.GetVendorPaths())
+		}
 
-		if *test.UpdateGolden {
-			// Update manifest and lock
-			testCase.UpdateFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
-			testCase.UpdateFile(dep.LockName, testProj.ProjPath(dep.LockName))
+		if reference {
+			// Check all files.
+			if *test.UpdateGolden {
+				// Update all files in the 'final' directory, removing those which
+				// no longer should exist.
+				if err := os.RemoveAll(testCase.FinalPath()); err != nil {
+					t.Fatalf("error removing 'final' directory: %s", err)
+				}
+				if err := fs.CopyDir(testProj.ProjPath(), testCase.FinalPath()); err != nil {
+					t.Fatalf("error copying into 'final' directory: %s", err)
+				}
+			} else {
+				// Compare all files from either of the two trees.
+				files := make(map[string]bool)
+				findFiles := func(dir string) error {
+					return filepath.Walk(dir,
+						func(path string, info os.FileInfo, err error) error {
+							if err != nil {
+								return err
+							}
+							if dir == path {
+								return nil
+							}
+							if !info.IsDir() {
+								localpath := path[len(dir)+1:]
+								files[localpath] = true
+							}
+							return nil
+						})
+				}
+				findFiles(testCase.FinalPath())
+				findFiles(testProj.ProjPath())
+
+				t.Logf("checking against %s", testCase.FinalPath())
+				for localpath := range files {
+					t.Logf("comparing %s", localpath)
+					testCase.CompareFile(localpath, testProj.ProjPath(localpath))
+				}
+			}
 		} else {
-			// Check final manifest and lock
-			testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
-			testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
+			if *test.UpdateGolden {
+				// Update manifest and lock
+				testCase.UpdateFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
+				testCase.UpdateFile(dep.LockName, testProj.ProjPath(dep.LockName))
+			} else {
+				// Check final manifest and lock
+				testCase.CompareFile(dep.ManifestName, testProj.ProjPath(dep.ManifestName))
+				testCase.CompareFile(dep.LockName, testProj.ProjPath(dep.LockName))
+			}
 		}
 	}
 }
