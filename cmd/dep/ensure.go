@@ -285,11 +285,7 @@ func (cmd *ensureCommand) runDefault(ctx *dep.Ctx, args []string, p *dep.Project
 		lock = dep.LockFromSolution(solution, p.Manifest.PruneOptions)
 	}
 
-	status, err := p.VerifyVendor()
-	if err != nil {
-		return errors.Wrap(err, "error while verifying vendor directory")
-	}
-	dw, err := dep.NewDeltaWriter(p.Lock, lock, status, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
+	dw, err := dep.NewDeltaWriter(p, lock, cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
@@ -365,11 +361,7 @@ func (cmd *ensureCommand) runUpdate(ctx *dep.Ctx, args []string, p *dep.Project,
 		return handleAllTheFailuresOfTheWorld(err)
 	}
 
-	status, err := p.VerifyVendor()
-	if err != nil {
-		return errors.Wrap(err, "error while verifying vendor directory")
-	}
-	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), status, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
+	dw, err := dep.NewDeltaWriter(p, dep.LockFromSolution(solution, p.Manifest.PruneOptions), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}
@@ -410,11 +402,6 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 			exmap[imp] = true
 		}
 	}
-
-	//exrmap, err := p.GetDirectDependencyNames(sm)
-	//if err != nil {
-	//return err
-	//}
 
 	// Note: these flags are only partially used by the latter parts of the
 	// algorithm; rather, it relies on inference. However, they remain in their
@@ -643,11 +630,7 @@ func (cmd *ensureCommand) runAdd(ctx *dep.Ctx, args []string, p *dep.Project, sm
 	}
 	sort.Strings(reqlist)
 
-	status, err := p.VerifyVendor()
-	if err != nil {
-		return errors.Wrap(err, "error while verifying vendor directory")
-	}
-	dw, err := dep.NewDeltaWriter(p.Lock, dep.LockFromSolution(solution, p.Manifest.PruneOptions), status, p.Manifest.PruneOptions, filepath.Join(p.AbsRoot, "vendor"), cmd.vendorBehavior())
+	dw, err := dep.NewDeltaWriter(p, dep.LockFromSolution(solution, p.Manifest.PruneOptions), cmd.vendorBehavior())
 	if err != nil {
 		return err
 	}

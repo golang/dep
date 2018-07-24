@@ -1,0 +1,5 @@
+# Gopkg.lock is out of sync:
+github.com/sdboyer/deptest@v1.0.0: not allowed by constraint master
+
+# vendor is out of sync:
+github.com/sdboyer/deptest: missing from vendor

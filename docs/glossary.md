@@ -26,6 +26,7 @@ dep uses some specialized terminology. Learn about it here!
 * [Source Root](#source-root)
 * [Sync](#sync)
 * [Transitive Dependency](#transitive-dependency)
+* [Vendor Verification](#vendor-verification)
 
 ---
 
@@ -144,3 +145,9 @@ This concept is explored in detail in [ensure mechanics](ensure-mechanics.md#sta
 A project's transitive dependencies are those dependencies that it does not import itself, but are imported by one of its dependencies.
 
 If each letter in `A -> B -> C -> D` represents a distinct project containing only a single package, and `->` indicates an import statement, then `C` and `D` are `A`'s transitive dependencies, whereas `B` is a [direct dependency](#transitive-dependency) of `A`.
+
+### Vendor Verification
+
+Dep guarantees that `vendor/` contains exactly the expected code by hashing the contents of each project and storing the resulting [digest in Gopkg.lock](Gopkg.lock.md#digest). This digest is computed _after_ pruning rules are applied.
+
+The digest is used to determine if the contents of `vendor/` need to be regenerated during a `dep ensure` run, and `dep check` uses it to determine whether `Gopkg.lock` and `vendor/` are in [sync](#sync). The [`noverify`](Gopkg.toml.md#noverify) list in `Gopkg.toml` can be used to bypass most of these verification behaviors.

@@ -1,0 +1,1 @@
+github.com/sdboyer/deptest: hash algorithm mismatch, want version 1  (CHECK IGNORED: marked noverify in Gopkg.toml)

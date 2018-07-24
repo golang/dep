@@ -195,7 +195,12 @@ func testIntegration(name, relPath, wd string, run integration.RunFunc) func(t *
 			}
 		}
 
+		if err != nil {
+			t.Log(err)
+		}
+
 		// Check error raised in final command
+		testCase.CompareCmdFailure(err != nil)
 		testCase.CompareError(err, testProj.GetStderr())
 
 		if *test.UpdateGolden {

@@ -1,0 +1,5 @@
+noverify = ["github.com/sdboyer/deptest"]
+
+[[override]]
+  name = "github.com/sdboyer/deptest"
+  branch = "master"

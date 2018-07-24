@@ -28,6 +28,7 @@ var (
 	errInvalidOverride     = errors.Errorf("%q must be a TOML array of tables", "override")
 	errInvalidRequired     = errors.Errorf("%q must be a TOML list of strings", "required")
 	errInvalidIgnored      = errors.Errorf("%q must be a TOML list of strings", "ignored")
+	errInvalidNoVerify     = errors.Errorf("%q must be a TOML list of strings", "noverify")
 	errInvalidPrune        = errors.Errorf("%q must be a TOML table of booleans", "prune")
 	errInvalidPruneProject = errors.Errorf("%q must be a TOML array of tables", "prune.project")
 	errInvalidMetadata     = errors.New("metadata should be a TOML table")
@@ -51,6 +52,8 @@ type Manifest struct {
 	Ignored  []string
 	Required []string
 
+	NoVerify []string
+
 	PruneOptions gps.CascadingPruneOptions
 }
 
@@ -59,6 +62,7 @@ type rawManifest struct {
 	Overrides    []rawProject    `toml:"override,omitempty"`
 	Ignored      []string        `toml:"ignored,omitempty"`
 	Required     []string        `toml:"required,omitempty"`
+	NoVerify     []string        `toml:"noverify,omitempty"`
 	PruneOptions rawPruneOptions `toml:"prune,omitempty"`
 }
 
@@ -85,7 +89,7 @@ const (
 	pruneOptionNonGo          = "non-go"
 )
 
-// Constants to represents per-project prune uint8 values.
+// Constants representing per-project prune uint8 values.
 const (
 	pvnone  uint8 = 0 // No per-project prune value was set in Gopkg.toml.
 	pvtrue  uint8 = 1 // Per-project prune value was explicitly set to true.
@@ -182,7 +186,7 @@ func validateManifest(s string) ([]error, error) {
 					return warns, errInvalidOverride
 				}
 			}
-		case "ignored", "required":
+		case "ignored", "required", "noverify":
 			valid := true
 			if rawList, ok := val.([]interface{}); ok {
 				// Check element type of the array. TOML doesn't let mixing of types in
@@ -200,6 +204,9 @@ func validateManifest(s string) ([]error, error) {
 				}
 				if prop == "required" {
 					return warns, errInvalidRequired
+				}
+				if prop == "noverify" {
+					return warns, errInvalidNoVerify
 				}
 			}
 		case "prune":
@@ -368,6 +375,7 @@ func fromRawManifest(raw rawManifest, buf *bytes.Buffer) (*Manifest, error) {
 	m.Ovr = make(gps.ProjectConstraints, len(raw.Overrides))
 	m.Ignored = raw.Ignored
 	m.Required = raw.Required
+	m.NoVerify = raw.NoVerify
 
 	for i := 0; i < len(raw.Constraints); i++ {
 		name, prj, err := toProject(raw.Constraints[i])
@@ -532,6 +540,7 @@ func (m *Manifest) toRaw() rawManifest {
 		Overrides:   make([]rawProject, 0, len(m.Ovr)),
 		Ignored:     m.Ignored,
 		Required:    m.Required,
+		NoVerify:    m.NoVerify,
 	}
 
 	for n, prj := range m.Constraints {

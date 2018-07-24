@@ -2,7 +2,7 @@
   "commands": [
     ["check"]
   ],
-  "exit-code": 1,
+  "should-fail": true,
   "vendor-final": [
     "github.com/sdboyer/deptest"
   ]
