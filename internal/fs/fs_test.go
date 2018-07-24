@@ -685,7 +685,6 @@ func TestCopyFileSymlink(t *testing.T) {
 	testcases := map[string]string{
 		filepath.Join("./testdata/symlinks/file-symlink"):         filepath.Join(h.Path("."), "dst-file"),
 		filepath.Join("./testdata/symlinks/windows-file-symlink"): filepath.Join(h.Path("."), "windows-dst-file"),
-		filepath.Join("./testdata/symlinks/dir-symlink"):          filepath.Join(h.Path("."), "dst-dir"),
 		filepath.Join("./testdata/symlinks/invalid-symlink"):      filepath.Join(h.Path("."), "invalid-symlink"),
 	}
 
