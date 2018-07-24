@@ -30,10 +30,11 @@ import (
 const availableTemplateVariables = "ProjectRoot, Constraint, Version, Revision, Latest, and PackageCount."
 const availableDefaultTemplateVariables = `.Projects[]{
 	    .ProjectRoot,.Source,.Constraint,.PackageCount,.Packages[],
-	    .Locked{.Branch,.Revision,.Version},.Latest{.Revision,.Version}
+		.PruneOpts,.Digest,.Locked{.Branch,.Revision,.Version},
+		.Latest{.Revision,.Version}
 	},
 	.Metadata{
-	    .AnalyzerName,.AnalyzerVersion,.InputsDigest,.SolverName,
+	    .AnalyzerName,.AnalyzerVersion,.InputImports,.SolverName,
 	    .SolverVersion
 	}`
 
@@ -405,6 +406,8 @@ func (out *templateOutput) DetailLine(ds *DetailStatus) error {
 		Constraint:   ds.getConsolidatedConstraint(),
 		Locked:       formatDetailVersion(ds.Version, ds.Revision),
 		Latest:       formatDetailLatestVersion(ds.Latest, ds.hasError),
+		PruneOpts:    ds.getPruneOpts(),
+		Digest:       ds.Digest.String(),
 		PackageCount: ds.PackageCount,
 		Source:       ds.Source,
 		Packages:     ds.Packages,
@@ -757,6 +760,8 @@ type rawDetailProject struct {
 	Packages     []string
 	Locked       rawDetailVersion
 	Latest       rawDetailVersion
+	PruneOpts    string
+	Digest       string
 	Source       string `json:"Source,omitempty"`
 	Constraint   string
 	PackageCount int
@@ -765,7 +770,8 @@ type rawDetailProject struct {
 type rawDetailMetadata struct {
 	AnalyzerName    string
 	AnalyzerVersion int
-	InputsDigest    string
+	InputsDigest    string // deprecated
+	InputImports    []string
 	SolverName      string
 	SolverVersion   int
 }
@@ -778,6 +784,7 @@ func newRawMetadata(metadata *dep.SolveMeta) rawDetailMetadata {
 	return rawDetailMetadata{
 		AnalyzerName:    metadata.AnalyzerName,
 		AnalyzerVersion: metadata.AnalyzerVersion,
+		InputImports:    metadata.InputImports,
 		SolverName:      metadata.SolverName,
 		SolverVersion:   metadata.SolverVersion,
 	}
@@ -802,8 +809,10 @@ type BasicStatus struct {
 // information included about a a project in a lock file.
 type DetailStatus struct {
 	BasicStatus
-	Packages []string
-	Source   string
+	Packages  []string
+	Source    string
+	PruneOpts gps.PruneOptions
+	Digest    verify.VersionedDigest
 }
 
 func (bs *BasicStatus) getConsolidatedConstraint() string {
@@ -849,6 +858,10 @@ func (bs *BasicStatus) getConsolidatedLatest(revSize uint8) string {
 	return latest
 }
 
+func (ds *DetailStatus) getPruneOpts() string {
+	return (ds.PruneOpts & ^gps.PruneNestedVendorDirs).String()
+}
+
 func (bs *BasicStatus) marshalJSON() *rawStatus {
 	return &rawStatus{
 		ProjectRoot:  bs.ProjectRoot,
@@ -868,6 +881,8 @@ func (ds *DetailStatus) marshalJSON() *rawDetailProject {
 		Constraint:   rawStatus.Constraint,
 		Locked:       formatDetailVersion(ds.Version, ds.Revision),
 		Latest:       formatDetailLatestVersion(ds.Latest, ds.hasError),
+		PruneOpts:    ds.getPruneOpts(),
+		Digest:       ds.Digest.String(),
 		Source:       ds.Source,
 		Packages:     ds.Packages,
 		PackageCount: ds.PackageCount,
@@ -926,9 +941,10 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 
 	lsat := verify.LockSatisfiesInputs(p.Lock, p.Manifest, params.RootPackageTree)
 	if lsat.Satisfied() {
-		// If these are equal, we're guaranteed that the lock is a transitively
-		// complete picture of all deps. That eliminates the need for at least
-		// some checks.
+		// If the lock satisfies the inputs, we're guaranteed (barring manual
+		// meddling, about which we can do nothing) that the lock is a
+		// transitively complete picture of all deps. That eliminates the need
+		// for some checks.
 
 		logger.Println("Checking upstream projects:")
 
@@ -945,7 +961,7 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 			wg.Add(1)
 			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
 
-			go func(proj gps.LockedProject) {
+			go func(proj verify.VerifiableProject) {
 				bs := BasicStatus{
 					ProjectRoot:  string(proj.Ident().ProjectRoot),
 					PackageCount: len(proj.Packages()),
@@ -1043,12 +1059,14 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 				if cmd.detail {
 					ds.Source = proj.Ident().Source
 					ds.Packages = proj.Packages()
+					ds.PruneOpts = proj.PruneOpts
+					ds.Digest = proj.Digest
 				}
 
 				dsCh <- &ds
 
 				wg.Done()
-			}(proj)
+			}(proj.(verify.VerifiableProject))
 		}
 
 		wg.Wait()
@@ -1118,12 +1136,6 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 		return false, errCount, err
 	}
 
-	// Hash digest mismatch may indicate that some deps are no longer
-	// needed, some are missing, or that some constraints or source
-	// locations have changed.
-	//
-	// It's possible for digests to not match, but still have a correct
-	// lock.
 	rm, _ := ptree.ToReachMap(true, true, false, p.Manifest.IgnoredPackages())
 
 	external := rm.FlattenFn(paths.IsStandardImportPath)
@@ -1406,28 +1418,75 @@ func parseStatusTemplate(format string) (*template.Template, error) {
 		"dec": func(i int) int {
 			return i - 1
 		},
+		"tomlStrSplit": tomlStrSplit,
+		"tomlStrSplit2": func(strlist []string, level int) string {
+			// Hardcode to two spaces.
+			inbracket, inp := strings.Repeat("  ", level), strings.Repeat("  ", level+1)
+			switch len(strlist) {
+			case 0:
+				return "[]"
+			case 1:
+				return fmt.Sprintf("[\"%s\"]", strlist[0])
+			default:
+				var buf bytes.Buffer
+
+				fmt.Fprintf(&buf, "[\n")
+				for _, str := range strlist {
+					fmt.Fprintf(&buf, "%s\"%s\",\n", inp, str)
+				}
+				fmt.Fprintf(&buf, "%s]", inbracket)
+
+				return buf.String()
+			}
+		},
 	}).Parse(format)
 
 	return tmpl, err
 }
 
+func tomlStrSplit(strlist []string) string {
+	switch len(strlist) {
+	case 0:
+		return "[]"
+	case 1:
+		return fmt.Sprintf("[\"%s\"]", strlist[0])
+	default:
+		var buf bytes.Buffer
+
+		// Hardcode to two spaces.
+		fmt.Fprintf(&buf, "[\n")
+		for _, str := range strlist {
+			fmt.Fprintf(&buf, "    \"%s\",\n", str)
+		}
+		fmt.Fprintf(&buf, "  ]")
+
+		return buf.String()
+	}
+}
+
 const statusLockTemplate = `# This file is autogenerated, do not edit; changes may be undone by the next 'dep ensure'.
 
 
-{{range $p := .Projects}}[[projects]]{{if $p.Locked.Branch}}
-  branch = "{{$p.Locked.Branch}}"{{end}}
+{{range $p := .Projects}}[[projects]]
+  {{- if $p.Locked.Branch}}
+  branch = "{{$p.Locked.Branch}}"
+  {{- end}}
+  digest = "{{$p.Digest}}"
   name = "{{$p.ProjectRoot}}"
-  packages = [{{if eq 0 (len $p.Packages)}}"."]{{else}}{{range $i, $pkg := $p.Packages}}
-    "{{$pkg}}"{{if lt $i (dec (len $p.Packages))}},{{end}}{{end}}
-  ]{{end}}
-  revision = "{{$p.Locked.Revision}}"{{if $p.Source}}
-  source = "{{$p.Source}}"{{end}}{{if $p.Locked.Version}}
-  version = "{{$p.Locked.Version}}"{{end}}
+  packages = {{(tomlStrSplit $p.Packages)}}
+  pruneopts = "{{$p.PruneOpts}}"
+  revision = "{{$p.Locked.Revision}}"
+  {{- if $p.Source}}
+  source = "{{$p.Source}}"
+  {{- end}}
+  {{- if $p.Locked.Version}}
+  version = "{{$p.Locked.Version}}"
+  {{- end}}
 
 {{end}}[solve-meta]
   analyzer-name = "{{.Metadata.AnalyzerName}}"
   analyzer-version = {{.Metadata.AnalyzerVersion}}
-  inputs-digest = "{{.Metadata.InputsDigest}}"
+  input-imports = {{(tomlStrSplit .Metadata.InputImports)}}
   solver-name = "{{.Metadata.SolverName}}"
   solver-version = {{.Metadata.SolverVersion}}
 `
