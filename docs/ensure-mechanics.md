@@ -67,7 +67,7 @@ Specifically, dep defines a number of invariants that must be met:
 
 If peeking ahead reveals that the sync invariants are already met, then the corresponding function needn't do any work; if they don't, then dep takes the resolution step. Either way, when `dep ensure` finishes, we can be sure that we're in the "known good state" of where all sync invariants are maintained.
 
-`dep check` will evaluate all of the above relations, and if any invariants do not hold, it will print a description of the desync and exit 1.
+`dep check` will evaluate all of the above relations, and if any invariants do not hold, it will print a description of the desync and exit 1. This behavior can be disabled on a per-project basis using the [`noverify` field in Gopkg.toml](Gopkg.toml.md#noverify).
 
 ## `dep ensure` flags and behavior variations
 

@@ -16,11 +16,17 @@ Environment variables are passed through to subcommands, and therefore can be us
 
 ### `DEPCACHEAGE`
 
-If set to a [duration](https://golang.org/pkg/time/#ParseDuration) (e.g. `24h`), it will enable caching of metadata from source repositories: lists of published versions, the contents of a project's `Gopkg.toml` file at a particular version, sets of packages and imports at a particular version.
+If set to a [duration](https://golang.org/pkg/time/#ParseDuration) (e.g. `24h`), it will enable caching of metadata from source repositories: 
 
-A duration must be set to enable caching (in future versions of dep, it will be on by default), but it is only used for mutable information, like version lists. Information associated with an immutable VCS revision (packages and imports; `Gopkg.toml` declarations) is cached indefinitely.
+* Lists of published versions
+* The contents of a project's `Gopkg.toml` file, at a particular version
+* A project's tree of packages and imports, at a particular version
 
-The cache lives in `$DEPCACHEDIR/bolt-v1.db`, where the version number is an internal number indicating associated with a particular data schema dep uses. The file can be removed safely; the database will be rebuilt as needed.
+A duration must be set to enable caching. (In future versions of dep, it will be on by default). The duration is used as a TTL, but only for mutable information, like version lists. Information associated with an immutable VCS revision (packages and imports; `Gopkg.toml` declarations) is cached indefinitely.
+
+The cache lives in `$DEPCACHEDIR/bolt-v1.db`, where the version number is an internal number associated with a particular data schema dep uses.
+
+The file can be removed safely; the database will be automatically rebuilt as needed.
 
 ### `DEPCACHEDIR`
 
