@@ -10,6 +10,7 @@
 <li><em>Package graph rules:</em> <a href="#required"><code>required</code></a> and <a href="#ignored"><code>ignored</code></a> allow the user to manipulate the import graph by including or excluding import paths, respectively.</li>
 <li><a href="#metadata"><code>metadata</code></a> are a user-defined maps of key-value pairs that dep will ignore. They provide a data sidecar for tools building on top of dep.</li>
 <li><a href="#prune"><code>prune</code></a> settings determine what files and directories can be deemed unnecessary, and thus automatically removed from <code>vendor/</code>.</li>
+<li><a href="#noverify"><code>noverify</code></a> is a list of project roots for which <a href="/dep/docs/glossary.html#vendor-verification">vendor verification</a> is skipped.</li>
 </ul>
 <p>Note that because TOML does not adhere to a tree structure, the <code>required</code> and <code>ignored</code> fields must be declared before any <code>[[constraint]]</code> or <code>[[override]]</code>.</p>
 <p>There is a full <a href="#example">example</a> <code>Gopkg.toml</code> file at the bottom of this document. <code>dep init</code> will also, by default, generate a <code>Gopkg.toml</code> containing some example values, for guidance.</p>
@@ -157,6 +158,18 @@ go install .
   go-tests = true
 </code></pre>
 <p>It is usually safe to set <code>non-go = true</code>, as well. However, as dep only has a clear model for the role played by Go files, and non-Go files necessarily fall outside that model, there can be no comparable general definition of safety.</p>
+<h2><a class="anchor" aria-hidden="true" name="noverify"></a><a href="#noverify" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a><code>noverify</code></h2>
+<p>The <code>noverify</code> field is a list of <a href="/dep/docs/glossary.html#project-root">project roots</a> to exclude from <a href="/dep/docs/glossary.html#vendor-verification">vendor verification</a>.</p>
+<p>Dep uses per-project hash digests, computed after pruning and recorded in <a href="/dep/docs/Gopkg.lock.html#digest">Gopkg.lock</a>, to determine if the contents of <code>vendor/</code> are as expected. If the recorded digest and the hash of the corresponding tree in <code>vendor/</code> differ, that project is considered to be out of sync:</p>
+<ul>
+<li><code>dep ensure</code> will regenerate it</li>
+<li><code>dep check</code> will complain of a hash mismatch and exit 1</li>
+</ul>
+<p>It is strongly preferable for almost all workflows that you leave <code>vendor/</code> unmodified, in whatever state dep puts it in. However, this isn't always an option. If you have no choice but to modify <code>vendor/</code> for a particular project, then add the project root for that project to <code>noverify</code>. This will have the following effects:</p>
+<ul>
+<li><code>dep ensure</code> will ignore hash mismatches for the project, and only regenerate it in <code>vendor/</code> if absolutely necessary (prune options change, package list changes, version changes)</li>
+<li><code>dep check</code> will continue to report hash mismatches (albeit with an annotation about <code>noverify</code>) for the project, but will no longer exit 1.</li>
+</ul>
 <h2><a class="anchor" aria-hidden="true" name="scope"></a><a href="#scope" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Scope</h2>
 <p><code>dep</code> evaluates</p>
 <ul>
@@ -164,10 +177,7 @@ go install .
 <li><code>required</code></li>
 <li><code>ignored</code></li>
 </ul>
-<p>only in the root project, i.e. the project where <code>dep</code> runs. For example,</p>
-<p>You have a project: <code>github.com/urname/goproject</code>.</p>
-<p><code>github.com/foo/bar</code> is a dependency for your project.</p>
-<p>Here <code>dep</code> evaluates the <code>Gopkg.toml</code> files of these packages as follows.</p>
+<p>only in the root project, i.e. the project where <code>dep</code> runs. For example, if you have a project: <code>github.com/urname/goproject</code>, and <code>github.com/foo/bar</code> is a dependency for your project, then dep will evaluate the <code>Gopkg.toml</code> files of these projects as follows:</p>
 <table>
 <thead>
 <tr><th>github.com/urname/goproject</th><th>github.com/foo/bar</th></tr>
@@ -179,8 +189,8 @@ go install .
 <tr><td>ignored ✔</td><td>ignored ✖</td></tr>
 </tbody>
 </table>
-<p>️✔ : Evaluated
-✖ ️: Not evaluated</p>
+<p>✔ : Evaluated
+✖ : Not evaluated</p>
 <h1><a class="anchor" aria-hidden="true" name="example"></a><a href="#example" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Example</h1>
 <p>A sample <code>Gopkg.toml</code> with most elements present:</p>
 <pre><code class="hljs css toml">required = ["github.com/user/thing/cmd/thing"]
@@ -189,6 +199,8 @@ ignored = [
   "github.com/user/project/pkgX",
   "bitbucket.org/user/project/pkgA/pkgY"
 ]
+
+noverify = ["github.com/something/odd"]
 
 [metadata]
 codename = "foo"

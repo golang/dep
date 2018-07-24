@@ -6,12 +6,23 @@
           };
         </script></nav></div><div class="container mainContainer"><div class="wrapper"><div class="post"><header class="postHeader"><a class="edit-page-link button" href="https://github.com/golang/dep/edit/master/docs/env-vars.md" target="_blank">Edit</a><h1>Environment Variables</h1></header><article><div><span><p>dep's behavior can be modified by some environment variables:</p>
 <ul>
+<li><a href="#depcacheage"><code>DEPCACHEAGE</code></a></li>
 <li><a href="#depcachedir"><code>DEPCACHEDIR</code></a></li>
 <li><a href="#depprojectroot"><code>DEPPROJECTROOT</code></a></li>
 <li><a href="#depnolock"><code>DEPNOLOCK</code></a></li>
 </ul>
 <p>Environment variables are passed through to subcommands, and therefore can be used to affect vcs (e.g. <code>git</code>) behavior.</p>
 <hr>
+<h3><a class="anchor" aria-hidden="true" name="depcacheage"></a><a href="#depcacheage" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a><code>DEPCACHEAGE</code></h3>
+<p>If set to a <a href="https://golang.org/pkg/time/#ParseDuration">duration</a> (e.g. <code>24h</code>), it will enable caching of metadata from source repositories:</p>
+<ul>
+<li>Lists of published versions</li>
+<li>The contents of a project's <code>Gopkg.toml</code> file, at a particular version</li>
+<li>A project's tree of packages and imports, at a particular version</li>
+</ul>
+<p>A duration must be set to enable caching. (In future versions of dep, it will be on by default). The duration is used as a TTL, but only for mutable information, like version lists. Information associated with an immutable VCS revision (packages and imports; <code>Gopkg.toml</code> declarations) is cached indefinitely.</p>
+<p>The cache lives in <code>$DEPCACHEDIR/bolt-v1.db</code>, where the version number is an internal number associated with a particular data schema dep uses.</p>
+<p>The file can be removed safely; the database will be automatically rebuilt as needed.</p>
 <h3><a class="anchor" aria-hidden="true" name="depcachedir"></a><a href="#depcachedir" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a><code>DEPCACHEDIR</code></h3>
 <p>Allows the user to specify a custom directory for dep's <a href="/dep/docs/glossary.html#local-cache">local cache</a> of pristine VCS source repositories. Defaults to <code>$GOPATH/pkg/dep</code>.</p>
 <h3><a class="anchor" aria-hidden="true" name="depprojectroot"></a><a href="#depprojectroot" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a><code>DEPPROJECTROOT</code></h3>
