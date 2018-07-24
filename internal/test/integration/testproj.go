@@ -37,7 +37,6 @@ type TestProject struct {
 	origWd     string
 	stdout     bytes.Buffer
 	stderr     bytes.Buffer
-	failed     bool
 	run        RunFunc
 }
 
@@ -160,12 +159,6 @@ func (p *TestProject) GetStdout() string {
 // GetStderr gets the Stderr output from test run.
 func (p *TestProject) GetStderr() string {
 	return p.stderr.String()
-}
-
-// Indicates if the command specified in the test run failed, whether or not
-// there was error output.
-func (p *TestProject) Failed() bool {
-	return p.failed
 }
 
 // GetVendorGit populates the initial vendor directory for a test project.

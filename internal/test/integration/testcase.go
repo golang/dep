@@ -174,6 +174,8 @@ func (tc *TestCase) CompareError(err error, stderr string) {
 	}
 }
 
+// CompareCmdFailure checks to see if the failure/success (in the sense of an
+// exit code) was as expected by the test fixture.
 func (tc *TestCase) CompareCmdFailure(gotFail bool) {
 	if gotFail == tc.ShouldFail {
 		return
