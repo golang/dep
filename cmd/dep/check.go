@@ -33,6 +33,10 @@ can be disabled with -skip-lock and -skip-vendor, respectively.
 
 (See https://golang.github.io/dep/docs/ensure-mechanics.html#staying-in-sync for
 more information on what it means to be "in sync.")
+
+If your workflow necessitates that you modify the contents of vendor, you can
+force check to ignore hash mismatches on a per-project basis by naming
+project roots in Gopkg.toml's "noverify" list.
 `
 
 type checkCommand struct {
@@ -163,6 +167,11 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 		sort.Strings(ordered)
 
 		for _, pr := range ordered {
+			var nvSuffix string
+			if noverify[pr] {
+				nvSuffix = "  (CHECK IGNORED: marked noverify in Gopkg.toml)"
+			}
+
 			status := statuses[pr]
 			switch status {
 			case verify.NotInTree:
@@ -177,21 +186,15 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 				} else {
 					logger.Printf("%s: orphaned file\n", pr)
 				}
-			case verify.DigestMismatchInLock, verify.HashVersionMismatch, verify.EmptyDigestInLock:
-				// NoVerify applies only to these three cases.
-				if !noverify[pr] {
-					switch status {
-					case verify.DigestMismatchInLock:
-						logger.Printf("%s: hash of vendored tree not equal to digest in Gopkg.lock\n", pr)
-					case verify.EmptyDigestInLock:
-						logger.Printf("%s: no digest in Gopkg.lock to compare against hash of vendored tree\n", pr)
-					case verify.HashVersionMismatch:
-						// This will double-print if the hash version is zero, but
-						// that's a rare case that really only occurs before the first
-						// run with a version of dep >=0.5.0, so it's fine.
-						logger.Printf("%s: hash algorithm mismatch, want version %v\n", pr, verify.HashVersion)
-					}
-				}
+			case verify.DigestMismatchInLock:
+				logger.Printf("%s: hash of vendored tree not equal to digest in Gopkg.lock%s\n", pr, nvSuffix)
+			case verify.EmptyDigestInLock:
+				logger.Printf("%s: no digest in Gopkg.lock to compare against hash of vendored tree%s\n", pr, nvSuffix)
+			case verify.HashVersionMismatch:
+				// This will double-print if the hash version is zero, but
+				// that's a rare case that really only occurs before the first
+				// run with a version of dep >=0.5.0, so it's fine.
+				logger.Printf("%s: hash algorithm mismatch, want version %v%s\n", pr, verify.HashVersion, nvSuffix)
 			}
 		}
 	}
