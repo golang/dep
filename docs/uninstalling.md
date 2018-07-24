@@ -8,7 +8,7 @@ To uninstall `dep` itself, follow these instructions, depending on how you insta
 
 ### If you installed `dep` by executing the `install.sh` script via curl
 
-If you installed `dep` by `curl`'ing the `install.sh` script, it is safe to simply delete the installed binary file.
+If you installed `dep` using the `install.sh` script, it is safe to simply delete the installed binary file.
 
 On Linux and MacOS, the `install.sh` script installs a pre-compiled binary to `$GOPATH/bin/dep`. It is safe to simply `rm` the installed `$GOPATH/bin/dep` file:
 
