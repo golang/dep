@@ -1,0 +1,5 @@
+This is a hack - it's effectively just verifying that the Gopkg.lock doesn't
+change for projects with noverify set, which (under the current logic) is an
+indicator that vendor wasn't updated.
+
+Of course, that vendor -> lock relatinoship isn't guaranteed to hold...

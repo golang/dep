@@ -24,6 +24,7 @@ type TestCase struct {
 	initialPath   string
 	finalPath     string
 	Commands      [][]string        `json:"commands"`
+	ShouldFail    bool              `json:"should-fail"`
 	ErrorExpected string            `json:"error-expected"`
 	GopathInitial map[string]string `json:"gopath-initial"`
 	VendorInitial map[string]string `json:"vendor-initial"`
@@ -50,6 +51,11 @@ func NewTestCase(t *testing.T, dir, name string) *TestCase {
 	err = json.Unmarshal(j, n)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Flip ShouldFail on if it's not set, but there's an expected error.
+	if n.ErrorExpected != "" && !n.ShouldFail {
+		n.ShouldFail = true
 	}
 	return n
 }
@@ -165,6 +171,18 @@ func (tc *TestCase) CompareError(err error, stderr string) {
 		tc.t.Fatalf("error raised where none was expected: \n%v", stderr)
 	} else if wantExists && !gotExists {
 		tc.t.Error("error not raised where one was expected:", want)
+	}
+}
+
+func (tc *TestCase) CompareCmdFailure(gotFail bool) {
+	if gotFail == tc.ShouldFail {
+		return
+	}
+
+	if tc.ShouldFail {
+		tc.t.Errorf("expected command to fail, but it did not")
+	} else {
+		tc.t.Errorf("expected command not to fail, but it did")
 	}
 }
 
