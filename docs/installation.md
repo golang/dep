@@ -56,3 +56,7 @@ go get -u github.com/golang/dep/cmd/dep
 ```
 
 Note that dep requires a functioning Go workspace and GOPATH. If you're unfamiliar with Go workspaces and GOPATH, have a look at [the language documentation](https://golang.org/doc/code.html#Organization) and get your local workspace set up. Dep's model could lead to being able to work without GOPATH, but we're not there yet.
+
+## Uninstalling
+
+Looking for a way to uninstall `dep`? There's a separate [doc page](uninstalling.md) for that!
