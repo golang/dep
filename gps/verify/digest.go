@@ -14,6 +14,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -152,14 +153,10 @@ type dirWalkClosure struct {
 //
 // Other than the `vendor` and VCS directories mentioned above, the calculated
 // hash includes the pathname to every discovered file system node, whether it
-// is an empty directory, a non-empty directory, empty file, non-empty file, or
-// symbolic link. If a symbolic link, the referent name is included. If a
-// non-empty file, the file's contents are included. If a non-empty directory,
-// the contents of the directory are included.
+// is an empty directory, a non-empty directory, an empty file, or a non-empty file.
 //
-// While filepath.Walk could have been used, that standard library function
-// skips symbolic links, and for now, we want the hash to include the symbolic
-// link referents.
+// Symbolic links are excluded, as they are not considered valid elements in the
+// definition of a Go module.
 func DigestFromDirectory(osDirname string) (VersionedDigest, error) {
 	osDirname = filepath.Clean(osDirname)
 
@@ -173,9 +170,14 @@ func DigestFromDirectory(osDirname string) (VersionedDigest, error) {
 		someHash:      sha256.New(),
 	}
 
-	err := DirWalk(osDirname, func(osPathname string, info os.FileInfo, err error) error {
+	err := filepath.Walk(osDirname, func(osPathname string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err // DirWalk received an error during initial Lstat
+			return err
+		}
+
+		// Completely ignore symlinks.
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
 		}
 
 		var osRelative string
@@ -207,11 +209,9 @@ func DigestFromDirectory(osDirname string) (VersionedDigest, error) {
 		switch {
 		case modeType&os.ModeDir > 0:
 			mt = os.ModeDir
-			// DirWalkFunc itself does not need to enumerate children, because
-			// DirWalk will do that for us.
+			// This func does not need to enumerate children, because
+			// filepath.Walk will do that for us.
 			shouldSkip = true
-		case modeType&os.ModeSymlink > 0:
-			mt = os.ModeSymlink
 		case modeType&os.ModeNamedPipe > 0:
 			mt = os.ModeNamedPipe
 			shouldSkip = true
@@ -225,9 +225,8 @@ func DigestFromDirectory(osDirname string) (VersionedDigest, error) {
 
 		// Write the relative pathname to hash because the hash is a function of
 		// the node names, node types, and node contents. Added benefit is that
-		// empty directories, named pipes, sockets, devices, and symbolic links
-		// will also affect final hash value. Use `filepath.ToSlash` to ensure
-		// relative pathname is os-agnostic.
+		// empty directories, named pipes, sockets, and devices. Use
+		// `filepath.ToSlash` to ensure relative pathname is os-agnostic.
 		writeBytesWithNull(closure.someHash, []byte(filepath.ToSlash(osRelative)))
 
 		binary.LittleEndian.PutUint32(closure.someModeBytes, uint32(mt)) // encode the type of mode
@@ -235,15 +234,6 @@ func DigestFromDirectory(osDirname string) (VersionedDigest, error) {
 
 		if shouldSkip {
 			return nil // nothing more to do for some of the node types
-		}
-
-		if mt == os.ModeSymlink { // okay to check for equivalence because we set to this value
-			osRelative, err = os.Readlink(osPathname) // read the symlink referent
-			if err != nil {
-				return errors.Wrap(err, "cannot Readlink")
-			}
-			writeBytesWithNull(closure.someHash, []byte(filepath.ToSlash(osRelative))) // write referent to hash
-			return nil                                                                 // proceed to next node in queue
 		}
 
 		// If we get here, node is a regular file.
@@ -540,4 +530,26 @@ func CheckDepTree(osDirname string, wantDigests map[string]VersionedDigest) (map
 	currentNode, nodes = nil, nil
 
 	return slashStatus, nil
+}
+
+// sortedChildrenFromDirname returns a lexicographically sorted list of child
+// nodes for the specified directory.
+func sortedChildrenFromDirname(osDirname string) ([]string, error) {
+	fh, err := os.Open(osDirname)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot Open")
+	}
+
+	osChildrenNames, err := fh.Readdirnames(0) // 0: read names of all children
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot Readdirnames")
+	}
+	sort.Strings(osChildrenNames)
+
+	// Close the file handle to the open directory without masking possible
+	// previous error value.
+	if er := fh.Close(); err == nil {
+		err = errors.Wrap(er, "cannot Close")
+	}
+	return osChildrenNames, err
 }
