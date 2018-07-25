@@ -21,6 +21,7 @@ import (
 	"text/template"
 
 	"github.com/golang/dep"
+	"github.com/golang/dep/cmd/dep/utils"
 	"github.com/golang/dep/gps"
 	"github.com/golang/dep/gps/paths"
 	"github.com/golang/dep/gps/verify"
@@ -957,9 +958,14 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 
 		var wg sync.WaitGroup
 
+		// Limit number of concurrent goroutines, see getConcurrentProjectLimit for details
+		concurrencyLimit := getConcurrentProjectLimit(ctx)
+		sem := make(chan bool, concurrencyLimit)
+
 		for i, proj := range slp {
 			wg.Add(1)
 			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
+			sem <- true
 
 			go func(proj verify.VerifiableProject) {
 				bs := BasicStatus{
@@ -1065,6 +1071,7 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 
 				dsCh <- &ds
 
+				<-sem
 				wg.Done()
 			}(proj.(verify.VerifiableProject))
 		}
@@ -1329,12 +1336,18 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 
 	var wg sync.WaitGroup
 
+	// Limit number of concurrent goroutines, see getConcurrentProjectLimit for details
+	concurrencyLimit := getConcurrentProjectLimit(ctx)
+	sem := make(chan bool, concurrencyLimit)
+
 	// Iterate through the locked projects and collect constraints of all the projects.
 	for i, proj := range lp {
 		wg.Add(1)
 		logger.Printf("(%d/%d) %s\n", i+1, len(lp), proj.Ident().ProjectRoot)
+		sem <- true
 
 		go func(proj gps.LockedProject) {
+			defer func() { <-sem }()
 			defer wg.Done()
 
 			manifest, _, err := sm.GetManifestAndLock(proj.Ident(), proj.Version(), rootAnalyzer)
@@ -1405,6 +1418,31 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 	}
 
 	return constraintCollection, errs
+}
+
+// Dep status iterates in several places over a list of projects and executes
+// code per project in parallel. These goroutines can create additional file
+// descriptors for example by writing to /dev/null via ioutil.Discard or by
+// creating pipes to communicate with subprocesses (e.g. executing git
+// via cmd/vcs_source). If the project list is long enough, it can result in
+// hitting the file descriptor limit set in the operating system.
+//
+// getConcurrentProjectLimit provides a limit how many goroutines should be
+// run in parallel. It attempts to read the soft RLIMIT_NOFILE from the OS.
+// If this fails, it takes the default limit of 256 which is the current default
+// limit on Darwin ( and lower than Linux/Win ). This limit is divided
+// by how many FDs are used max in parallel per goroutine (A first
+// approximation through profiling the execution of dep status is 4.)
+// TODO: Improve max parallel FDs per goroutine approximation.
+func getConcurrentProjectLimit(ctx *dep.Ctx) uint64 {
+	var maxFDperGoroutine uint64 = 4
+	var defaultSoftRlimit uint64 = 256
+	fdLimit, err := utils.FileDescriptorLimit()
+	if err != nil {
+		ctx.Err.Printf("unable to get FD limit from system: %v\n", err)
+		return defaultSoftRlimit / maxFDperGoroutine
+	}
+	return fdLimit / maxFDperGoroutine
 }
 
 type byProject []projectConstraint
