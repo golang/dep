@@ -3,7 +3,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:0dba41ffdf62b10cbbd79009edceb0eaf635031e854fb456fdd5be154802f8d3"
+  digest = "1:c683a5f3a422ecd929d76af63de214178e6caa41cbfdf4522112f7f9173d0cae"
   name = "github.com/sdboyer/deptesttres"
   packages = ["."]
   pruneopts = ""

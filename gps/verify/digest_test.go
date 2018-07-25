@@ -153,6 +153,7 @@ func TestVerifyDepTree(t *testing.T) {
 	}
 
 	checkStatus := func(t *testing.T, status map[string]VendorStatus, key string, want VendorStatus) {
+		t.Helper()
 		got, ok := status[key]
 		if !ok {
 			t.Errorf("Want key: %q", key)
