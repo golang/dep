@@ -509,29 +509,19 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	hasMissingPkgs, errCount, err := cmd.runStatusAll(ctx, out, p, sm)
-	if err != nil {
-		switch err {
+	_, errCount, runerr := cmd.runStatusAll(ctx, out, p, sm)
+	if runerr != nil {
+		switch runerr {
 		case errFailedUpdate:
-			// Print the results with unknown data
-			ctx.Out.Println(buf.String())
 			// Print the help when in non-verbose mode
 			if !ctx.Verbose {
 				ctx.Out.Printf("The status of %d projects are unknown due to errors. Rerun with `-v` flag to see details.\n", errCount)
 			}
 		case errInputDigestMismatch:
-			// Tell the user why mismatch happened and how to resolve it.
-			if hasMissingPkgs {
-				ctx.Err.Printf("Lock inputs-digest mismatch due to the following packages missing from the lock:\n\n")
-				ctx.Out.Print(buf.String())
-				ctx.Err.Printf("\nThis happens when a new import is added. Run `dep ensure` to install the missing packages.\n")
-			} else {
-				ctx.Err.Printf("Lock inputs-digest mismatch. This happens when Gopkg.toml is modified.\n" +
-					"Run `dep ensure` to regenerate the inputs-digest.")
-			}
+			ctx.Err.Printf("Gopkg.lock is out of sync with imports and/or Gopkg.toml. Run `dep check` for details.\n")
+		default:
+			return runerr
 		}
-
-		return err
 	}
 
 	if cmd.outFilePath == "" {
@@ -549,7 +539,7 @@ func (cmd *statusCommand) Run(ctx *dep.Ctx, args []string) error {
 		}
 	}
 
-	return nil
+	return runerr
 }
 
 func (cmd *statusCommand) validateFlags() error {
@@ -955,19 +945,13 @@ func (cmd *statusCommand) runStatusAll(ctx *dep.Ctx, out outputter, p *dep.Proje
 		errListPkgCh := make(chan error, len(slp))
 		errListVerCh := make(chan error, len(slp))
 
-		// Hardcode to a limit of 16 simultaneous projects. This is plenty high
-		// enough to gain concurrency benefits, but low enough that we won't
-		// hit an open fd limit on any OS.
-		sem := make(chan struct{}, 16)
 		var wg sync.WaitGroup
 
 		for i, proj := range slp {
 			wg.Add(1)
 			logger.Printf("(%d/%d) %s\n", i+1, len(slp), proj.Ident().ProjectRoot)
-			sem <- struct{}{}
 
 			go func(proj verify.VerifiableProject) {
-				defer func() { <-sem }()
 				bs := BasicStatus{
 					ProjectRoot:  string(proj.Ident().ProjectRoot),
 					PackageCount: len(proj.Packages()),
@@ -1333,20 +1317,14 @@ func collectConstraints(ctx *dep.Ctx, p *dep.Project, sm gps.SourceManager) (con
 	// Channel for receiving all the errors.
 	errCh := make(chan error, len(lp))
 
-	// Hardcode to a limit of 16 simultaneous projects. This is plenty high
-	// enough to gain concurrency benefits, but low enough that we won't
-	// hit an open fd limit on any OS.
-	sem := make(chan struct{}, 16)
 	var wg sync.WaitGroup
 
 	// Iterate through the locked projects and collect constraints of all the projects.
 	for i, proj := range lp {
 		wg.Add(1)
 		logger.Printf("(%d/%d) %s\n", i+1, len(lp), proj.Ident().ProjectRoot)
-		sem <- struct{}{}
 
 		go func(proj gps.LockedProject) {
-			defer func() { <-sem }()
 			defer wg.Done()
 
 			manifest, _, err := sm.GetManifestAndLock(proj.Ident(), proj.Version(), rootAnalyzer)
