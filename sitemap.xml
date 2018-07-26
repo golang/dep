@@ -3,6 +3,7 @@
 <url> <loc>https://golang.github.io/help.html</loc> <changefreq>weekly</changefreq> <priority>0.5</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/en/help.html" /> </url>
 <url> <loc>https://golang.github.io/index.html</loc> <changefreq>weekly</changefreq> <priority>0.5</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/en/index.html" /> </url>
 <url> <loc>https://golang.github.io/users.html</loc> <changefreq>weekly</changefreq> <priority>0.5</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/en/users.html" /> </url>
+<url> <loc>https://golang.github.io/blog/2018/07/25/announce-v0.5.0.html</loc> <changefreq>weekly</changefreq> <priority>0.3</priority> </url>
 <url> <loc>https://golang.github.io/blog/2018/01/23/announce-v0.4.0.html</loc> <changefreq>weekly</changefreq> <priority>0.3</priority> </url>
 <url> <loc>https://golang.github.io/docs/daily-dep.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/daily-dep.html" /> </url>
 <url> <loc>https://golang.github.io/docs/deduction.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/deduction.html" /> </url>
@@ -18,4 +19,5 @@
 <url> <loc>https://golang.github.io/docs/migrating.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/migrating.html" /> </url>
 <url> <loc>https://golang.github.io/docs/new-project.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/new-project.html" /> </url>
 <url> <loc>https://golang.github.io/docs/the-solver.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/the-solver.html" /> </url>
+<url> <loc>https://golang.github.io/docs/uninstalling.html</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://golang.github.io/docs/uninstalling.html" /> </url>
 </urlset>

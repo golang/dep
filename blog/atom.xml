@@ -2,12 +2,26 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://golang.github.io/blog</id>
     <title>dep Blog</title>
-    <updated>2018-01-23T06:00:00Z</updated>
+    <updated>2018-07-25T06:00:00Z</updated>
     <generator>Feed for Node.js</generator>
     <link rel="alternate" href="https://golang.github.io/blog"/>
     <subtitle>The best place to stay up-to-date with the latest dep news and events.</subtitle>
     <logo>https://golang.github.iodocs/assets/DigbyFlat.svg</logo>
     <rights>Copyright © 2018 The Go Authors</rights>
+    <entry>
+        <title type="html"><![CDATA[Announcing dep v0.5.0]]></title>
+        <id>https://golang.github.io/blog/2018/07/25/announce-v0.5.0.html</id>
+        <link href="https://golang.github.io/blog/2018/07/25/announce-v0.5.0.html">
+        </link>
+        <updated>2018-07-25T06:00:00Z</updated>
+        <summary type="html"><![CDATA[v0.5.0 of dep has been [released](https://github.com/golang/dep/releases/tag/v0.5.0)!
+
+The big theme of this release is performance improvements. dep was designed for safety from the outset, because we knew that foundation would let us speed things u]]></summary>
+        <author>
+            <name>sam boyer</name>
+            <uri>http://twitter.com/sdboyer</uri>
+        </author>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Announcing dep v0.4.1 (with docs!)]]></title>
         <id>https://golang.github.io/blog/2018/01/23/announce-v0.4.0.html</id>
