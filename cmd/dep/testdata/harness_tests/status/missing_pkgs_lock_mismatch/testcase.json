@@ -2,6 +2,6 @@
   "commands": [
     ["status"]
   ],
-  "error-expected": "due to the following packages missing from the lock",
+  "error-expected": "is out of sync with imports",
   "vendor-final": []
 }

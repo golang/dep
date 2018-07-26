@@ -7,9 +7,13 @@
 
 ## Dep
 
-`dep` is a prototype dependency management tool for Go. It requires Go 1.9 or newer to compile. **`dep` is safe for production use.**
+`dep` is a dependency management tool for Go. It requires Go 1.9 or newer to compile.
 
-`dep` is the official _experiment_, but not yet the official tool. Check out the [Roadmap](https://github.com/golang/dep/wiki/Roadmap) for more on what this means!
+`dep` was the "official experiment." The Go toolchain, as of 1.11, has
+(experimentally) adopted an approach that sharply diverges from `dep`. As a
+result, we are continuing development of `dep`, but gearing work  primarily
+towards the development of an alternative prototype for versioning behavior in
+the toolchain.
 
 For guides and reference materials about `dep`, see [the documentation](https://golang.github.io/dep).
 

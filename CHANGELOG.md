@@ -16,7 +16,7 @@ NEW FEATURES:
 
 BUG FIXES:
 
-* Excise certain git-reltaed environment variables. ([#1872](https://github.com/golang/dep/pull/1872))
+* Excise certain git-related environment variables. ([#1872](https://github.com/golang/dep/pull/1872))
 
 IMPROVEMENTS:
 
