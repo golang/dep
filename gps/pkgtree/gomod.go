@@ -6,23 +6,29 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
-// goModPath was taken verbatim from: go1.10.3/src/cmd/go/internal/load/pkg.go
+// goModPath was taken, nearly, verbatim from: go1.10.3/src/cmd/go/internal/load/pkg.go
 
 var (
-	modulePrefix   = []byte("\nmodule ")
-	goModPathCache = make(map[string]string)
+	modulePrefix       = []byte("\nmodule ")
+	goModPathCache     = make(map[string]string)
+	goModPathCacheLock sync.RWMutex
 )
 
 // goModPath returns the module path in the go.mod in dir, if any.
 func goModPath(dir string) (path string) {
+	goModPathCacheLock.RLock()
 	path, ok := goModPathCache[dir]
+	goModPathCacheLock.RUnlock()
 	if ok {
 		return path
 	}
 	defer func() {
+		goModPathCacheLock.Lock()
 		goModPathCache[dir] = path
+		goModPathCacheLock.Unlock()
 	}()
 
 	data, err := ioutil.ReadFile(filepath.Join(dir, "go.mod"))
