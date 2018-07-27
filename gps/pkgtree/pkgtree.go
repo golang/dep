@@ -126,10 +126,31 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			f.Close()
 		}
 
+		ip := filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot))
+
+		// walk back up the filesystem to the import root, inclusive, to check
+		// to see if a go.mod file requires an adjustment to the import path.
+		for i := len(wp); i >= len(fileRoot); i-- {
+			if i < len(wp) && wp[i] != filepath.Separator {
+				continue
+			}
+
+			var gomod string
+			if gomod = goModPath(wp[:i]); gomod == "" {
+				continue
+			}
+
+			// there was a go.mod file in this directory which states that the
+			// module, from this point in the file tree, should be imported as gomod
+			ip = filepath.Join(gomod, wp[i:])
+
+			break
+		}
+
 		// Compute the import path. Run the result through ToSlash(), so that
 		// windows file paths are normalized to slashes, as is expected of
 		// import paths.
-		ip := filepath.ToSlash(filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot)))
+		ip = filepath.ToSlash(ip)
 
 		// Find all the imports, across all os/arch combos
 		p := &build.Package{
