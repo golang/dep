@@ -6,7 +6,6 @@ package gps
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/Masterminds/semver"
 	"github.com/golang/dep/gps/internal/pb"
@@ -375,7 +374,7 @@ func (m ProjectConstraints) overrideAll(pcm ProjectConstraints) (out []workingCo
 		k++
 	}
 
-	sort.SliceStable(out, func(i, j int) bool {
+	sortSlice(out, func(i, j int) bool {
 		return out[i].Ident.Less(out[j].Ident)
 	})
 	return
