@@ -151,7 +151,7 @@ func testSourceGateway(t *testing.T) {
 				t.Fatalf("wanted nonexistent err when passing bad version, got: %s", err)
 			}
 
-			err = sg.exportVersionTo(ctx, badver, cachedir)
+			err = sg.exportVersionTo(ctx, badver, cachedir, ProjectRoot("github.com/sdboyer/deptest"))
 			if err == nil {
 				t.Fatal("wanted err on nonexistent version")
 			} else if err.Error() != wanterr.Error() {

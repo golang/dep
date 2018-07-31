@@ -556,7 +556,7 @@ func (sm *SourceMgr) ExportProject(ctx context.Context, id ProjectIdentifier, v 
 		return err
 	}
 
-	return srcg.exportVersionTo(ctx, v, to)
+	return srcg.exportVersionTo(ctx, v, to, id.ProjectRoot)
 }
 
 // ExportPrunedProject writes out a tree of the provided LockedProject, applying

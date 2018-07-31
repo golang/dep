@@ -9,6 +9,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/golang/dep/gps/pkgtree"
@@ -322,11 +325,66 @@ func (sg *sourceGateway) existsUpstream(ctx context.Context) error {
 	return err
 }
 
-func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to string) error {
+func moveModules(to string, projectRoot ProjectRoot, pkgs pkgtree.PackageTree) error {
+	basedir := strings.TrimSuffix(to, string(projectRoot))
+	modules := map[string]struct{}{}
+	for _, pkg := range pkgs.Packages {
+		if pkg.P.RelModPath == "" {
+			continue
+		}
+
+		// the filesystem path containing go.mod
+		modpath := filepath.FromSlash(filepath.Join(string(projectRoot), pkg.P.RelModPath))
+
+		// the filesystem path of the module (before renaming)
+		godir := filepath.FromSlash(filepath.Join(basedir, modpath))
+
+		// where the module will have to be moved
+		moddir := filepath.FromSlash(filepath.Join(basedir, pkg.P.Module))
+
+		// ensure we have to move the directory
+		if godir == moddir {
+			continue
+		}
+
+		// only do this once per modpath
+		if _, ok := modules[modpath]; ok {
+			continue
+		}
+
+		modules[modpath] = struct{}{}
+
+		tmppath := filepath.Join(filepath.Dir(godir), "_"+filepath.Base(godir))
+
+		// move the dir to a temp dir
+		if err := os.Rename(godir, tmppath); err != nil {
+			return errors.Wrap(err, "error moving module to tempdir")
+		}
+
+		// create the dir containing the module
+		if err := os.MkdirAll(filepath.Dir(moddir), 0755); err != nil {
+			return errors.Wrap(err, "error making module dir")
+		}
+
+		// move the module into the proper place
+		if err := os.Rename(tmppath, moddir); err != nil {
+			return errors.Wrap(err, "error moving module from tempdir")
+		}
+	}
+
+	return nil
+}
+
+func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to string, projectRoot ProjectRoot) error {
+	pkgs, err := sg.listPackages(ctx, projectRoot, v)
+	if err != nil {
+		return err
+	}
+
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	err := sg.require(ctx, sourceExistsLocally)
+	err = sg.require(ctx, sourceExistsLocally)
 	if err != nil {
 		return err
 	}
@@ -337,7 +395,11 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 	}
 
 	err = sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
-		return sg.src.exportRevisionTo(ctx, r, to)
+		if eerr := sg.src.exportRevisionTo(ctx, r, to); eerr != nil {
+			return eerr
+		}
+
+		return moveModules(to, projectRoot, pkgs)
 	})
 
 	// It's possible (in git) that we may have tried this against a version that
@@ -349,7 +411,11 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 	if err != nil && sg.srcState&sourceHasLatestLocally == 0 {
 		if err = sg.require(ctx, sourceHasLatestLocally); err == nil {
 			err = sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
-				return sg.src.exportRevisionTo(ctx, r, to)
+				if eerr := sg.src.exportRevisionTo(ctx, r, to); eerr != nil {
+					return eerr
+				}
+
+				return moveModules(to, projectRoot, pkgs)
 			})
 		}
 	}
@@ -358,10 +424,15 @@ func (sg *sourceGateway) exportVersionTo(ctx context.Context, v Version, to stri
 }
 
 func (sg *sourceGateway) exportPrunedVersionTo(ctx context.Context, lp LockedProject, prune PruneOptions, to string) error {
+	pkgs, err := sg.listPackages(ctx, lp.Ident().ProjectRoot, lp.Version())
+	if err != nil {
+		return err
+	}
+
 	sg.mu.Lock()
 	defer sg.mu.Unlock()
 
-	err := sg.require(ctx, sourceExistsLocally)
+	err = sg.require(ctx, sourceExistsLocally)
 	if err != nil {
 		return err
 	}
@@ -378,7 +449,11 @@ func (sg *sourceGateway) exportPrunedVersionTo(ctx context.Context, lp LockedPro
 	}
 
 	if err = sg.suprvsr.do(ctx, sg.src.upstreamURL(), ctExportTree, func(ctx context.Context) error {
-		return sg.src.exportRevisionTo(ctx, r, to)
+		if eerr := sg.src.exportRevisionTo(ctx, r, to); eerr != nil {
+			return eerr
+		}
+
+		return moveModules(to, lp.Ident().ProjectRoot, pkgs)
 	}); err != nil {
 		return err
 	}

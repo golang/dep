@@ -18,6 +18,8 @@ import (
 )
 
 var (
+	cacheKeyModule       = []byte("d")
+	cacheKeyModPath      = []byte("a")
 	cacheKeyComment      = []byte("c")
 	cacheKeyConstraint   = cacheKeyComment
 	cacheKeyError        = []byte("e")
@@ -372,6 +374,18 @@ func cachePutPackageOrErr(b *bolt.Bucket, poe pkgtree.PackageOrErr) error {
 		err := b.Put(cacheKeyError, []byte(poe.Err.Error()))
 		return errors.Wrapf(err, "failed to put error: %v", poe.Err)
 	}
+	if len(poe.P.RelModPath) > 0 {
+		err := b.Put(cacheKeyModPath, []byte(poe.P.RelModPath))
+		if err != nil {
+			return errors.Wrapf(err, "failed to put package: %v", poe.P)
+		}
+	}
+	if len(poe.P.Module) > 0 {
+		err := b.Put(cacheKeyModule, []byte(poe.P.Module))
+		if err != nil {
+			return errors.Wrapf(err, "failed to put package: %v", poe.P)
+		}
+	}
 	if len(poe.P.CommentPath) > 0 {
 		err := b.Put(cacheKeyComment, []byte(poe.P.CommentPath))
 		if err != nil {
@@ -427,6 +441,8 @@ func cacheGetPackageOrErr(b *bolt.Bucket) (pkgtree.PackageOrErr, error) {
 	}
 
 	var p pkgtree.Package
+	p.Module = string(b.Get(cacheKeyModule))
+	p.RelModPath = string(b.Get(cacheKeyModPath))
 	p.CommentPath = string(b.Get(cacheKeyComment))
 	if ip := b.Bucket(cacheKeyImport); ip != nil {
 		err := ip.ForEach(func(_, v []byte) error {

@@ -25,6 +25,8 @@ import (
 type Package struct {
 	Name        string   // Package name, as declared in the package statement
 	ImportPath  string   // Full import path, including the prefix provided to ListPackages()
+	RelModPath  string   // Location of go.mod file for package, relative to project root
+	Module      string   // The name (import path) of the go module
 	CommentPath string   // Import path given in the comment on the package statement
 	Imports     []string // Imports from all go and cgo files
 	TestImports []string // Imports from all go test files (in go/build parlance: both TestImports and XTestImports)
@@ -127,6 +129,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		}
 
 		ip := filepath.Join(importRoot, strings.TrimPrefix(wp, fileRoot))
+		var modpath, module string
 
 		// walk back up the filesystem to the import root, inclusive, to check
 		// to see if a go.mod file requires an adjustment to the import path.
@@ -143,6 +146,12 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 			// there was a go.mod file in this directory which states that the
 			// module, from this point in the file tree, should be imported as gomod
 			ip = filepath.Join(gomod, wp[i:])
+			modpath = strings.TrimPrefix(wp[:i], fileRoot)
+			module = gomod
+
+			if modpath == "" {
+				modpath = "."
+			}
 
 			break
 		}
@@ -175,6 +184,8 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 
 		pkg := Package{
 			ImportPath:  ip,
+			RelModPath:  modpath,
+			Module:      module,
 			CommentPath: p.ImportComment,
 			Name:        p.Name,
 			Imports:     p.Imports,
