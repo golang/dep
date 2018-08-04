@@ -95,6 +95,13 @@ func DiffLocks(l1, l2 gps.Lock) LockDelta {
 			Name: pr1,
 		}
 
+		// Edge case: If there are no lockedProjects on the RHS, they have most probably been removed from the lock file.
+		if len(p2) == 0 {
+			lpd.ProjectRemoved = true
+			diff.ProjectDeltas[pr1] = lpd
+			continue
+		}
+
 		for i2 := i2next; i2 < len(p2); i2++ {
 			lp2 := p2[i2]
 			pr2 := lp2.Ident().ProjectRoot
