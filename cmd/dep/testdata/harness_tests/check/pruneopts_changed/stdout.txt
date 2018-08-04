@@ -1,0 +1,3 @@
+# Gopkg.lock is out of sync:
+github.com/sdboyer/deptest: prune options changed ( -> UT)
+
