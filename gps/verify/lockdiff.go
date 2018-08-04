@@ -93,13 +93,10 @@ func DiffLocks(l1, l2 gps.Lock) LockDelta {
 
 		lpd := LockedProjectDelta{
 			Name: pr1,
-		}
-
-		// Edge case: If there are no lockedProjects on the RHS, they have most probably been removed from the lock file.
-		if len(p2) == 0 {
-			lpd.ProjectRemoved = true
-			diff.ProjectDeltas[pr1] = lpd
-			continue
+			// Default to assuming a project was removed, as it will handle both
+			// the obvious removal case (where there's a visible hole in p2),
+			// and the non-obvious case, where p2 is shorter than p1.
+			ProjectRemoved: true,
 		}
 
 		for i2 := i2next; i2 < len(p2); i2++ {
@@ -108,7 +105,10 @@ func DiffLocks(l1, l2 gps.Lock) LockDelta {
 
 			switch strings.Compare(string(pr1), string(pr2)) {
 			case 0: // Found a matching project
-				lpd.LockedProjectPropertiesDelta = DiffLockedProjectProperties(lp1, lp2)
+				lpd = LockedProjectDelta{
+					Name: pr1,
+					LockedProjectPropertiesDelta: DiffLockedProjectProperties(lp1, lp2),
+				}
 				i2next = i2 + 1 // Don't visit this project again
 			case +1: // Found a new project
 				diff.ProjectDeltas[pr2] = LockedProjectDelta{
@@ -117,8 +117,6 @@ func DiffLocks(l1, l2 gps.Lock) LockDelta {
 				}
 				i2next = i2 + 1 // Don't visit this project again
 				continue        // Keep looking for a matching project
-			case -1: // Project has been removed, handled below
-				lpd.ProjectRemoved = true
 			}
 
 			break // Done evaluating this project, move onto the next

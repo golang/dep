@@ -1,4 +1,8 @@
-# (next version)
+# v0.5.1
+
+BUG FIXES:
+
+* Correctly handle certain cases where `dep ensure` removed projects from Gopkg.lock. ([#1945](https://github.com/golang/dep/issue/1945)).
 
 # v0.5.0
 
