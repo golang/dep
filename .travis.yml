@@ -78,6 +78,10 @@ jobs:
             - release/dep-freebsd-386.sha256
             - release/dep-windows-386.exe
             - release/dep-windows-386.exe.sha256
+            - release/dep-linux-ppc64
+            - release/dep-linux-ppc64.sha256
+            - release/dep-linux-ppc64le
+            - release/dep-linux-ppc64le.sha256
           skip_cleanup: true
           on:
             repo: golang/dep
