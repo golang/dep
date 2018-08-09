@@ -4,6 +4,10 @@ BUG FIXES:
 
 * Correctly handle certain cases where `dep ensure` removed projects from Gopkg.lock. ([#1945](https://github.com/golang/dep/issue/1945)).
 
+IMPROVEMENTS:
+
+* Avoid doing HTTP requests (go get metadata) if the `source` is known from `Gopkg.toml` file
+
 # v0.5.0
 
 NEW FEATURES:

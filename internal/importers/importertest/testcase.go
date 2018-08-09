@@ -53,7 +53,7 @@ func (tc TestCase) Execute(t *testing.T, convert func(logger *log.Logger, sm gps
 	//h.Parallel()
 
 	ctx := NewTestContext(h)
-	sm, err := ctx.SourceManager()
+	sm, err := ctx.SourceManager(nil)
 	h.Must(err)
 	defer sm.Release()
 

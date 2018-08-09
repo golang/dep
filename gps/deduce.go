@@ -107,6 +107,70 @@ type pathDeducer interface {
 	deduceSource(string, *url.URL) (maybeSources, error)
 }
 
+// staticDeducer is about deducing the project root of a dependency (path)
+// by checking that the path starts with the `pr`
+//
+// staticDeducer is also about "deducing" the project source but *statically*
+// as configured under the [[constraint]] and [[override]] without checking
+// anything with a git provider (github, bitbucket, gitlab, and so on)
+// or validating a regexp
+type staticDeducer struct {
+	pr  string
+	src string
+}
+
+func (m staticDeducer) deduceRoot(path string) (string, error) {
+	if strings.HasPrefix(path, m.pr) {
+		return m.pr, nil
+	}
+	return "", fmt.Errorf("%s is not a valid path for a source on %s", path, m.pr)
+}
+
+func (m staticDeducer) deduceSource(path string, u1234 *url.URL) (maybeSources, error) {
+	u1, _, err := normalizeURI(m.src)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not a valid path for a source on %s", path, m.pr)
+	}
+
+	mb := maybeSources{}
+	if u1.Scheme != "" {
+		mb = maybeSources{maybeGitSource{url: u1}}
+	} else {
+		// here the `src` is not identified as an URL (scheme is missing), so add scheme to `maybesources` according to isgit and ishg
+		// This isn't definitive, but it'll probably catch most
+		isgit := strings.HasSuffix(u1.Path, ".git") || (u1.User != nil && u1.User.Username() == "git")
+		ishg := strings.HasSuffix(u1.Path, ".hg") || (u1.User != nil && u1.User.Username() == "hg")
+
+		// git is probably more common, even on bitbucket. however, bitbucket
+		// appears to fail _extremely_ slowly on git pings (ls-remote) when the
+		// underlying repository is actually an hg repository, so it's better
+		// to try hg first.
+		if !isgit {
+			for _, scheme := range hgSchemes {
+				u2 := *u1
+				if scheme == "ssh" {
+					u2.User = url.User("hg")
+				}
+				u2.Scheme = scheme
+				mb = append(mb, maybeHgSource{url: &u2})
+			}
+		}
+
+		if !ishg {
+			for _, scheme := range gitSchemes {
+				u2 := *u1
+				if scheme == "ssh" {
+					u2.User = url.User("git")
+				}
+				u2.Scheme = scheme
+				mb = append(mb, maybeGitSource{url: &u2})
+			}
+		}
+	}
+
+	return mb, nil
+}
+
 type githubDeducer struct {
 	regexp *regexp.Regexp
 }

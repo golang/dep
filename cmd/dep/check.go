@@ -69,7 +69,7 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 		return err
 	}
 
-	sm, err := ctx.SourceManager()
+	sm, err := ctx.SourceManager(p)
 	if err != nil {
 		return err
 	}

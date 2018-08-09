@@ -28,7 +28,7 @@ func TestStatusFormatVersion(t *testing.T) {
 	t.Parallel()
 
 	tests := map[gps.Version]string{
-		nil: "",
+		nil:                            "",
 		gps.NewBranch("master"):        "branch master",
 		gps.NewVersion("1.0.0"):        "1.0.0",
 		gps.Revision("flooboofoobooo"): "flooboo",
@@ -762,14 +762,14 @@ func TestCollectConstraints(t *testing.T) {
 		Err:    discardLogger,
 	}
 
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	// Create new project and set root. Setting root is required for PackageList
 	// to run properly.
 	p := new(dep.Project)
 	p.SetRoot(testProjPath)
+
+	sm, err := ctx.SourceManager(p)
+	h.Must(err)
+	defer sm.Release()
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

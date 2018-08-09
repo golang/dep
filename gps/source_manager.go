@@ -207,7 +207,12 @@ type SourceManagerConfig struct {
 // gps's SourceManager is intended to be threadsafe (if it's not, please file a
 // bug!). It should be safe to reuse across concurrent solving runs, even on
 // unrelated projects.
-func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
+//
+// The purpose of the slice of ProjectIdentifier param is to add StaticDeducers to
+// according to the ProjectIdentifier.Source property if and only if
+// the ProjectIdentifier.ProjectRoot is not already concerned by a deducer
+// (default ones defined in `pathDeducerTrie()`).
+func NewSourceManager(c SourceManagerConfig, pis []ProjectIdentifier) (*SourceMgr, error) {
 	if c.Logger == nil {
 		c.Logger = log.New(ioutil.Discard, "", 0)
 	}
@@ -292,6 +297,16 @@ func NewSourceManager(c SourceManagerConfig) (*SourceMgr, error) {
 	ctx, cf := context.WithCancel(context.TODO())
 	superv := newSupervisor(ctx)
 	deducer := newDeductionCoordinator(superv)
+
+	// here we deal with the [[constraint]].source present in the Gopkg.toml/lock files
+	// if the ProjectRoot is not already concerned by a deducer (default ones defined in `pathDeducerTrie()`),
+	// we'll add a staticDeducer to retrieve the specified source for this import path and all subpackages
+	for _, pi := range pis {
+		if _, _, found := deducer.deducext.LongestPrefix(string(pi.ProjectRoot)); !found {
+			pr := string(pi.ProjectRoot)
+			deducer.deducext.Insert(pr, staticDeducer{pr: pr, src: pi.Source})
+		}
+	}
 
 	var sc sourceCache
 	if c.CacheAge > 0 {

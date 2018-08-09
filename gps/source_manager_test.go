@@ -95,7 +95,7 @@ func TestSourceManager_InferConstraint(t *testing.T) {
 			sm, err := NewSourceManager(SourceManagerConfig{
 				Cachedir: h.Path(cacheDir),
 				Logger:   log.New(test.Writer{TB: t}, "", 0),
-			})
+			}, nil)
 			h.Must(err)
 
 			got, err := sm.InferConstraint(tc.str, tc.project)

@@ -44,7 +44,7 @@ func main() {
 
 	// Set up a SourceManager. This manages interaction with sources (repositories).
 	tempdir, _ := ioutil.TempDir("", "gps-repocache")
-	sourcemgr, _ := gps.NewSourceManager(gps.SourceManagerConfig{Cachedir: filepath.Join(tempdir)})
+	sourcemgr, _ := gps.NewSourceManager(gps.SourceManagerConfig{Cachedir: filepath.Join(tempdir)}, nil)
 	defer sourcemgr.Release()
 
 	// Prep and run the solver

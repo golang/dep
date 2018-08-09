@@ -679,7 +679,7 @@ func TestGitSourceAdaptiveCleanup(t *testing.T) {
 		sm, err = NewSourceManager(SourceManagerConfig{
 			Cachedir: cpath,
 			Logger:   log.New(test.Writer{TB: t}, "", 0),
-		})
+		}, nil)
 		if err != nil {
 			t.Fatalf("Unexpected error on SourceManager creation: %s", err)
 		}

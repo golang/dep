@@ -218,12 +218,12 @@ func TestValidateUpdateArgs(t *testing.T) {
 		Err:    errLogger,
 	}
 
-	sm, err := ctx.SourceManager()
-	h.Must(err)
-	defer sm.Release()
-
 	p := new(dep.Project)
 	params := p.MakeParams()
+
+	sm, err := ctx.SourceManager(p)
+	h.Must(err)
+	defer sm.Release()
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

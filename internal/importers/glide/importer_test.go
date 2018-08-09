@@ -178,7 +178,7 @@ func TestGlideConfig_Import(t *testing.T) {
 	defer h.Cleanup()
 
 	ctx := importertest.NewTestContext(h)
-	sm, err := ctx.SourceManager()
+	sm, err := ctx.SourceManager(nil)
 	h.Must(err)
 	defer sm.Release()
 

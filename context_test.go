@@ -587,7 +587,7 @@ func TestDepCachedir(t *testing.T) {
 			Out:      discardLgr,
 			Err:      discardLgr,
 		}
-		sm, err := ctx.SourceManager()
+		sm, err := ctx.SourceManager(nil)
 		h.Must(err)
 		defer sm.Release()
 

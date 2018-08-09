@@ -96,7 +96,11 @@ func defaultGOPATH() string {
 
 // SourceManager produces an instance of gps's built-in SourceManager
 // initialized to log to the receiver's logger.
-func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
+//
+// The Project param is used to build the entire list of ProjectIdentifier
+// for dealing with Source property defined under [[constraints]] and
+// [[override]] sections of Gopkg.toml
+func (c *Ctx) SourceManager(p *Project) (*gps.SourceMgr, error) {
 	cachedir := c.Cachedir
 	if cachedir == "" {
 		// When `DEPCACHEDIR` isn't set in the env, use the default - `$GOPATH/pkg/dep`.
@@ -107,12 +111,26 @@ func (c *Ctx) SourceManager() (*gps.SourceMgr, error) {
 		}
 	}
 
+	var pis []gps.ProjectIdentifier
+	if p != nil && p.Manifest != nil {
+		for pr, pp := range p.Manifest.Constraints {
+			if pp.Source != "" {
+				pis = append(pis, gps.ProjectIdentifier{ProjectRoot: pr, Source: pp.Source})
+			}
+		}
+		for pr, pp := range p.Manifest.Ovr {
+			if pp.Source != "" {
+				pis = append(pis, gps.ProjectIdentifier{ProjectRoot: pr, Source: pp.Source})
+			}
+		}
+	}
+
 	return gps.NewSourceManager(gps.SourceManagerConfig{
 		CacheAge:       c.CacheAge,
 		Cachedir:       cachedir,
 		Logger:         c.Out,
 		DisableLocking: c.DisableLocking,
-	})
+	}, pis)
 }
 
 // LoadProject starts from the current working directory and searches up the
