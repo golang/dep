@@ -29,6 +29,14 @@ Install the `dep` package:
 pacman -S dep
 ```
 
+## Fedora
+
+Install the `dep` package:
+
+```sh
+dnf install -y dep
+```
+
 ## Install From Source
 
 The snippet below installs the latest release of dep from source and sets the
