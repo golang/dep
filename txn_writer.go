@@ -668,8 +668,8 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 
 	// Ensure vendor/.git is preserved if present
 	if hasDotGit(vpath) {
-		err = fs.RenameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(vnewpath, "vendor/.git"))
-		if _, ok := err.(*os.LinkError); ok {
+		err = fs.RenameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(vnewpath, ".git"))
+		if err != nil {
 			return errors.Wrap(err, "failed to preserve vendor/.git")
 		}
 	}
