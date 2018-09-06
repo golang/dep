@@ -931,17 +931,35 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*Prob
 			return true
 
 		case grey:
-			// Import cycles can arise in healthy situations through xtests, so
-			// allow them for now.
+			// Grey means an import cycle. These can arise in healthy situations
+			// through xtest. They can also arise in less healthy but valid
+			// situations where an edge in the import graph is reversed based on
+			// the presence of a build tag. For example, if A depends on B on
+			// Linux, but B depends on A on Darwin, the import graph is not
+			// cyclic on either Linux or Darwin but dep will see what appears to
+			// be a dependency cycle because it considers all tags at once.
 			//
-			// FIXME(sdboyer) we need an improved model that allows us to
-			// accurately reject real import cycles.
+			// Handling import cycles for the purposes of reachablity is
+			// straightforward: we treat all packages in the cycle as
+			// equivalent. Any package imported by one package in the cycle is
+			// necessarily reachable by all other packages in the cycle.
+
+			// Merge the reachsets in the cycle by sharing the same external
+			// reachset and internal reachset amongst all packages in the
+			// cycle.
+			var cycleStarted bool
+			for _, ppkg := range path {
+				if cycleStarted {
+					exrsets[ppkg] = exrsets[pkg]
+					inrsets[ppkg] = inrsets[pkg]
+				} else if ppkg == pkg {
+					cycleStarted = true
+				}
+			}
+			if !cycleStarted {
+				panic(fmt.Sprintf("path to grey package %s did not include cycle: %s", pkg, path))
+			}
 			return true
-			// grey means an import cycle; guaranteed badness right here. You'd
-			// hope we never encounter it in a dependency (really? you published
-			// that code?), but we have to defend against it.
-			//colors[pkg] = black
-			//poison(append(path, pkg)) // poison self and parents
 
 		case black:
 			// black means we're revisiting a package that was already
