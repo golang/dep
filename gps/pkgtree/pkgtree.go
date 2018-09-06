@@ -901,14 +901,6 @@ func wmToReach(workmap map[string]wm, backprop bool) (ReachMap, map[string]*Prob
 			// Now, recurse until done, or a false bubbles up, indicating the
 			// path is poisoned.
 			for in := range w.in {
-				// It's possible, albeit weird, for a package to import itself.
-				// If we try to visit self, though, then it erroneously poisons
-				// the path, as it would be interpreted as grey. In practice,
-				// self-imports are a no-op, so we can just skip it.
-				if in == pkg {
-					continue
-				}
-
 				clean := dfe(in, path)
 				if !clean && backprop {
 					// Path is poisoned. If we're backpropagating errors, then
