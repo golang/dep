@@ -231,17 +231,19 @@ It is usually safe to set `non-go = true`, as well. However, as dep only has a c
 
 ## `noverify`
 
-The `noverify` field is a list of [project roots](glossary.md#project-root) to exclude from [vendor verification](glossary.md#vendor-verification).
+The `noverify` field is a list of paths, typically [project roots](glossary.md#project-root), to exclude from [vendor verification](glossary.md#vendor-verification).
 
 Dep uses per-project hash digests, computed after pruning and recorded in [Gopkg.lock](Gopkg.lock.md#digest), to determine if the contents of `vendor/` are as expected. If the recorded digest and the hash of the corresponding tree in `vendor/` differ, that project is considered to be out of sync:
 
 * `dep ensure` will regenerate it
 * `dep check` will complain of a hash mismatch and exit 1
 
-It is strongly preferable for almost all workflows that you leave `vendor/` unmodified, in whatever state dep puts it in. However, this isn't always an option. If you have no choice but to modify `vendor/` for a particular project, then add the project root for that project to `noverify`. This will have the following effects:
+It is strongly recommended that you leave `vendor/` unmodified, in whatever state dep puts it in. However, this isn't always feasible. If you have no choice but to modify `vendor/` for a particular project, then add the project root for that project to `noverify`. This will have the following effects:
 
 * `dep ensure` will ignore hash mismatches for the project, and only regenerate it in `vendor/` if absolutely necessary (prune options change, package list changes, version changes)
 * `dep check` will continue to report hash mismatches (albeit with an annotation about `noverify`) for the project, but will no longer exit 1. 
+
+`noverify` can also be used to preserve certain excess paths that would otherwise be removed; for example, adding `WORKSPACE` to the `noverify` list would allow you to preserve `vendor/WORKSPACE`, which can help with some Bazel-based workflows.
 
 ## Scope
 

@@ -1,5 +1,9 @@
 # v0.5.1
 
+IMPROVEMENTS:
+
+* The `noverify` field in `Gopkg.toml` allows for the preservation of excess files under `vendor`. ([#2002](https://github.com/golang/dep/issue/2002))
+
 BUG FIXES:
 
 * Correctly handle certain cases where `dep ensure` removed projects from Gopkg.lock. ([#1945](https://github.com/golang/dep/issue/1945)).
