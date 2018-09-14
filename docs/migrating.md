@@ -31,7 +31,7 @@ The behavior of `dep init` varies depending on what's in your existing codebase,
 The inference phase is where `dep init`'s behavior varies. By default, `dep init` will look in your codebase for metadata files from [other Go package management tools that it understands](https://github.com/golang/dep/tree/master/internal/importers), and attempt to automatically migrate the data in these files into concepts that make sense in a dep. Depending on the tool and the particular values dep finds, metadata from the tool may be treated as either:
 
 * A hint: information that dep will try to honor in the solving phase, but will discard if it cannot find a solution that respects the hint.
-* A rule: information that must obeyed in the solving phase, and will ultimately appear in `Gopkg.toml` as a `[[constraint]]`. If the solving phase cannot find a solution that satisfies the rules, it will fail with an informative message.
+* A rule: information that must be obeyed in the solving phase, and will ultimately appear in `Gopkg.toml` as a `[[constraint]]`. If the solving phase cannot find a solution that satisfies the rules, it will fail with an informative message.
 
 There are three circumstances that can lead dep not to make any tool-based inferences:
 
