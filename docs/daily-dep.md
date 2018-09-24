@@ -17,7 +17,7 @@ Let's start with words!
 
 Dep's main command is `dep ensure`. The verb is "ensure" to imply that the action is not just some single, discrete action (like adding a dependency), but enforcing some kind of broader guarantee. If we wanted to express the `dep ensure` guarantee as a sentence, it would go something like this:
 
-> Hey dep, please make sure that [my project](glossary.md#current-project) is [in sync](glossary.md#sync): that [`Gopkg.lock`](Gopkg.lock.md) satisfies all the imports in my project, and all the rules in[ `Gopkg.toml`](Gopkg.toml.md), and that `vendor/` contains exactly what `Gopkg.lock` says it should."
+> "Hey dep, please make sure that [my project](glossary.md#current-project) is [in sync](glossary.md#sync): that [`Gopkg.lock`](Gopkg.lock.md) satisfies all the imports in my project, and all the rules in[ `Gopkg.toml`](Gopkg.toml.md), and that `vendor/` contains exactly what `Gopkg.lock` says it should."
 
 As the narrative indicates, `dep ensure` is a holistic operation. Rather than offering a series of commands to run in succession that incrementally achieve some final state, each run of `dep ensure` delivers a safe, complete, and reproducible set of dependencies with respect to the current state of your project. You might imagine repeated runs of `dep ensure` as being a bit like a frog, hopping from one lily pad to the next.
 
