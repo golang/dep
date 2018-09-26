@@ -105,6 +105,10 @@ func (g *Importer) convert(pr gps.ProjectRoot) (*dep.Manifest, *dep.Lock) {
 			continue
 		}
 
+		if strings.HasPrefix(pkg.Path, string(pr)) {
+			continue
+		}
+
 		// There are valid govendor configs in the wild that don't have a revision set
 		// so we are not requiring it to be set during import
 
