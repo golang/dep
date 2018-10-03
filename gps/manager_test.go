@@ -984,9 +984,6 @@ func TestSupervisor(t *testing.T) {
 			return nil
 		})
 		errchan <- err
-		//if err != nil {
-		//	t.Fatal("unexpected err on do() completion:", err)
-		//}
 		close(wait)
 	}()
 	<-wait

@@ -547,11 +547,9 @@ func TestWorkmapToReach(t *testing.T) {
 
 			rm, em := wmToReach(fix.workmap, fix.backprop)
 			if !reflect.DeepEqual(rm, fix.rm) {
-				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
 				t.Errorf("Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", rm, fix.rm)
 			}
 			if !reflect.DeepEqual(em, fix.em) {
-				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %# v\n\t(WNT): %# v", name, em, fix.em))
 				t.Errorf("Did not get expected error map:\n\t(GOT): %v\n\t(WNT): %v", em, fix.em)
 			}
 		})
