@@ -47,7 +47,7 @@ func (s *solver) traceCheckQueue(q *versionQueue, bmi bimodalIdentifier, cont bo
 	if cont {
 		// Continue is an "inner" message.. indenting
 		verb = "continue"
-		vlen = vlen + " more"
+		vlen += " more"
 		indent = innerIndent
 	} else {
 		verb = "attempt"
