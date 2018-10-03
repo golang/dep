@@ -150,7 +150,7 @@ func fixtureSolveSimpleChecks(fix specfix, soln Solution, err error, t *testing.
 	if err != nil {
 		if fixfail == nil {
 			t.Errorf("Solve failed unexpectedly:\n%s", err)
-		} else if !(fixfail.Error() == err.Error()) {
+		} else if fixfail.Error() != err.Error() {
 			// TODO(sdboyer) reflect.DeepEqual works for now, but once we start
 			// modeling more complex cases, this should probably become more robust
 			t.Errorf("Failure mismatch:\n\t(GOT): %s\n\t(WNT): %s", err, fixfail)
