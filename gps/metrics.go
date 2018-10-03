@@ -31,7 +31,7 @@ func newMetrics() *metrics {
 
 func (m *metrics) push(name string) {
 	cn := m.stack[len(m.stack)-1]
-	m.times[cn] = m.times[cn] + time.Since(m.last)
+	m.times[cn] += time.Since(m.last)
 
 	m.stack = append(m.stack, name)
 	m.last = time.Now()
@@ -39,7 +39,7 @@ func (m *metrics) push(name string) {
 
 func (m *metrics) pop() {
 	on := m.stack[len(m.stack)-1]
-	m.times[on] = m.times[on] + time.Since(m.last)
+	m.times[on] += time.Since(m.last)
 
 	m.stack = m.stack[:len(m.stack)-1]
 	m.last = time.Now()
