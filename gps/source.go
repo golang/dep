@@ -277,9 +277,7 @@ func newSourceGateway(ctx context.Context, src source, superv *supervisor, cache
 	local := src.existsLocally(ctx)
 	if local {
 		state |= sourceExistsLocally
-		if err := superv.do(ctx, src.upstreamURL(), ctValidateLocal, func(ctx context.Context) error {
-			return src.maybeClean(ctx)
-		}); err != nil {
+		if err := superv.do(ctx, src.upstreamURL(), ctValidateLocal, src.maybeClean); err != nil {
 			return nil, err
 		}
 	}
