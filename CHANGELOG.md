@@ -7,6 +7,7 @@ IMPROVEMENTS:
 BUG FIXES:
 
 * Correctly handle certain cases where `dep ensure` removed projects from Gopkg.lock. ([#1945](https://github.com/golang/dep/issue/1945)).
+* Skip package itself or its sub package in govendor configs to avoid deadlock. ([#2019](https://github.com/golang/dep/issues/2019)).
 
 # v0.5.0
 
