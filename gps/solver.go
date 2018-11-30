@@ -912,7 +912,7 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 	if nil == q.current() {
 		// this case should not be reachable, but reflects improper solver state
 		// if it is, so panic immediately
-		panic("version queue is empty, should not happen")
+		panic("version queue is empty, should not happen: " + string(q.id.ProjectRoot) + " " + q.id.Source)
 	}
 
 	faillen := len(q.fails)
