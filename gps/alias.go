@@ -13,10 +13,16 @@ import (
 //ResourceAlias map of source to alias
 type ResourceAlias = map[string]string
 
-//AliasConfigFile alias file location
+//AliasFile alias file location
 const AliasFile = "./Gopkg.alias"
+
+//AliasEnv alias environment variable name
 const AliasEnv = "DEPALIAS"
+
+//AliasComment comment line prefix
 const AliasComment = "//"
+
+//AliasEnvSeparator source target split char
 const AliasEnvSeparator = "="
 
 // readAlias read alias form  a config file in work directory
@@ -49,10 +55,9 @@ func readAlias() (m ResourceAlias, err error) {
 		if os.IsNotExist(err) {
 			err = nil
 			return
-		} else {
-			_, _ = fmt.Fprintf(os.Stderr, "error process alias file %s", AliasFile)
-			return
 		}
+		_, _ = fmt.Fprintf(os.Stderr, "error process alias file %s", AliasFile)
+		return
 	}
 	reader := bufio.NewReader(file)
 	buffer := bytes.NewBuffer(make([]byte, 1024))
