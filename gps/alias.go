@@ -15,7 +15,7 @@ type ResourceAlias = map[string]string
 
 //AliasConfigFile alias file location
 const AliasFile = "./Gopkg.alias"
-const AliasEnv = "DEP_ALIAS"
+const AliasEnv = "DEPALIAS"
 const AliasComment = "//"
 const AliasEnvSeparator = "="
 
