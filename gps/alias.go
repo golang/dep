@@ -99,21 +99,21 @@ func parseAlias(path string, uri *url.URL) (pd pathDeduction, ok bool) {
 
 		return pathDeduction{}, false
 	}
-	for root, source := range alias {
-		if strings.HasPrefix(path, root) {
+	for src, target := range alias {
+		if strings.HasPrefix(path, src) {
 			ok = true
-			i := strings.Index(source, "/")
-			uri.Host = source[:i]
-			uri.Path = source[i:]
-			mb := make(maybeSources, len(gopkginSchemes))
+			i := strings.Index(target, "/")
+			uri.Host = target[:i]
+			uri.Path = target[i:]
+			maybe := make(maybeSources, len(gopkginSchemes))
 			for k, scheme := range gopkginSchemes {
 				u := *uri
 				u.Scheme = scheme
-				mb[k] = maybeGitSource{url: &u}
+				maybe[k] = maybeGitSource{url: &u}
 			}
 			pd = pathDeduction{
-				root: root,
-				mb:   mb,
+				root: src,
+				mb:   maybe,
 			}
 		}
 	}
