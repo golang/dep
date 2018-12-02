@@ -1,5 +1,17 @@
 # v0.5.1
-
+NEW FEATURES:
+* Added pkg source alias function.  
+Could be config by environment variable `DEPALIAS` with `{SOURCE}={TARGET}{os.PathListSeparator}`.  
+Or config in `Gopkg.alias` file with `SOURCE=TARGET` in each line.  
+eg:  
+  `golang.org/x/blog=github.com/golang/blog;golang.org/x/crypto=github.com/golang/crypto` for windows. 
+  `golang.org/x/blog=github.com/golang/blog:golang.org/x/crypto=github.com/golang/crypto` for linux.  
+  *Gopkg.alias* file :
+  ```
+  // some comment
+  golang.org/x/blog=github.com/golang/blog
+  golang.org/x/crypto=github.com/golang/crypto
+  ```
 IMPROVEMENTS:
 
 * The `noverify` field in `Gopkg.toml` allows for the preservation of excess files under `vendor`. ([#2002](https://github.com/golang/dep/issue/2002))
