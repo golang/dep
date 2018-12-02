@@ -679,7 +679,11 @@ func (dc *deductionCoordinator) deduceKnownPaths(path string) (pathDeduction, er
 			mb:   mb,
 		}, nil
 	}
-
+	// try use alias
+	pd, ok := parseAlias(path, u)
+	if ok {
+		return pd, nil
+	}
 	// Next, try the vcs extension-based (infix) matcher
 	exm := vcsExtensionDeducer{regexp: vcsExtensionRegex}
 	if root, err := exm.deduceRoot(path); err == nil {
