@@ -20,6 +20,9 @@ type ResourceAlias = map[string]string
 //AliasFile alias file location
 const AliasFile = "./Gopkg.alias"
 
+//AliasGlobalFile alias global file location
+const AliasGlobalFile = "dep.alias"
+
 //AliasEnv alias environment variable name
 const AliasEnv = "DEPALIAS"
 
@@ -39,6 +42,43 @@ func readAlias() (m ResourceAlias, err error) {
 		pair   []string
 	)
 	m = make(map[string]string)
+	//read global config file
+	if file, err = os.Open(AliasGlobalFile); err != nil {
+		if os.IsNotExist(err) {
+			err = nil
+			return
+		}
+		_, _ = fmt.Fprintf(os.Stderr, "error process global alias file %s", AliasFile)
+		return
+	}
+
+	reader := bufio.NewReader(file)
+	buffer := bytes.NewBuffer(make([]byte, 1024))
+	for {
+		if part, prefix, err = reader.ReadLine(); err != nil {
+			break
+		}
+		buffer.Write(part)
+		if !prefix {
+			lines = append(lines, buffer.String())
+			buffer.Reset()
+		}
+	}
+	if err == io.EOF {
+		err = nil
+	}
+	for l, line := range lines {
+		if strings.HasPrefix(strings.TrimPrefix(line, " "), AliasComment) {
+			continue
+		}
+		pair := strings.Split(line, "=")
+		if len(pair) != 2 {
+			_, _ = fmt.Fprintf(os.Stderr, "failed to parse gloabl alias config in file %s:%d ", AliasGlobalFile, l)
+			continue
+		}
+		m[pair[0]] = pair[1]
+	}
+	_ = file.Close()
 	//read alias env
 	alias := os.Getenv(AliasEnv)
 	if len(alias) != 0 {
@@ -63,8 +103,9 @@ func readAlias() (m ResourceAlias, err error) {
 		_, _ = fmt.Fprintf(os.Stderr, "error process alias file %s", AliasFile)
 		return
 	}
-	reader := bufio.NewReader(file)
-	buffer := bytes.NewBuffer(make([]byte, 1024))
+	defer file.Close()
+	reader = bufio.NewReader(file)
+	buffer = bytes.NewBuffer(make([]byte, 1024))
 	for {
 		if part, prefix, err = reader.ReadLine(); err != nil {
 			break
