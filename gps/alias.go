@@ -3,7 +3,6 @@ package gps
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -15,7 +14,10 @@ import (
 type ResourceAlias = map[string]string
 
 //AliasConfigFile alias file location
-const AliasConfigFile = "./Gopkg.alias"
+const AliasFile = "./Gopkg.alias"
+const AliasEnv = "DEP_ALIAS"
+const AliasComment = "//"
+const AliasEnvSeparator = "="
 
 // readAlias read alias form  a config file in work directory
 func readAlias() (m ResourceAlias, err error) {
@@ -24,10 +26,33 @@ func readAlias() (m ResourceAlias, err error) {
 		part   []byte
 		prefix bool
 		lines  []string
+		pair   []string
 	)
 	m = make(map[string]string)
-	if file, err = os.Open(AliasConfigFile); err != nil {
-		return
+	//read alias env
+	alias := os.Getenv(AliasEnv)
+	if len(alias) != 0 {
+		al := strings.Split(alias, string(os.PathListSeparator))
+		if len(al) != 0 {
+			for l, value := range al {
+				pair = strings.Split(value, AliasEnvSeparator)
+				if len(pair) != 2 {
+					_, _ = fmt.Fprintf(os.Stderr, "failed to parse alias config in environment variable %s:%d \n%s", AliasEnv, l, alias)
+					continue
+				}
+				m[pair[0]] = pair[1]
+			}
+		}
+	}
+	//read alias file
+	if file, err = os.Open(AliasFile); err != nil {
+		if os.IsNotExist(err) {
+			err = nil
+			return
+		} else {
+			_, _ = fmt.Fprintf(os.Stderr, "error process alias file %s", AliasFile)
+			return
+		}
 	}
 	reader := bufio.NewReader(file)
 	buffer := bytes.NewBuffer(make([]byte, 1024))
@@ -45,9 +70,13 @@ func readAlias() (m ResourceAlias, err error) {
 		err = nil
 	}
 	for l, line := range lines {
+		if strings.HasPrefix(strings.TrimPrefix(line, " "), AliasComment) {
+			continue
+		}
 		pair := strings.Split(line, "=")
 		if len(pair) != 2 {
-			return m, errors.New(fmt.Sprintf("failed to parse alias config in file %s:%d ", AliasConfigFile, l))
+			_, _ = fmt.Fprintf(os.Stderr, "failed to parse alias config in file %s:%d ", AliasFile, l)
+			continue
 		}
 		m[pair[0]] = pair[1]
 	}
@@ -58,11 +87,7 @@ func readAlias() (m ResourceAlias, err error) {
 func parseAlias(path string, uri *url.URL) (pd pathDeduction, ok bool) {
 	alias, e := readAlias()
 	if e != nil {
-		if os.IsNotExist(e) {
 
-		} else {
-			_, _ = fmt.Fprintf(os.Stderr, "error process alias file %s", AliasConfigFile)
-		}
 		return pathDeduction{}, false
 	}
 	for root, source := range alias {
