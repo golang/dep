@@ -58,7 +58,8 @@ for OS in ${DEP_BUILD_PLATFORMS[@]}; do
         GOARCH=${ARCH} GOOS=${OS} CGO_ENABLED=${CGO_ENABLED} ${GO_BUILD_CMD} -ldflags "${GO_BUILD_LDFLAGS}"\
             -o "${DEP_ROOT}/release/${NAME}" ./cmd/dep/
         pushd "${DEP_ROOT}/release" > /dev/null
-        shasum -a 256 "${NAME}" > "${NAME}.sha256"
+        which shasum > /dev/null 2>&1 && shasum -a 256 "${NAME}" > "${NAME}.sha256"
+        which sha256sum > /dev/null 2>&1 && sha256sum "${NAME}" > "${NAME}.sha256"
         popd > /dev/null
     fi
   done
