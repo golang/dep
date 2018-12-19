@@ -100,6 +100,8 @@ jobs:
             - release/dep-linux-ppc64.sha256
             - release/dep-linux-ppc64le
             - release/dep-linux-ppc64le.sha256
+            - release/dep-linux-s390x
+            - release/dep-linux-s390x.sha256
           skip_cleanup: true
           on:
             repo: golang/dep
