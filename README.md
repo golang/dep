@@ -28,6 +28,12 @@ $ brew install dep
 $ brew upgrade dep
 ```
 
+On Debian platforms you can install or upgrade to the latest version with apt-get:
+
+```sh
+$ sudo apt-get install go-dep
+```
+
 On other platforms you can use the `install.sh` script:
 
 ```sh
