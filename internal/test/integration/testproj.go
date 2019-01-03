@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/dep/internal/fs"
 	"github.com/golang/dep/internal/test"
 	"github.com/pkg/errors"
 )
@@ -56,8 +57,22 @@ func NewTestProject(t *testing.T, initPath, wd string, run RunFunc) *TestProject
 		run:    run,
 	}
 	new.makeRootTempDir()
+	new.TempDir(projectRoot)
+	dst := filepath.Join(new.tempdir, projectRoot)
+	// Not all test projects have an "initial" directory.
+	if _, err := os.Lstat(initPath); !os.IsNotExist(err) {
+		// Everything except for the inner destination
+		// directory must exist when calling CopyDir. It was
+		// created earlier by new.TempDir, so we have to
+		// remove it again here.
+		if err := os.Remove(dst); err != nil {
+			t.Fatalf("Remove(%s): %s", dst, err)
+		}
+		if err := fs.CopyDir(initPath, dst); err != nil {
+			t.Fatalf("CopyDir(%s, %s): %s", initPath, dst, err)
+		}
+	}
 	new.TempDir(projectRoot, "vendor")
-	new.CopyTree(initPath)
 
 	new.Setenv("GOPATH", new.tempdir)
 
@@ -195,39 +210,6 @@ func (p *TestProject) DoRun(args []string) error {
 		}
 	}
 	return status
-}
-
-// CopyTree recursively copies a source directory into the test project's directory.
-func (p *TestProject) CopyTree(src string) {
-	filepath.Walk(src,
-		func(path string, info os.FileInfo, err error) error {
-			if path != src {
-				localpath := path[len(src)+1:]
-				if info.IsDir() {
-					p.TempDir(projectRoot, localpath)
-				} else {
-					destpath := filepath.Join(p.ProjPath(), localpath)
-					copyFile(destpath, path)
-				}
-			}
-			return nil
-		})
-}
-
-func copyFile(dest, src string) {
-	in, err := os.Open(src)
-	if err != nil {
-		panic(err)
-	}
-	defer in.Close()
-
-	out, err := os.Create(dest)
-	if err != nil {
-		panic(err)
-	}
-	defer out.Close()
-
-	io.Copy(out, in)
 }
 
 // GetVendorPaths collects final vendor paths at a depth of three levels.
