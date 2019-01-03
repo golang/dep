@@ -1,0 +1,9 @@
+{
+    "commands": [
+        ["init"],
+        ["ensure"]
+    ],
+    "vendor-final": [
+        "compare"
+    ]
+}
