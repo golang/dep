@@ -28,7 +28,7 @@ func TestStatusFormatVersion(t *testing.T) {
 	t.Parallel()
 
 	tests := map[gps.Version]string{
-		nil: "",
+		nil:                            "",
 		gps.NewBranch("master"):        "branch master",
 		gps.NewVersion("1.0.0"):        "1.0.0",
 		gps.Revision("flooboofoobooo"): "flooboo",

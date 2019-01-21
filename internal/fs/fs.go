@@ -144,7 +144,7 @@ func EquivalentPaths(p1, p2 string) (bool, error) {
 				return false, nil
 			}
 		} else {
-			if strings.ToLower(p1Filename) != strings.ToLower(p2Filename) {
+			if !strings.EqualFold(p1Filename, p2Filename) {
 				return false, nil
 			}
 		}
