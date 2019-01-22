@@ -4,11 +4,15 @@
 # license that can be found in the LICENSE file.
 #
 # This script will generate coverage.txt
-set -e
+
+if [[ "${CI:-}" != 'true' ]]; then
+    # https://github.com/golang/dep/issues/2089
+    set -e
+fi
 
 PKGS=$(go list ./... | grep -v /vendor/)
 for pkg in $PKGS; do
-  go test -race -coverprofile=profile.out -covermode=atomic $pkg
+  go test -timeout=300s -race -coverprofile=profile.out -covermode=atomic $pkg
   if [[ -f profile.out ]]; then
     cat profile.out >> coverage.txt
     rm profile.out
