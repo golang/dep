@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/golang/dep/gps/pkgtree"
@@ -217,7 +218,21 @@ func (*gitSource) existsCallsListVersions() bool {
 func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, err error) {
 	r := s.repo
 
-	cmd := commandContext(ctx, "git", "ls-remote", r.Remote())
+	// XXX(theckman): if git ls-remote is given a Bitbucket mercurial repository
+	// by mistake, this command can take a very long time to error. This is
+	// because it's hitting a connection timeout condition on each connection
+	// attempt, resulting in it taking 120s * n (connections) to return. The
+	// number of connection attempts seems to be tied to the number of IPs
+	// returned for the DNS record. If this is encountered during an ensure
+	// resolution, the command can run for a pretty long period of time as it
+	// tries to check multiple versions.
+	//
+	// There does not seem to be a way to configure its connection timeout or
+	// retry limit, so we need to set a shorter timeout so this doesn't hang
+	// forever.
+	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+
+	cmd := commandContext(cctx, "git", "ls-remote", r.Remote())
 	// We want to invoke from a place where it's not possible for there to be a
 	// .git file instead of a .git directory, as git ls-remote will choke on the
 	// former and erroneously quit. However, we can't be sure that the repo
@@ -230,7 +245,9 @@ func (s *gitSource) listVersions(ctx context.Context) (vlist []PairedVersion, er
 	}
 	// Ensure no prompting for PWs
 	cmd.SetEnv(append([]string{"GIT_ASKPASS=", "GIT_TERMINAL_PROMPT=0"}, os.Environ()...))
+
 	out, err := cmd.CombinedOutput()
+	cancel()
 	if err != nil {
 		return nil, errors.Wrap(err, string(out))
 	}
