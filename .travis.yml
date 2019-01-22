@@ -12,7 +12,7 @@ jobs:
       env:
         - DEPTESTBYPASS501=1
       os: linux
-      go: 1.10.x
+      go: 1.11.x
       script:
         - make validate test
         - ./hack/coverage.bash
@@ -27,11 +27,19 @@ jobs:
       env:
         - DEPTESTBYPASS501=1
       script: make test
+    - &simple-test
+      go: 1.10.x
+      stage: test
+      go_import_path: github.com/golang/dep
+      install: skip
+      env:
+        - DEPTESTBYPASS501=1
+      script: make test
     - <<: *simple-test
       go: tip
     - <<: *simple-test
       os: osx
-      go: 1.10.x
+      go: 1.11.x
       install:
         # brew takes horribly long to update itself despite the above caching
         # attempt; only bzr install if it's not on the $PATH
@@ -47,7 +55,7 @@ jobs:
         # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
         - trap EXIT
         - make test
-    - go: 1.10.x
+    - go: 1.11.x
       # Run on OS X so that we get a CGO-enabled binary for this OS; see
       # https://github.com/golang/dep/issues/1838 for more details.
       os: osx
