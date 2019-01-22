@@ -21,15 +21,6 @@ jobs:
         - codeclimate-test-reporter < coverage.txt
     # YAML alias, for settings shared across the simpler builds
     - &simple-test
-      go: 1.9.x
-      stage: test
-      go_import_path: github.com/golang/dep
-      install:
-        - ssh-keyscan -t $TRAVIS_SSH_KEY_TYPES -H bitbucket.org >> ~/.ssh/known_hosts
-      env:
-        - DEPTESTBYPASS501=1
-      script: make test
-    - &simple-test
       go: 1.10.x
       stage: test
       go_import_path: github.com/golang/dep
@@ -38,6 +29,8 @@ jobs:
       env:
         - DEPTESTBYPASS501=1
       script: make test
+    - <<: *simple-test
+      go: 1.9.x
     - <<: *simple-test
       go: tip
     - <<: *simple-test
