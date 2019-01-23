@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -241,77 +242,101 @@ var pathDeductionFixtures = map[string][]pathDeductionFixture{
 	},
 	"bitbucket": {
 		{
-			in:   "bitbucket.org/sdboyer/reporoot",
-			root: "bitbucket.org/sdboyer/reporoot",
+			in:   "bitbucket.org/theckman/testgitrepo",
+			root: "bitbucket.org/theckman/testgitrepo",
 			mb: maybeSources{
-				maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
-				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
-				maybeHgSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("git://bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
+				maybeGitSource{url: mkurl("https://bitbucket.org/theckman/testgitrepo")},
+				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/theckman/testgitrepo")},
+				maybeGitSource{url: mkurl("git://bitbucket.org/theckman/testgitrepo")},
+				maybeGitSource{url: mkurl("http://bitbucket.org/theckman/testgitrepo")},
 			},
 		},
 		{
-			in:   "bitbucket.org/sdboyer/reporoot/foo/bar",
-			root: "bitbucket.org/sdboyer/reporoot",
+			in:   "bitbucket.org/theckman/testgitrepo/foo/bar",
+			root: "bitbucket.org/theckman/testgitrepo",
 			mb: maybeSources{
-				maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
-				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
-				maybeHgSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("git://bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot")},
+				maybeGitSource{url: mkurl("https://bitbucket.org/theckman/testgitrepo")},
+				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/theckman/testgitrepo")},
+				maybeGitSource{url: mkurl("git://bitbucket.org/theckman/testgitrepo")},
+				maybeGitSource{url: mkurl("http://bitbucket.org/theckman/testgitrepo")},
 			},
 		},
 		{
-			in:   "https://bitbucket.org/sdboyer/reporoot/foo/bar",
-			root: "bitbucket.org/sdboyer/reporoot",
+			in:   "https://bitbucket.org/theckman/testgitrepo/foo/bar",
+			root: "bitbucket.org/theckman/testgitrepo",
 			mb: maybeSources{
-				maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
-				maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot")},
+				maybeGitSource{url: mkurl("https://bitbucket.org/theckman/testgitrepo")},
+			},
+		},
+
+		{
+			in:   "bitbucket.org/mattfarina/testhgrepo",
+			root: "bitbucket.org/mattfarina/testhgrepo",
+			mb: maybeSources{
+				maybeHgSource{url: mkurl("https://bitbucket.org/mattfarina/testhgrepo")},
+				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/mattfarina/testhgrepo")},
+				maybeHgSource{url: mkurl("http://bitbucket.org/mattfarina/testhgrepo")},
+			},
+		},
+		{
+			in:   "bitbucket.org/mattfarina/testhgrepo/foo/bar",
+			root: "bitbucket.org/mattfarina/testhgrepo",
+			mb: maybeSources{
+				maybeHgSource{url: mkurl("https://bitbucket.org/mattfarina/testhgrepo")},
+				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/mattfarina/testhgrepo")},
+				maybeHgSource{url: mkurl("http://bitbucket.org/mattfarina/testhgrepo")},
+			},
+		},
+		{
+			in:   "https://bitbucket.org/mattfarina/testhgrepo/foo/bar",
+			root: "bitbucket.org/mattfarina/testhgrepo",
+			mb: maybeSources{
+				maybeHgSource{url: mkurl("https://bitbucket.org/mattfarina/testhgrepo")},
 			},
 		},
 		// Less standard behaviors possible due to the hg/git ambiguity
 		{
-			in:   "bitbucket.org/sdboyer/reporoot.git",
-			root: "bitbucket.org/sdboyer/reporoot.git",
+			in:   "bitbucket.org/theckman/testgitrepo.git",
+			root: "bitbucket.org/theckman/testgitrepo.git",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot.git")},
-				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot.git")},
-				maybeGitSource{url: mkurl("git://bitbucket.org/sdboyer/reporoot.git")},
-				maybeGitSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot.git")},
+				maybeGitSource{url: mkurl("https://bitbucket.org/theckman/testgitrepo.git")},
+				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/theckman/testgitrepo.git")},
+				maybeGitSource{url: mkurl("git://bitbucket.org/theckman/testgitrepo.git")},
+				maybeGitSource{url: mkurl("http://bitbucket.org/theckman/testgitrepo.git")},
 			},
 		},
 		{
-			in:   "git@bitbucket.org:sdboyer/reporoot.git",
-			root: "bitbucket.org/sdboyer/reporoot.git",
+			in:   "git@bitbucket.org:theckman/testgitrepo.git",
+			root: "bitbucket.org/theckman/testgitrepo.git",
 			mb: maybeSources{
-				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/sdboyer/reporoot.git")},
+				maybeGitSource{url: mkurl("ssh://git@bitbucket.org/theckman/testgitrepo.git")},
 			},
 		},
 		{
-			in:   "bitbucket.org/sdboyer/reporoot.hg",
-			root: "bitbucket.org/sdboyer/reporoot.hg",
+			in:   "bitbucket.org/mattfarina/testhgrepo.hg",
+			root: "bitbucket.org/mattfarina/testhgrepo.hg",
 			mb: maybeSources{
-				maybeHgSource{url: mkurl("https://bitbucket.org/sdboyer/reporoot.hg")},
-				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot.hg")},
-				maybeHgSource{url: mkurl("http://bitbucket.org/sdboyer/reporoot.hg")},
+				maybeHgSource{url: mkurl("https://bitbucket.org/mattfarina/testhgrepo.hg")},
+				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/mattfarina/testhgrepo.hg")},
+				maybeHgSource{url: mkurl("http://bitbucket.org/mattfarina/testhgrepo.hg")},
 			},
 		},
 		{
-			in:   "hg@bitbucket.org:sdboyer/reporoot",
-			root: "bitbucket.org/sdboyer/reporoot",
+			in:   "hg@bitbucket.org:mattfarina/testhgrepo",
+			root: "bitbucket.org/mattfarina/testhgrepo",
 			mb: maybeSources{
-				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/sdboyer/reporoot")},
+				maybeHgSource{url: mkurl("ssh://hg@bitbucket.org/mattfarina/testhgrepo")},
 			},
 		},
 		{
-			in:     "git://bitbucket.org/sdboyer/reporoot.hg",
-			root:   "bitbucket.org/sdboyer/reporoot.hg",
+			in:     "git://bitbucket.org/mattfarina/testhgrepo.hg",
+			root:   "bitbucket.org/mattfarina/testhgrepo.hg",
 			srcerr: errors.New("git is not a valid scheme for accessing an hg repository"),
+		},
+		{
+			in:     "hg://bitbucket.org/theckman/testgitrepo.git",
+			root:   "bitbucket.org/theckman/testgitrepo.git",
+			srcerr: errors.New("hg is not a valid scheme for accessing a git repository"),
 		},
 	},
 	"launchpad": {
@@ -677,5 +702,61 @@ func TestVanityDeductionSchemeMismatch(t *testing.T) {
 	// TODO(sdboyer) this is not actually the error that it should be
 	if err == nil {
 		t.Error("should have errored on scheme mismatch between input and go-get metadata")
+	}
+}
+
+func Test_getBitbucketRepo(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+		err   string
+	}{
+		{
+			name:  "malformed",
+			input: "some/repo",
+			err:   `bitbucket repo path "some/repo" appears malformed, want /USER/REPO`,
+		},
+		{
+			name:  "has_git_suffix",
+			input: "/some/repo.git",
+			want:  "some/repo",
+		},
+		{
+			name:  "has_hg_suffix",
+			input: "/some/repo.hg",
+			want:  "some/repo",
+		},
+		{
+			name:  "no_suffix",
+			input: "/some/repo",
+			want:  "some/repo",
+		},
+	}
+
+	for _, tt := range tests {
+		var got string
+		var err error
+
+		t.Run(tt.name, func(t *testing.T) {
+			got, err = getBitbucketRepo(tt.input)
+			if err != nil {
+				if len(tt.err) > 0 {
+					if strings.Contains(err.Error(), tt.err) {
+						return
+					}
+					t.Fatalf("did not find %q in error %q", tt.err, err)
+				}
+				t.Fatalf("getBitbucketRepo() unexpected error: %s", err)
+			}
+
+			if len(tt.err) > 0 {
+				t.Fatalf("getBitbucketRepo() error %q did not occur as expected", tt.err)
+			}
+
+			if got != tt.want {
+				t.Fatalf("getBitbucketRepo() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

@@ -9,3 +9,6 @@
 /profile.out
 /coverage.txt
 release/
+
+# code coverage files
+*.out
