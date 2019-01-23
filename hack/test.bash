@@ -8,10 +8,7 @@
 # DEP_BUILD_PLATFORMS="linux" DEP_BUILD_ARCHS="amd64" ./hack/build-all.bash
 # can be called to build only for linux-amd64
 
-if [[ "${CI:-}" != 'true' ]]; then
-    # https://github.com/golang/dep/issues/2089
-    set -e
-fi
+set -e
 
 IMPORT_DURING_SOLVE=${IMPORT_DURING_SOLVE:-false}
 

@@ -3,12 +3,9 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 #
-# This script will generate coverage.txt
+# This script will generate coverage.txt.
 
-if [[ "${CI:-}" != 'true' ]]; then
-    # https://github.com/golang/dep/issues/2089
-    set -e
-fi
+set -e
 
 PKGS=$(go list ./... | grep -v /vendor/)
 for pkg in $PKGS; do
