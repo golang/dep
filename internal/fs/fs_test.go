@@ -917,8 +917,8 @@ func TestIsRegular(t *testing.T) {
 		exists bool
 		err    bool
 	}{
-		wd: {false, true},
-		filepath.Join(wd, "testdata"):                       {false, true},
+		wd:                            {false, true},
+		filepath.Join(wd, "testdata"): {false, true},
 		filepath.Join(wd, "testdata", "test.file"):          {true, false},
 		filepath.Join(wd, "this_file_does_not_exist.thing"): {false, false},
 		fn: {false, true},
@@ -972,9 +972,9 @@ func TestIsDir(t *testing.T) {
 		exists bool
 		err    bool
 	}{
-		wd: {true, false},
-		filepath.Join(wd, "testdata"):                       {true, false},
-		filepath.Join(wd, "main.go"):                        {false, true},
+		wd:                            {true, false},
+		filepath.Join(wd, "testdata"): {true, false},
+		filepath.Join(wd, "main.go"):  {false, true},
 		filepath.Join(wd, "this_file_does_not_exist.thing"): {false, true},
 		dn: {false, true},
 	}

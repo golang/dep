@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 type cmd struct {
@@ -66,10 +67,10 @@ func (c cmd) CombinedOutput() ([]byte, error) {
 			if err := c.Cmd.Process.Signal(os.Interrupt); err != nil {
 				// If an error comes back from attempting to signal, proceed
 				// immediately to hard kill.
-				_ = c.Cmd.Process.Kill()
+				_ = unix.Kill(-c.Cmd.Process.Pid, syscall.SIGKILL)
 			} else {
 				defer time.AfterFunc(time.Minute, func() {
-					_ = c.Cmd.Process.Kill()
+					_ = unix.Kill(-c.Cmd.Process.Pid, syscall.SIGKILL)
 				}).Stop()
 				<-waitDone
 			}

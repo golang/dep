@@ -255,7 +255,7 @@ func fillPackage(p *build.Package) error {
 			if ic != "" {
 				importComments = append(importComments, ic)
 			}
-			if c.Pos() > pf.Package { // +build comment must come before package
+			if c.Pos() > pf.Package { // "+build" comment must come before package
 				continue
 			}
 

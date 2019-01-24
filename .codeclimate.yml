@@ -22,7 +22,9 @@ checks:
     enabled: false
 plugins:
   gofmt:
-    enabled: true
+    # Codeclimate go fmt does not agree with tip go fmt; consider re-enabling
+    # CC when the advice matches up with tip again.
+    enabled: false
   govet:
     enabled: true
   golint:
