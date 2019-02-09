@@ -31,7 +31,7 @@ if [[ -z "${DEP_BUILD_PLATFORMS}" ]]; then
 fi
 
 if [[ -z "${DEP_BUILD_ARCHS}" ]]; then
-    DEP_BUILD_ARCHS="amd64 386 ppc64 ppc64le"
+    DEP_BUILD_ARCHS="amd64 386 ppc64 ppc64le s390x"
 fi
 
 mkdir -p "${DEP_ROOT}/release"
@@ -50,14 +50,16 @@ for OS in ${DEP_BUILD_PLATFORMS[@]}; do
     else
       CGO_ENABLED=0
     fi
-    if [[ "${ARCH}" == "ppc64" || "${ARCH}" == "ppc64le" ]] && [[ "${OS}" != "linux" ]]; then
-        # ppc64 and ppc64le are only supported on Linux.
+    if [[ "${ARCH}" == "ppc64" || "${ARCH}" == "ppc64le" || "${ARCH}" == "s390x" ]] && [[ "${OS}" != "linux" ]]; then
+        # ppc64, ppc64le, and s390x are only supported on Linux.
         echo "Building for ${OS}/${ARCH} not supported."
     else
         echo "Building for ${OS}/${ARCH} with CGO_ENABLED=${CGO_ENABLED}"
         GOARCH=${ARCH} GOOS=${OS} CGO_ENABLED=${CGO_ENABLED} ${GO_BUILD_CMD} -ldflags "${GO_BUILD_LDFLAGS}"\
             -o "${DEP_ROOT}/release/${NAME}" ./cmd/dep/
-        shasum -a 256 "${DEP_ROOT}/release/${NAME}" > "${DEP_ROOT}/release/${NAME}".sha256
+        pushd "${DEP_ROOT}/release" > /dev/null
+        shasum -a 256 "${NAME}" > "${NAME}.sha256"
+        popd > /dev/null
     fi
   done
 done

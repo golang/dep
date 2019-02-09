@@ -13,7 +13,7 @@ Briefly, the four states are:
 1.  The [current project's](glossary.md#current-project) source code.
 2.  A [manifest](glossary.md#manifest) - a file describing the current project's dependency requirements. In dep, this is the [`Gopkg.toml`](Gopkg.toml.md) file.
 3.  A [lock](glossary.md#lock) - a file containing a transitively-complete, reproducible description of the dependency graph. In dep, this is the [`Gopkg.lock`](Gopkg.lock.md) file.
-4.  The source code of the dependences themselves. In dep's current design, this is the `vendor/` directory.
+4.  The source code of the dependencies themselves. In dep's current design, this is the `vendor/` directory.
 
 We can visually represent these four states as follows:
 
@@ -156,7 +156,7 @@ Ordinarily, when the solver encounters a project name for which there's an entry
 
 "Skips pulling the version from the lock" would imply that `dep ensure -update github.com/foo/bar` is equivalent to removing the `[[project]]` stanza for `github.com/foo/bar` from your `Gopkg.lock`, then running `dep ensure`. And indeed it is - however, that approach is not recommended, and subtle changes may be introduced in the future that complicate the equivalency.
 
-If `-update` is passed with no arguments, then `ChangeAll` is set to `true`, resulting in the solver ignoring `Gopkg.lock` for all newly-encountered project names. This is equivalent to explicitly passing all of your dependences as arguments to `dep ensure -update`, as well as `rm Gopkg.lock && dep ensure`. Again, however, neither of these approaches are recommended, and future changes may introduce subtle differences.
+If `-update` is passed with no arguments, then `ChangeAll` is set to `true`, resulting in the solver ignoring `Gopkg.lock` for all newly-encountered project names. This is equivalent to explicitly passing all of your dependencies as arguments to `dep ensure -update`, as well as `rm Gopkg.lock && dep ensure`. Again, however, neither of these approaches are recommended, and future changes may introduce subtle differences.
 
 When a version hint from `Gopkg.lock` is not placed at the head of the version queue, it means that dep will explore the set of possible versions for a particular dependency. This exploration is performed according to a [fixed sort order](https://godoc.org/github.com/golang/dep/gps#SortForUpgrade), where newer versions are tried first, resulting in an update.
 

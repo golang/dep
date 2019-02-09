@@ -141,7 +141,7 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 			noverify[skip] = true
 		}
 
-		var vendorfail bool
+		var vendorfail, hasnoverify bool
 		// One full pass through, to see if we need to print the header, and to
 		// create an array of names to sort for deterministic output.
 		var ordered []string
@@ -149,53 +149,74 @@ func (cmd *checkCommand) Run(ctx *dep.Ctx, args []string) error {
 			ordered = append(ordered, path)
 
 			switch status {
-			case verify.DigestMismatchInLock, verify.HashVersionMismatch, verify.EmptyDigestInLock:
-				// NoVerify applies only to these three cases.
+			case verify.DigestMismatchInLock, verify.HashVersionMismatch, verify.EmptyDigestInLock, verify.NotInLock:
 				if noverify[path] {
+					hasnoverify = true
 					continue
 				}
 				fallthrough
-			case verify.NotInTree, verify.NotInLock:
+			case verify.NotInTree:
+				// NoVerify cannot be used to make dep check ignore the absence
+				// of a project entirely.
+				if noverify[path] {
+					delete(noverify, path)
+				}
+
 				fail = true
 				if !vendorfail {
 					vendorfail = true
-					logger.Println("# vendor is out of sync:")
 				}
-
 			}
 		}
 		sort.Strings(ordered)
 
+		var vfbuf, novbuf bytes.Buffer
+		var bufptr *bytes.Buffer
+
+		fmt.Fprintf(&vfbuf, "# vendor is out of sync:\n")
+		fmt.Fprintf(&novbuf, "# out of sync, but ignored, due to noverify in Gopkg.toml:\n")
+
 		for _, pr := range ordered {
-			var nvSuffix string
 			if noverify[pr] {
-				nvSuffix = "  (CHECK IGNORED: marked noverify in Gopkg.toml)"
+				bufptr = &novbuf
+			} else {
+				bufptr = &vfbuf
 			}
 
 			status := statuses[pr]
 			switch status {
 			case verify.NotInTree:
-				logger.Printf("%s: missing from vendor\n", pr)
+				fmt.Fprintf(bufptr, "%s: missing from vendor\n", pr)
 			case verify.NotInLock:
 				fi, err := os.Stat(filepath.Join(p.AbsRoot, "vendor", pr))
 				if err != nil {
 					return errors.Wrap(err, "could not stat file that VerifyVendor claimed existed")
 				}
 				if fi.IsDir() {
-					logger.Printf("%s: unused project\n", pr)
+					fmt.Fprintf(bufptr, "%s: unused project\n", pr)
 				} else {
-					logger.Printf("%s: orphaned file\n", pr)
+					fmt.Fprintf(bufptr, "%s: orphaned file\n", pr)
 				}
 			case verify.DigestMismatchInLock:
-				logger.Printf("%s: hash of vendored tree not equal to digest in Gopkg.lock%s\n", pr, nvSuffix)
+				fmt.Fprintf(bufptr, "%s: hash of vendored tree not equal to digest in Gopkg.lock\n", pr)
 			case verify.EmptyDigestInLock:
-				logger.Printf("%s: no digest in Gopkg.lock to compare against hash of vendored tree%s\n", pr, nvSuffix)
+				fmt.Fprintf(bufptr, "%s: no digest in Gopkg.lock to compare against hash of vendored tree\n", pr)
 			case verify.HashVersionMismatch:
 				// This will double-print if the hash version is zero, but
 				// that's a rare case that really only occurs before the first
 				// run with a version of dep >=0.5.0, so it's fine.
-				logger.Printf("%s: hash algorithm mismatch, want version %v%s\n", pr, verify.HashVersion, nvSuffix)
+				fmt.Fprintf(bufptr, "%s: hash algorithm mismatch, want version %v\n", pr, verify.HashVersion)
 			}
+		}
+
+		if vendorfail {
+			logger.Print(vfbuf.String())
+			if hasnoverify {
+				logger.Println()
+			}
+		}
+		if hasnoverify {
+			logger.Print(novbuf.String())
 		}
 	}
 

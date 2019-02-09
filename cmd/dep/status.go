@@ -340,7 +340,7 @@ func (out *dotOutput) BasicHeader() error {
 
 func (out *dotOutput) BasicFooter() error {
 	gvo := out.g.output("")
-	_, err := fmt.Fprintf(out.w, gvo.String())
+	_, err := fmt.Fprint(out.w, gvo.String())
 	return err
 }
 

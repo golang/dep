@@ -74,7 +74,7 @@ func (cmd *initCommand) Run(ctx *dep.Ctx, args []string) error {
 	}
 
 	var root string
-	if len(args) <= 0 {
+	if len(args) == 0 {
 		root = ctx.WorkingDir
 	} else {
 		root = args[0]

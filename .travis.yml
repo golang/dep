@@ -1,5 +1,6 @@
 language: go
 sudo: false
+dist: xenial
 notifications:
   email: false
 jobs:
@@ -7,12 +8,14 @@ jobs:
     - stage: test
       go_import_path: github.com/golang/dep
       install:
+        - ssh-keyscan -t $TRAVIS_SSH_KEY_TYPES -H bitbucket.org >> ~/.ssh/known_hosts
         - make get-deps
         - npm install -g codeclimate-test-reporter
       env:
         - DEPTESTBYPASS501=1
+        - TZ=UTC
       os: linux
-      go: 1.10.x
+      go: 1.11.x
       script:
         - make validate test
         - ./hack/coverage.bash
@@ -20,25 +23,39 @@ jobs:
         - codeclimate-test-reporter < coverage.txt
     # YAML alias, for settings shared across the simpler builds
     - &simple-test
-      go: 1.9.x
+      go: 1.10.x
       stage: test
       go_import_path: github.com/golang/dep
-      install: skip
+      install:
+        - ssh-keyscan -t $TRAVIS_SSH_KEY_TYPES -H bitbucket.org >> ~/.ssh/known_hosts
       env:
         - DEPTESTBYPASS501=1
+        - TZ=UTC
       script: make test
     - <<: *simple-test
+      go: 1.9.x
+    - <<: *simple-test
       go: tip
+      install:
+        - ssh-keyscan -t $TRAVIS_SSH_KEY_TYPES -H bitbucket.org >> ~/.ssh/known_hosts
+        - mkdir -p /home/travis/var/cache
+      env:
+        - GOCACHE=/home/travis/var/cache
+        - DEPTESTBYPASS501=1
+        - TZ=UTC
+
     - <<: *simple-test
       os: osx
-      go: 1.10.x
+      go: 1.11.x
       install:
         # brew takes horribly long to update itself despite the above caching
         # attempt; only bzr install if it's not on the $PATH
+        - ssh-keyscan -t $TRAVIS_SSH_KEY_TYPES -H bitbucket.org >> ~/.ssh/known_hosts
         - test $(which bzr) || brew install bzr
       env:
         - HOMEBREW_NO_AUTO_UPDATE=1
         - DEPTESTBYPASS501=1
+        - TZ=UTC
       script:
         # OSX as of El Capitan sets an exit trap that interacts poorly with how
         # travis seems to spawn these shells; if set -e is set, then it can cause
@@ -47,13 +64,14 @@ jobs:
         # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
         - trap EXIT
         - make test
-    - go: 1.10.x
+    - go: 1.11.x
       # Run on OS X so that we get a CGO-enabled binary for this OS; see
       # https://github.com/golang/dep/issues/1838 for more details.
       os: osx
       stage: deploy
       go_import_path: github.com/golang/dep
-      install: skip
+      install:
+        - ssh-keyscan -t $TRAVIS_SSH_KEY_TYPES -H bitbucket.org >> ~/.ssh/known_hosts
       script: skip
       before_deploy:
         - ./hack/build-all.bash
@@ -82,6 +100,8 @@ jobs:
             - release/dep-linux-ppc64.sha256
             - release/dep-linux-ppc64le
             - release/dep-linux-ppc64le.sha256
+            - release/dep-linux-s390x
+            - release/dep-linux-s390x.sha256
           skip_cleanup: true
           on:
             repo: golang/dep

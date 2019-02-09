@@ -106,7 +106,7 @@ func DiffLocks(l1, l2 gps.Lock) LockDelta {
 			switch strings.Compare(string(pr1), string(pr2)) {
 			case 0: // Found a matching project
 				lpd = LockedProjectDelta{
-					Name: pr1,
+					Name:                         pr1,
 					LockedProjectPropertiesDelta: DiffLockedProjectProperties(lp1, lp2),
 				}
 				i2next = i2 + 1 // Don't visit this project again

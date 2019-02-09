@@ -432,6 +432,7 @@ const (
 	missingFromTree
 	projectAdded
 	projectRemoved
+	pathPreserved
 )
 
 // NewDeltaWriter prepares a vendor writer that will construct a vendor
@@ -510,17 +511,26 @@ func NewDeltaWriter(p *Project, newLock *Lock, behavior VendorBehavior) (TreeWri
 		// We don't validate this field elsewhere as it can be difficult to know
 		// at the beginning of a dep ensure command whether or not the noverify
 		// project actually will exist as part of the Lock by the end of the
-		// run. So, only apply if it's in the lockdiff, and isn't a removal.
+		// run. So, only apply if it's in the lockdiff.
 		if _, has := dw.lockDiff.ProjectDeltas[pr]; has {
-			if typ, has := dw.changed[pr]; has && typ < noVerify {
-				// Avoid writing noverify projects at all for the lower change
-				// types.
-				delete(dw.changed, pr)
+			if typ, has := dw.changed[pr]; has {
+				if typ < noVerify {
+					// Avoid writing noverify projects at all for the lower change
+					// types.
+					delete(dw.changed, pr)
 
-				// Uncomment this if we want to switch to the safer behavior,
-				// where we ALWAYS write noverify projects.
-				//dw.changed[pr] = noVerify
+					// Uncomment this if we want to switch to the safer behavior,
+					// where we ALWAYS write noverify projects.
+					//dw.changed[pr] = noVerify
+				} else if typ == projectRemoved {
+					// noverify can also be used to preserve files that would
+					// otherwise be removed.
+					dw.changed[pr] = pathPreserved
+				}
 			}
+			// It's also allowed to preserve entirely unknown paths using noverify.
+		} else if _, has := status[spr]; has {
+			dw.changed[pr] = pathPreserved
 		}
 	}
 
@@ -564,29 +574,28 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 		projs[lp.Ident().ProjectRoot] = lp
 	}
 
-	dropped := []gps.ProjectRoot{}
+	var dropped, preserved []gps.ProjectRoot
 	i := 0
 	tot := len(dw.changed)
-	if len(dw.changed) > 0 {
-		logger.Println("# Bringing vendor into sync")
+	for _, reason := range dw.changed {
+		if reason != pathPreserved {
+			logger.Println("# Bringing vendor into sync")
+			break
+		}
 	}
+
 	for pr, reason := range dw.changed {
-		if reason == projectRemoved {
+		switch reason {
+		case projectRemoved:
 			dropped = append(dropped, pr)
+			continue
+		case pathPreserved:
+			preserved = append(preserved, pr)
 			continue
 		}
 
 		to := filepath.FromSlash(filepath.Join(vnewpath, string(pr)))
-		proj, has := projs[pr]
-		if !has {
-			// This shouldn't be reachable, but it's preferable to print an
-			// error and continue rather than panic. https://github.com/golang/dep/issues/1945
-			// TODO(sdboyer) remove this once we've increased confidence around
-			// this case.
-			fmt.Fprintf(os.Stderr, "Internal error - %s had change code %v but was not in new Gopkg.lock. Re-running dep ensure should fix this. Please file a bug at https://github.com/golang/dep/issues/new!\n", pr, reason)
-			continue
-		}
-		po := proj.(verify.VerifiableProject).PruneOpts
+		po := projs[pr].(verify.VerifiableProject).PruneOpts
 		if err := sm.ExportPrunedProject(context.TODO(), projs[pr], po, to); err != nil {
 			return errors.Wrapf(err, "failed to export %s", pr)
 		}
@@ -666,13 +675,18 @@ func (dw *DeltaWriter) Write(path string, sm gps.SourceManager, examples bool, l
 		}
 	}
 
-	// Ensure vendor/.git is preserved if present
+	// Special case: ensure vendor/.git is preserved if present
 	if hasDotGit(vpath) {
-		err = fs.RenameWithFallback(filepath.Join(vpath, ".git"), filepath.Join(vnewpath, "vendor/.git"))
-		if _, ok := err.(*os.LinkError); ok {
-			return errors.Wrap(err, "failed to preserve vendor/.git")
+		preserved = append(preserved, ".git")
+	}
+
+	for _, path := range preserved {
+		err = fs.RenameWithFallback(filepath.Join(vpath, string(path)), filepath.Join(vnewpath, string(path)))
+		if err != nil {
+			return errors.Wrapf(err, "failed to preserve vendor/%s", path)
 		}
 	}
+
 	err = os.RemoveAll(vpath)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove original vendor directory")
