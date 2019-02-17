@@ -2,7 +2,22 @@
 
 IMPROVEMENTS:
 
+* Add CI tests against go1.11.
+* Fix indefinite hang cloning Git repositories that failed fsck checks. ([#2070][2070])
 * The `noverify` field in `Gopkg.toml` allows for the preservation of excess files under `vendor`. ([#2002](https://github.com/golang/dep/issue/2002))
+* Add releases for `arm`, `armv6` ([#2102][2102]), `s390x` ([#2070][2070]), and `ppc` architectures.
+* Fix handling of cyclic import graphs ([#2003][2003]).
+* Fix error in preservation of vendor/.git ([#2000][2000]).
+* Fix an edge case in lockdiff where all the projects may be removed from the lock file ([#1972][1972]).
+* Fix panic related to projects. ([#1945][1945])
+
+[2102]: https://github.com/golang/dep/pull/2102
+[2070]: https://github.com/golang/dep/pull/2070
+[2000]: https://github.com/golang/dep/pull/2000
+[1981]: https://github.com/golang/dep/pull/1981
+[2003]: https://github.com/golang/dep/pull/2003
+[1972]: https://github.com/golang/dep/pull/1972
+[1945]: https://github.com/golang/dep/pull/1945
 
 BUG FIXES:
 
