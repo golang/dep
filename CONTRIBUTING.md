@@ -24,7 +24,7 @@ When [filing an issue](https://github.com/golang/dep/issues/new), make sure to a
 ## Contributing code
 
 Let us know if you are interested in working on an issue by leaving a comment
-on the issue in GitHub. This helps avoid multiple people unknowingly 
+on the issue in GitHub. This helps avoid multiple people unknowingly
 working on the same issue.
 
 Please read the [Contribution Guidelines](https://golang.org/doc/contribute.html)
