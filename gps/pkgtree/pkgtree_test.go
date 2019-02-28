@@ -1539,6 +1539,24 @@ func TestListPackages(t *testing.T) {
 				},
 			},
 		},
+		"slash-star": {
+			fileRoot:   j("slash-star_confl"),
+			importRoot: "slash-star_confl",
+			out: PackageTree{
+				ImportRoot: "slash-star_confl",
+				Packages: map[string]PackageOrErr{
+					"slash-star_confl": {
+						Err: &ConflictingImportComments{
+							ImportPath: "slash-star_confl",
+							ConflictingImportComments: []string{
+								"vanity1",
+								"vanity2",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, fix := range table {

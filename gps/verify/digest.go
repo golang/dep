@@ -299,10 +299,10 @@ const (
 
 func (ls VendorStatus) String() string {
 	switch ls {
-	case NotInTree:
-		return "not in tree"
 	case NotInLock:
 		return "not in lock"
+	case NotInTree:
+		return "not in tree"
 	case NoMismatch:
 		return "match"
 	case EmptyDigestInLock:

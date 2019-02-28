@@ -117,6 +117,7 @@ func TestDigestFromDirectory(t *testing.T) {
 	// ensure hash ignores prefix.
 
 	t.Run("AbsolutePrefix", func(t *testing.T) {
+		t.Parallel()
 		prefix := getTestdataVerifyRoot(t)
 		got, err := DigestFromDirectory(filepath.Join(prefix, relativePathname))
 		if err != nil {
@@ -128,6 +129,7 @@ func TestDigestFromDirectory(t *testing.T) {
 	})
 
 	t.Run("RelativePrefix", func(t *testing.T) {
+		t.Parallel()
 		prefix := "../_testdata/digest"
 		got, err := DigestFromDirectory(filepath.Join(prefix, relativePathname))
 		if err != nil {
@@ -231,6 +233,81 @@ func TestVerifyDepTree(t *testing.T) {
 		checkStatus(t, status, "github.com/bob/emptyDigest", HashVersionMismatch)
 		checkStatus(t, status, "github.com/charlie/notInTree", NotInTree)
 		checkStatus(t, status, "launchpad.net/match", HashVersionMismatch)
+	})
+
+	t.Run("Non-existent directory", func(t *testing.T) {
+		t.Parallel()
+		wantDigests := make(map[string]VersionedDigest)
+		for k, v := range wantSums {
+			wantDigests[k] = VersionedDigest{
+				HashVersion: HashVersion + 1,
+				Digest:      v,
+			}
+		}
+
+		status, err := CheckDepTree("fooVendorRoot", wantDigests)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got, want := len(status), 6; got != want {
+			t.Errorf("Unexpected result count from VerifyDepTree:\n\t(GOT): %v\n\t(WNT): %v", got, want)
+		}
+
+		checkStatus(t, status, "github.com/alice/match", NotInTree)
+		checkStatus(t, status, "github.com/alice/mismatch", NotInTree)
+		checkStatus(t, status, "github.com/bob/match", NotInTree)
+		checkStatus(t, status, "github.com/bob/emptyDigest", NotInTree)
+		checkStatus(t, status, "github.com/charlie/notInTree", NotInTree)
+		checkStatus(t, status, "launchpad.net/match", NotInTree)
+
+	})
+}
+
+func TestParseVersionedDigest(t *testing.T) {
+	t.Run("Parse valid VersionedDigest", func(t *testing.T) {
+		t.Parallel()
+		input := "1:60861e762bdbe39c4c7bf292c291329b731c9925388fd41125888f5c1c595feb"
+		vd, err := ParseVersionedDigest(input)
+		if err != nil {
+			t.Fatal()
+		}
+
+		expectedHash := "60861e762bdbe39c4c7bf292c291329b731c9925388fd41125888f5c1c595feb"
+		if got, want := vd.Digest, expectedHash; bytes.Equal(got, []byte(expectedHash)) {
+			t.Errorf("Unexpected result from ParseVersionedDigest:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		}
+
+		if got, want := vd.String(), input; got != want {
+			t.Errorf("Unexpected result from ParseVersionedDigest String:\n\t(GOT): %s\n\t(WNT): %s", got, want)
+		}
+	})
+
+	t.Run("Parse VersionedDigest with invalid format", func(t *testing.T) {
+		t.Parallel()
+		input := "1abc"
+		_, err := ParseVersionedDigest(input)
+		if err == nil {
+			t.Error("expected error for invalid VersionedDigest format")
+		}
+	})
+
+	t.Run("Parse VersionedDigest with invalid hex string", func(t *testing.T) {
+		t.Parallel()
+		input := "1:60861g762bdbe39c4c7bf292c291329b731c9925388fd41125888f5c1c595feb"
+		_, err := ParseVersionedDigest(input)
+		if err == nil {
+			t.Error("expected error VersionedDigest with invalid hex string")
+		}
+	})
+
+	t.Run("Parse VersionedDigest with invalid hash version", func(t *testing.T) {
+		t.Parallel()
+		input := "a:60861e762bdbe39c4c7bf292c291329b731c9925388fd41125888f5c1c595feb"
+		_, err := ParseVersionedDigest(input)
+		if err == nil {
+			t.Error("expected error VersionedDigest with invalid hash version")
+		}
 	})
 }
 

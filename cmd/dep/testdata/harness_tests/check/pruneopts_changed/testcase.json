@@ -1,0 +1,9 @@
+{
+  "commands": [
+    ["check"]
+  ],
+  "should-fail": true,
+  "vendor-final": [
+    "github.com/sdboyer/deptest"
+  ]
+}
