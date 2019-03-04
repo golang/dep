@@ -14,8 +14,9 @@ jobs:
       env:
         - DEPTESTBYPASS501=1
         - TZ=UTC
+        - GOCACHE=/home/travis/var/cache
       os: linux
-      go: 1.11.x
+      go: 1.12.x
       script:
         - make validate test
         - ./hack/coverage.bash
@@ -23,7 +24,7 @@ jobs:
         - codeclimate-test-reporter < coverage.txt
     # YAML alias, for settings shared across the simpler builds
     - &simple-test
-      go: 1.10.x
+      go: 1.11.x
       stage: test
       go_import_path: github.com/golang/dep
       install:
@@ -31,7 +32,8 @@ jobs:
       env:
         - DEPTESTBYPASS501=1
         - TZ=UTC
-      script: make test
+      script:
+        - make test
     - <<: *simple-test
       go: 1.9.x
     - <<: *simple-test
@@ -46,7 +48,7 @@ jobs:
 
     - <<: *simple-test
       os: osx
-      go: 1.11.x
+      go: 1.12.x
       install:
         # brew takes horribly long to update itself despite the above caching
         # attempt; only bzr install if it's not on the $PATH
@@ -56,6 +58,7 @@ jobs:
         - HOMEBREW_NO_AUTO_UPDATE=1
         - DEPTESTBYPASS501=1
         - TZ=UTC
+        - GOCACHE=/Users/travis/var/cache
       script:
         # OSX as of El Capitan sets an exit trap that interacts poorly with how
         # travis seems to spawn these shells; if set -e is set, then it can cause
@@ -64,7 +67,7 @@ jobs:
         # Related: https://superuser.com/questions/1044130/why-am-i-having-how-can-i-fix-this-error-shell-session-update-command-not-f
         - trap EXIT
         - make test
-    - go: 1.11.x
+    - go: 1.12.x
       # Run on OS X so that we get a CGO-enabled binary for this OS; see
       # https://github.com/golang/dep/issues/1838 for more details.
       os: osx
@@ -72,7 +75,8 @@ jobs:
       go_import_path: github.com/golang/dep
       install:
         - ssh-keyscan -t $TRAVIS_SSH_KEY_TYPES -H bitbucket.org >> ~/.ssh/known_hosts
-      script: skip
+      script:
+        - skip
       before_deploy:
         - ./hack/build-all.bash
       deploy:

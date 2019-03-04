@@ -141,7 +141,7 @@ func ListPackages(fileRoot, importRoot string) (PackageTree, error) {
 		if err != nil {
 			switch err.(type) {
 			case gscan.ErrorList, *gscan.Error, *build.NoGoError, *ConflictingImportComments:
-				// Assorted cases in which we've encounter malformed or
+				// Assorted cases in which we've encountered malformed or
 				// nonexistent Go source code.
 				ptree.Packages[ip] = PackageOrErr{
 					Err: err,

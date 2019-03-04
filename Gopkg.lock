@@ -42,6 +42,19 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:2e3c336fc7fde5c984d2841455a658a6d626450b1754a854b3b32e7a8f49a07a"
+  name = "github.com/google/go-cmp"
+  packages = [
+    "cmp",
+    "cmp/internal/diff",
+    "cmp/internal/function",
+    "cmp/internal/value",
+  ]
+  pruneopts = "NUT"
+  revision = "3af367b6b30c263d47e8895973edcca9a49cf029"
+  version = "v0.2.0"
+
+[[projects]]
   digest = "1:f5169729244becc423886eae4d72547e28ac3f13f861bed8a9d749bc7238a1c3"
   name = "github.com/jmank88/nuts"
   packages = ["."]
@@ -122,6 +135,7 @@
     "github.com/armon/go-radix",
     "github.com/boltdb/bolt",
     "github.com/golang/protobuf/proto",
+    "github.com/google/go-cmp/cmp",
     "github.com/jmank88/nuts",
     "github.com/nightlyone/lockfile",
     "github.com/pelletier/go-toml",

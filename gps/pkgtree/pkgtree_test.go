@@ -21,6 +21,7 @@ import (
 	"github.com/golang/dep/gps/paths"
 	"github.com/golang/dep/internal/fs"
 	_ "github.com/golang/dep/internal/test" // DO NOT REMOVE, allows go test ./... -update to work
+	"github.com/google/go-cmp/cmp"
 )
 
 // PackageTree.ToReachMap() uses an easily separable algorithm, wmToReach(),
@@ -546,11 +547,13 @@ func TestWorkmapToReach(t *testing.T) {
 			}
 
 			rm, em := wmToReach(fix.workmap, fix.backprop)
-			if !reflect.DeepEqual(rm, fix.rm) {
+			if diff := cmp.Diff(rm, fix.rm); diff != "" {
 				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", name, rm, fix.rm))
 				t.Errorf("Did not get expected reach map:\n\t(GOT): %s\n\t(WNT): %s", rm, fix.rm)
 			}
-			if !reflect.DeepEqual(em, fix.em) {
+			if diff := cmp.Diff(em, fix.em, cmp.Comparer(func(x error, y error) bool {
+				return x.Error() == y.Error()
+			})); diff != "" {
 				//t.Error(pretty.Sprintf("wmToReach(%q): Did not get expected error map:\n\t(GOT): %# v\n\t(WNT): %# v", name, em, fix.em))
 				t.Errorf("Did not get expected error map:\n\t(GOT): %v\n\t(WNT): %v", em, fix.em)
 			}
