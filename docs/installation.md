@@ -21,6 +21,11 @@ $ brew install dep
 $ brew upgrade dep
 ```
 
+## Windows
+
+You can install from source (see below) or download a tarball from
+[go.equinox.io](https://go.equinox.io/github.com/golang/dep/cmd/dep).
+
 ## Arch Linux
 
 Install the `dep` package:

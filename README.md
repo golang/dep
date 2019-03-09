@@ -11,7 +11,7 @@
 
 `dep` was the "official experiment." The Go toolchain, as of 1.11, has
 (experimentally) adopted an approach that sharply diverges from `dep`. As a
-result, we are continuing development of `dep`, but gearing work  primarily
+result, we are continuing development of `dep`, but gearing work primarily
 towards the development of an alternative prototype for versioning behavior in
 the toolchain.
 
@@ -19,7 +19,8 @@ For guides and reference materials about `dep`, see [the documentation](https://
 
 ## Installation
 
-It is strongly recommended that you use a released version. Release binaries are available on the [releases](https://github.com/golang/dep/releases) page.
+You should use an officially released version. Release binaries are available on
+the [releases](https://github.com/golang/dep/releases) page.
 
 On MacOS you can install or upgrade to the latest released version with Homebrew:
 
@@ -34,6 +35,9 @@ On Debian platforms you can install or upgrade to the latest version with apt-ge
 $ sudo apt-get install go-dep
 ```
 
+On Windows, you can download a tarball from
+[go.equinox.io](https://go.equinox.io/github.com/golang/dep/cmd/dep).
+
 On other platforms you can use the `install.sh` script:
 
 ```sh
@@ -45,7 +49,8 @@ It will install into your `$GOPATH/bin` directory by default or any other direct
 If your platform is not supported, you'll need to build it manually or let the team know and we'll consider adding your platform
 to the release builds.
 
-If you're interested in hacking on `dep`, you can install via `go get`:
+If you're interested in getting the source code, or hacking on `dep`, you can
+install via `go get`:
 
 ```sh
 go get -u github.com/golang/dep/cmd/dep
