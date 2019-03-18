@@ -106,8 +106,8 @@ jobs:
             - release/dep-linux-ppc64le.sha256
             - release/dep-linux-s390x
             - release/dep-linux-s390x.sha256
-            - release/dep-linux-armv6
-            - release/dep-linux-armv6.sha256
+            - release/dep-linux-arm
+            - release/dep-linux-arm.sha256
             - release/dep-linux-arm64
             - release/dep-linux-arm64.sha256
           skip_cleanup: true
