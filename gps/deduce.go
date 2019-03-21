@@ -848,6 +848,11 @@ func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, e
 			return nil, errors.Wrapf(err, "unable to build HTTP request for URL %q", url)
 		}
 
+		req, err = addRequestHeader(url, req)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to add HTTP request header for URL %q", url)
+		}
+
 		resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed HTTP request to URL %q", url)
@@ -857,6 +862,26 @@ func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, e
 	default:
 		return nil, errors.Errorf("unknown remote protocol scheme: %q", scheme)
 	}
+}
+
+func addRequestHeader(url string, req *http.Request) (*http.Request, error) {
+	networkResourcePath := path.Join(os.Getenv("HOME"), ".netrc")
+
+	if _, err := os.Stat(networkResourcePath); err == nil {
+		machines, _, err := netrc.ParseFile(networkResourcePath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to parse .netrc file")
+		}
+
+		for _, m := range machines {
+			if strings.Contains(url, m.Name) {
+				req.SetBasicAuth(m.Login, m.Password)
+				break
+			}
+		}
+	}
+
+	return req, nil
 }
 
 // getMetadata fetches and decodes remote metadata for path.
