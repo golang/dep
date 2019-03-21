@@ -10,13 +10,15 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/armon/go-radix"
+	radix "github.com/armon/go-radix"
+	"github.com/fhs/go-netrc/netrc"
 	"github.com/pkg/errors"
 )
 
