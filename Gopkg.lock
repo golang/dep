@@ -42,35 +42,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:74e461c9d50ee4a47a0f027f924d1feb3f959bcb7ddffc43ebf89574313e088c"
-  name = "github.com/golang/dep"
-  packages = [
-    ".",
-    "gps",
-    "gps/internal/pb",
-    "gps/paths",
-    "gps/pkgtree",
-    "gps/verify",
-    "internal/feedback",
-    "internal/fs",
-    "internal/importers",
-    "internal/importers/base",
-    "internal/importers/glide",
-    "internal/importers/glock",
-    "internal/importers/godep",
-    "internal/importers/govend",
-    "internal/importers/govendor",
-    "internal/importers/gvt",
-    "internal/importers/importertest",
-    "internal/importers/vndr",
-    "internal/test",
-    "internal/test/integration",
-  ]
-  pruneopts = "NUT"
-  revision = "faa6189302b8a862e5612d332ff3755c19784749"
-  version = "v0.5.1"
-
-[[projects]]
   digest = "1:9f35c1344b56e5868d511d231f215edd0650aa572664f856444affdd256e43e4"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
@@ -159,26 +130,6 @@
     "github.com/armon/go-radix",
     "github.com/boltdb/bolt",
     "github.com/fhs/go-netrc/netrc",
-    "github.com/golang/dep",
-    "github.com/golang/dep/gps",
-    "github.com/golang/dep/gps/internal/pb",
-    "github.com/golang/dep/gps/paths",
-    "github.com/golang/dep/gps/pkgtree",
-    "github.com/golang/dep/gps/verify",
-    "github.com/golang/dep/internal/feedback",
-    "github.com/golang/dep/internal/fs",
-    "github.com/golang/dep/internal/importers",
-    "github.com/golang/dep/internal/importers/base",
-    "github.com/golang/dep/internal/importers/glide",
-    "github.com/golang/dep/internal/importers/glock",
-    "github.com/golang/dep/internal/importers/godep",
-    "github.com/golang/dep/internal/importers/govend",
-    "github.com/golang/dep/internal/importers/govendor",
-    "github.com/golang/dep/internal/importers/gvt",
-    "github.com/golang/dep/internal/importers/importertest",
-    "github.com/golang/dep/internal/importers/vndr",
-    "github.com/golang/dep/internal/test",
-    "github.com/golang/dep/internal/test/integration",
     "github.com/golang/protobuf/proto",
     "github.com/jmank88/nuts",
     "github.com/nightlyone/lockfile",
