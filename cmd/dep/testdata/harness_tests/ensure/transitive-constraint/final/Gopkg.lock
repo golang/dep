@@ -2,20 +2,24 @@
 
 
 [[projects]]
+  digest = "1:790b232e551fb110286b1fa62c89c5fe7b03fbfb528cd8d4fb46a7a4293f0d44"
   name = "github.com/carolynvs/deptest-transcons-b"
   packages = ["."]
+  pruneopts = ""
   revision = "bc9969bda2dd54b67470c2f199b14d2665c0f7a1"
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:cb2def9cb92c7efda5d2caca1bfff95ef91562f5645d009b5c21427d80926519"
   name = "github.com/carolynvs/deptest-transcons-c"
   packages = ["."]
+  pruneopts = ""
   revision = "24ede1a3d5a6a036793bfcadf8802f60148adf90"
   version = "v1.0.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "bd219aa442b67cb568bd608a1c39644db8835170c8c5b83bfd3e0f8f0caf07f3"
+  input-imports = ["github.com/carolynvs/deptest-transcons-b"]
   solver-name = "gps-cdcl"
   solver-version = 1
