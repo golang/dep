@@ -30,7 +30,6 @@ var (
 	hgSchemes      = []string{"https", "ssh", "http"}
 	svnSchemes     = []string{"https", "http", "svn", "svn+ssh"}
 	gopkginSchemes = []string{"https", "http"}
-	netrcOnce      sync.Once
 	netrc          []netrcLine
 	netrcErr       error
 )
@@ -859,7 +858,7 @@ func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, e
 			return nil, errors.Wrapf(err, "unable to build HTTP request for URL %q", url)
 		}
 
-		req, err = addRequestHeader(url, req)
+		req, _ = addRequestHeader(url, req)
 
 		resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 		if err != nil {
@@ -907,6 +906,7 @@ func parseNetrc(data string) []netrcLine {
 			case "machine":
 				l = netrcLine{machine: f[i+1]}
 			case "default":
+				// Do nothing.
 				break
 			case "login":
 				l.login = f[i+1]
@@ -931,16 +931,6 @@ func parseNetrc(data string) []netrcLine {
 	}
 
 	return nrc
-}
-
-func havePassword(machine string) bool {
-	netrcOnce.Do(readNetrc)
-	for _, line := range netrc {
-		if line.machine == machine {
-			return true
-		}
-	}
-	return false
 }
 
 func netrcPath() (string, error) {
