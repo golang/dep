@@ -34,14 +34,6 @@
   version = "v1.3.1"
 
 [[projects]]
-  digest = "1:e9fd9fdb68a32484b36fd855dcceb8938c285d12868d36b5518f36aa5e01139a"
-  name = "github.com/fhs/go-netrc"
-  packages = ["netrc"]
-  pruneopts = "NUT"
-  revision = "4ffed54ee5c32ebfb1b8c7c72fc90bb08dc3ff43"
-  version = "v1.0.0"
-
-[[projects]]
   digest = "1:9f35c1344b56e5868d511d231f215edd0650aa572664f856444affdd256e43e4"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
@@ -129,7 +121,6 @@
     "github.com/Masterminds/vcs",
     "github.com/armon/go-radix",
     "github.com/boltdb/bolt",
-    "github.com/fhs/go-netrc/netrc",
     "github.com/golang/protobuf/proto",
     "github.com/jmank88/nuts",
     "github.com/nightlyone/lockfile",

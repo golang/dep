@@ -8,17 +8,19 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 
 	radix "github.com/armon/go-radix"
-	"github.com/fhs/go-netrc/netrc"
 	"github.com/pkg/errors"
 )
 
@@ -28,9 +30,16 @@ var (
 	hgSchemes      = []string{"https", "ssh", "http"}
 	svnSchemes     = []string{"https", "http", "svn", "svn+ssh"}
 	gopkginSchemes = []string{"https", "http"}
+	netrcOnce      sync.Once
+	netrc          []netrcLine
+	netrcErr       error
 )
 
 const gopkgUnstableSuffix = "-unstable"
+
+func init() {
+	readNetrc()
+}
 
 func validateVCSScheme(scheme, typ string) bool {
 	// everything allows plain ssh
@@ -851,9 +860,6 @@ func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, e
 		}
 
 		req, err = addRequestHeader(url, req)
-		if err != nil {
-			return nil, errors.Wrapf(err, "unable to add HTTP request header for URL %q", url)
-		}
 
 		resp, err := http.DefaultClient.Do(req.WithContext(ctx))
 		if err != nil {
@@ -866,20 +872,116 @@ func doFetchMetadata(ctx context.Context, scheme, path string) (io.ReadCloser, e
 	}
 }
 
-func addRequestHeader(url string, req *http.Request) (*http.Request, error) {
-	networkResourcePath := path.Join(os.Getenv("HOME"), ".netrc")
+// See https://github.com/golang/go/blob/master/src/cmd/go/internal/web2/web.go
+// for implementation
+// Temporary netrc reader until https://github.com/golang/go/issues/31334 is solved
+type netrcLine struct {
+	machine  string
+	login    string
+	password string
+}
 
-	if _, err := os.Stat(networkResourcePath); err == nil {
-		machines, _, err := netrc.ParseFile(networkResourcePath)
-		if err != nil {
-			return nil, errors.Wrapf(err, "unable to parse .netrc file")
+func parseNetrc(data string) []netrcLine {
+	// See https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html
+	// for documentation on the .netrc format.
+	var nrc []netrcLine
+	var l netrcLine
+	inMacro := false
+	for _, line := range strings.Split(data, "\n") {
+		if inMacro {
+			if line == "" {
+				inMacro = false
+			}
+			continue
 		}
 
-		for _, m := range machines {
-			if strings.Contains(url, m.Name) {
-				req.SetBasicAuth(m.Login, m.Password)
+		f := strings.Fields(line)
+		i := 0
+		for ; i < len(f)-1; i += 2 {
+			// Reset at each "machine" token.
+			// “The auto-login process searches the .netrc file for a machine token
+			// that matches […]. Once a match is made, the subsequent .netrc tokens
+			// are processed, stopping when the end of file is reached or another
+			// machine or a default token is encountered.”
+			switch f[i] {
+			case "machine":
+				l = netrcLine{machine: f[i+1]}
+			case "default":
 				break
+			case "login":
+				l.login = f[i+1]
+			case "password":
+				l.password = f[i+1]
+			case "macdef":
+				// “A macro is defined with the specified name; its contents begin with
+				// the next .netrc line and continue until a null line (consecutive
+				// new-line characters) is encountered.”
+				inMacro = true
 			}
+			if l.machine != "" && l.login != "" && l.password != "" {
+				nrc = append(nrc, l)
+				l = netrcLine{}
+			}
+		}
+
+		if i < len(f) && f[i] == "default" {
+			// “There can be only one default token, and it must be after all machine tokens.”
+			break
+		}
+	}
+
+	return nrc
+}
+
+func havePassword(machine string) bool {
+	netrcOnce.Do(readNetrc)
+	for _, line := range netrc {
+		if line.machine == machine {
+			return true
+		}
+	}
+	return false
+}
+
+func netrcPath() (string, error) {
+	if env := os.Getenv("NETRC"); env != "" {
+		return env, nil
+	}
+
+	dir := os.Getenv("HOME")
+
+	base := ".netrc"
+	if runtime.GOOS == "windows" {
+		base = "_netrc"
+	}
+	return filepath.Join(dir, base), nil
+}
+
+func readNetrc() {
+	path, err := netrcPath()
+	if err != nil {
+		netrcErr = err
+		return
+	}
+
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			netrcErr = err
+		}
+		return
+	}
+
+	netrc = parseNetrc(string(data))
+}
+
+// addRequestHeader addes basic authentication on go-get requests
+// for private repositories.
+func addRequestHeader(url string, req *http.Request) (*http.Request, error) {
+	for _, m := range netrc {
+		if strings.Contains(url, m.machine) {
+			req.SetBasicAuth(m.login, m.password)
+			break
 		}
 	}
 
