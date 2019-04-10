@@ -962,11 +962,16 @@ func readNetrc() {
 	netrc = parseNetrc(string(data))
 }
 
-// addRequestHeader addes basic authentication on go-get requests
+// addRequestHeader uses basic authentication on go-get requests
 // for private repositories.
-func addRequestHeader(url string, req *http.Request) (*http.Request, error) {
+func addRequestHeader(rawurl string, req *http.Request) (*http.Request, error) {
 	for _, m := range netrc {
-		if strings.Contains(url, m.machine) {
+		u, err := url.Parse(rawurl)
+		if err != nil {
+			continue
+		}
+
+		if u.Host == m.machine {
 			req.SetBasicAuth(m.login, m.password)
 			break
 		}
