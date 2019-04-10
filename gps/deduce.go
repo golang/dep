@@ -31,7 +31,6 @@ var (
 	svnSchemes     = []string{"https", "http", "svn", "svn+ssh"}
 	gopkginSchemes = []string{"https", "http"}
 	netrc          []netrcLine
-	netrcErr       error
 )
 
 const gopkgUnstableSuffix = "-unstable"
@@ -947,15 +946,11 @@ func netrcPath() (string, error) {
 func readNetrc() {
 	path, err := netrcPath()
 	if err != nil {
-		netrcErr = err
 		return
 	}
 
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			netrcErr = err
-		}
 		return
 	}
 
