@@ -7,7 +7,7 @@ GOBIN := $(GOPATH)/bin
 default: build validate test
 
 get-deps:
-	go get -u golang.org/x/lint/golint honnef.co/go/tools/cmd/megacheck
+	go get -u golang.org/x/lint/golint honnef.co/go/tools/cmd/staticcheck
 
 build:
 	go fmt ./...
