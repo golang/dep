@@ -1,4 +1,19 @@
+# v0.5.2
+
+Released on May 8, 2019
+
+IMPROVEMENTS:
+
+* Dep will read a netrc file now, which should allow you to authenticate against
+  Gitlab and other private repositories that require basic auth. ([#2155][2155])
+
+* Ignore "mod" VCS type in parseMetaGoImports ([#2152][2152])
+
+* Use correct filename for ARM releases.
+
 # v0.5.1
+
+Released on February 16, 2019
 
 IMPROVEMENTS:
 
