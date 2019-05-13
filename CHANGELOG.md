@@ -1,4 +1,11 @@
-# v0.5.2
+# v0.5.3
+
+Released on May 13, 2019
+
+0.5.2 was released without a "v" prefix on the tag. The contents of this release
+are identical to 0.5.2.
+
+# 0.5.2
 
 Released on May 8, 2019
 
