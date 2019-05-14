@@ -22,7 +22,9 @@ If set to a [duration](https://golang.org/pkg/time/#ParseDuration) (e.g. `24h`),
 * The contents of a project's `Gopkg.toml` file, at a particular version
 * A project's tree of packages and imports, at a particular version
 
-A duration must be set to enable caching. (In future versions of dep, it will be on by default). The duration is used as a TTL, but only for mutable information, like version lists. Information associated with an immutable VCS revision (packages and imports; `Gopkg.toml` declarations) is cached indefinitely.
+The default duration is `24h`, and values <= 0 will disable the cache.
+The duration is used as a TTL, but only for mutable information, like version lists.
+Information associated with an immutable VCS revision (packages and imports; `Gopkg.toml` declarations) is cached indefinitely.
 
 The cache lives in `$DEPCACHEDIR/bolt-v1.db`, where the version number is an internal number associated with a particular data schema dep uses.
 

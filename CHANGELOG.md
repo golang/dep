@@ -1,3 +1,9 @@
+# (next version)
+
+NEW FEATURES:
+
+* Enable persistent source caching by default (`DEPCACHEAGE`). ([#2163][2163])
+
 # v0.5.3
 
 Released on May 13, 2019

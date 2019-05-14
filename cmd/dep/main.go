@@ -24,6 +24,8 @@ import (
 	"github.com/golang/dep/internal/fs"
 )
 
+const defaultCacheAge = 24 * time.Hour
+
 var (
 	successExitCode = 0
 	errorExitCode   = 1
@@ -185,7 +187,7 @@ func (c *Config) Run() int {
 				}
 			}
 
-			var cacheAge time.Duration
+			cacheAge := defaultCacheAge
 			if env := getEnv(c.Env, "DEPCACHEAGE"); env != "" {
 				var err error
 				cacheAge, err = time.ParseDuration(env)
