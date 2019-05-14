@@ -262,13 +262,31 @@ var examples = [...][2]string{
 	},
 }
 
+var envVars = [...][2]string{
+	{
+		"DEPCACHEAGE",
+		"Maximum age of cached source metadata to use. Default 24h. Set <= 0 to disable.",
+	},
+	{
+		"DEPCACHEDIR",
+		"Directory for local cache. Defaults to $GOPATH/pkg/dep.",
+	},
+	{
+		"DEPPROJECTROOT",
+		"Override the GOPATH inferred project root.",
+	},
+	{
+		"DEPNOLOCK",
+		"Bypass local cache lock file creation.",
+	},
+}
+
 func fprintUsage(w io.Writer) {
 	fmt.Fprintln(w, "Dep is a tool for managing dependencies for Go projects")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage: \"dep [command]\"")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
-	fmt.Fprintln(w)
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
 	commands := commandList()
@@ -282,6 +300,12 @@ func fprintUsage(w io.Writer) {
 	fmt.Fprintln(w, "Examples:")
 	for _, example := range examples {
 		fmt.Fprintf(tw, "\t%s\t%s\n", example[0], example[1])
+	}
+	tw.Flush()
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Environment Variables:")
+	for _, envVar := range envVars {
+		fmt.Fprintf(tw, "\t%s\t%s\n", envVar[0], envVar[1])
 	}
 	tw.Flush()
 	fmt.Fprintln(w)
