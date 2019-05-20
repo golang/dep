@@ -146,8 +146,7 @@ func (r *gitRepo) defendAgainstSubmodules(ctx context.Context) error {
 			"submodule",
 			"foreach",
 			"--recursive",
-			"git",
-			"clean", "-x", "-d", "-f", "-f",
+			"git clean -x -d -f -f",
 		)
 		cmd.SetDir(r.LocalPath())
 		if out, err := cmd.CombinedOutput(); err != nil {
