@@ -6,7 +6,7 @@
 </p>
 
 <i>Would you like to see your company name here? <a
-href="/golang/dep/issue/2165">We're looking for a stable source of
+href="https://github.com/golang/dep/issues/2165">We're looking for a stable source of
 funding.</a></i>
 
 ## Dep
