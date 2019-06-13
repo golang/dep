@@ -267,7 +267,7 @@ only in the root project, i.e. the project where `dep` runs. For example, if you
 
 # Example
 
-A sample `Gopkg.toml` with most elements present:
+Here's a sample `Gopkg.toml` with most elements present.
 
 ```toml
 required = ["github.com/user/thing/cmd/thing"]
@@ -294,7 +294,7 @@ codename = "foo"
   name = "github.com/user/project"
   version = "1.0.0"
 
-  [metadata]
+  [constraint.metadata]
   property1 = "value1"
   property2 = 10
 
@@ -307,6 +307,6 @@ codename = "foo"
   name = "github.com/x/y"
   version = "2.4.0"
 
-  [metadata]
+  [override.metadata]
   propertyX = "valueX"
 ```
