@@ -39,6 +39,12 @@ On Debian platforms you can install or upgrade to the latest version with apt-ge
 $ sudo apt-get install go-dep
 ```
 
+On FreeBSD you can install the latest version with pkg:
+
+```console
+# pkg install godep
+```
+
 On Windows, you can download a tarball from
 [go.equinox.io](https://go.equinox.io/github.com/golang/dep/cmd/dep).
 
