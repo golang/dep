@@ -28,14 +28,14 @@ the [releases](https://github.com/golang/dep/releases) page.
 
 On MacOS you can install or upgrade to the latest released version with Homebrew:
 
-```sh
+```console
 $ brew install dep
 $ brew upgrade dep
 ```
 
 On Debian platforms you can install or upgrade to the latest version with apt-get:
 
-```sh
+```console
 $ sudo apt-get install go-dep
 ```
 
@@ -50,7 +50,7 @@ On Windows, you can download a tarball from
 
 On other platforms you can use the `install.sh` script:
 
-```sh
+```console
 $ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ```
 
@@ -62,8 +62,8 @@ to the release builds.
 If you're interested in getting the source code, or hacking on `dep`, you can
 install via `go get`:
 
-```sh
-go get -u github.com/golang/dep/cmd/dep
+```console
+$ go get -u github.com/golang/dep/cmd/dep
 ```
 
 ## Feedback
