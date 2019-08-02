@@ -942,7 +942,9 @@ func (s *solver) findValidVersion(q *versionQueue, pl []string) error {
 		}
 	}
 
-	s.fail(s.sel.getDependenciesOn(q.id)[0].depender.id)
+	if deps := s.sel.getDependenciesOn(q.id); deps != nil && len(deps) > 0 {
+		s.fail(s.sel.getDependenciesOn(q.id)[0].depender.id)
+	}
 
 	// Return a compound error of all the new errors encountered during this
 	// attempt to find a new, valid version
