@@ -205,7 +205,16 @@ Once you have set that up, dep will automatically use that Token to authenticate
 
 ## How do I get dep to authenticate via SSH to a git repo?
 
-You can rewrite the repo url and use the git+ssh shema with follow example:
+You can change the source field in the `Gopkg.toml` to use the git+ssh shema.  For example, you could use the following:
+
+```
+[[constraint]]
+  name = "github.yourEnterprise.com/org/project"
+  source = "git@github.yourEnterprise.com:org/project.git"
+  branch = "master"
+```
+
+Alternatively, can rewrite all repo URLs and use the git+ssh shema with follow example:
 
 ```
 git config --global url."git@github.yourEnterprise.com:".insteadOf "https://github.yourEnterprise.com/"
