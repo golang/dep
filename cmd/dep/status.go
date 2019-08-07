@@ -74,7 +74,7 @@ dep status -f='{{if eq .Constraint "master"}}{{.ProjectRoot}} {{end}}'
 
 	Displays the list of package names constrained on the master branch.
 	The -f flag allows you to use Go templates along with it's various
-	constructs for formating output data. Available flags are as follows:
+	constructs for formatting output data. Available flags are as follows:
 	` + availableTemplateVariables + `
 
 dep status -detail -f='{{range $i, $p := .Projects}}{{if ne .Source "" -}}
