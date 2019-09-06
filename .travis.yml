@@ -32,6 +32,7 @@ jobs:
       env:
         - DEPTESTBYPASS501=1
         - TZ=UTC
+        - GOCACHE=/home/travis/var/cache
       script:
         - make test
     - <<: *simple-test
@@ -41,10 +42,6 @@ jobs:
       install:
         - ssh-keyscan -t $TRAVIS_SSH_KEY_TYPES -H bitbucket.org >> ~/.ssh/known_hosts
         - mkdir -p /home/travis/var/cache
-      env:
-        - GOCACHE=/home/travis/var/cache
-        - DEPTESTBYPASS501=1
-        - TZ=UTC
 
     - <<: *simple-test
       os: osx
