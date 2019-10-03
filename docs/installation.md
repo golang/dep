@@ -9,7 +9,8 @@ It is strongly recommended that you use a released version of dep. While tip is 
 Pre-compiled binaries are available on the [releases](https://github.com/golang/dep/releases) page. You can use the `install.sh` script to automatically install one for your local platform:
 
 ```sh
-$ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+$ curl -O https://raw.githubusercontent.com/golang/dep/master/install.sh
+$ sh ./install.sh
 ```
 
 ## MacOS
