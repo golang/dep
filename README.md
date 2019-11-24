@@ -36,6 +36,8 @@ $ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 
 It will install into your `$GOPATH/bin` directory by default or any other directory you specify using the `INSTALL_DIRECTORY` environment variable.
 
+On windows you can find the binaries from release path https://github.com/golang/dep/releases
+
 If your platform is not supported, you'll need to build it manually or let the team know and we'll consider adding your platform
 to the release builds.
 
