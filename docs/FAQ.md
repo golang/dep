@@ -203,6 +203,13 @@ machine github.com
 
 Once you have set that up, dep will automatically use that Token to authenticate to the repositories.
 
+A last alternative could be to force your git configuration to use your token for any access to github :
+```
+git config --global url."https://<your_personal_access_token>@github.com".insteadOf "https://github.com"
+```
+You have to replace <your_personnal_access_token> with the token value in this command.
+After this, any call to github with https will use your token, dep one included.
+
 ## How do I get dep to authenticate via SSH to a git repo?
 
 You can rewrite the repo url and use the git+ssh shema with follow example:
