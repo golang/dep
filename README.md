@@ -13,13 +13,12 @@ funding.</a></i>
 
 `dep` is a dependency management tool for Go. It requires Go 1.9 or newer to compile.
 
-`dep` was the "official experiment." The Go toolchain, as of 1.11, has adopted
-an approach that sharply diverges from `dep`. As a result, we are continuing
-development of `dep`, but gearing work primarily towards the development of an
-alternative prototype for versioning behavior in the toolchain.
+`dep` was initially developed to experiment with a new dependency management system
+for Go; but, as of Go 1.11, **the Go project has officially adopted a different approach, 
+based on the concept of Modules**, which is described in a [series of posts](https://blog.golang.org/using-go-modules) 
+published on [blog.golang.org](https://blog.golang.org).
 
-For guides and reference materials about `dep`, see [the
-documentation](https://golang.github.io/dep).
+For guides and reference materials about `dep`, see [the documentation](https://golang.github.io/dep).
 
 ## Installation
 
