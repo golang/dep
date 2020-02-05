@@ -161,7 +161,13 @@ echo "Release Tag = $DEP_RELEASE_TAG"
 downloadJSON RELEASE_DATA "$RELEASES_URL/tag/$DEP_RELEASE_TAG"
 
 BINARY_URL="$RELEASES_URL/download/$DEP_RELEASE_TAG/$BINARY"
-DOWNLOAD_FILE=$(mktemp)
+
+# mktemp command in MacOS has no default template
+if [ "$OS" = "darwin" ]; then
+    DOWNLOAD_FILE=$(mktemp -t temp-dep)
+else
+    DOWNLOAD_FILE=$(mktemp)
+fi
 
 downloadFile "$BINARY_URL" "$DOWNLOAD_FILE"
 
