@@ -40,7 +40,7 @@ type command interface {
 }
 
 // Helper type so that commands can fail without generating any additional
-// ouptut.
+// output.
 type silentfail struct{}
 
 func (silentfail) Error() string {
