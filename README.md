@@ -42,6 +42,12 @@ $ sudo apt-get install go-dep
 On Windows, you can download a tarball from
 [go.equinox.io](https://go.equinox.io/github.com/golang/dep/cmd/dep).
 
+OR
+Install [Git Bash](https://git-scm.com/downloads) & then run 
+```
+$go get -u github.com/golang/dep
+```
+
 On other platforms you can use the `install.sh` script:
 
 ```sh
