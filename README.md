@@ -38,7 +38,15 @@ On Debian platforms you can install or upgrade to the latest version with apt-ge
 $ sudo apt-get install go-dep
 ```
 
-On Windows, you can download a tarball from
+On Windows, you can install or upgrade to the latest released version with Choco
+
+```sh
+$ choco install dep
+$ choco upgrade dep
+```
+
+or you can download a tarball from
+
 [go.equinox.io](https://go.equinox.io/github.com/golang/dep/cmd/dep).
 
 On other platforms you can use the `install.sh` script:
