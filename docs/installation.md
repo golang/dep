@@ -2,7 +2,7 @@
 title: Installation
 ---
 
-It is strongly recommended that you use a released version of dep. While tip is never purposefully broken, its stability is not guaranteed.
+It is strongly recommended that you use a released version of dep. While branch tip is never purposefully broken, its stability is not guaranteed.
 
 ## Binary Installation
 
