@@ -71,8 +71,6 @@ Go 1.4 introduced [import comments](https://golang.org/cmd/go/#hdr-Import_path_c
 
 Because most projects are consistent about their import comment use over time, this issue typically only occurs when adding a new dependency or attempting to revive an older project.
 
-> Note: dep does not currently enforce this rule, but [it needs to](https://github.com/golang/dep/issues/902).
-
 **Remediation:** change the code by fixing the offending import paths. If the offending import paths are not in the current project and you don't directly control the dependency, you'll have to fork and fix it yourself, then use `source` to point to your fork.
 
 ### Import path casing
