@@ -5,18 +5,13 @@
   <a href="https://goreportcard.com/report/github.com/golang/dep"><img src="https://goreportcard.com/badge/github.com/golang/dep" /></a>
 </p>
 
-<i>Would you like to see your company name here? <a
-href="https://github.com/golang/dep/issues/2165">We're looking for a stable source of
-funding.</a></i>
-
 ## Dep
 
 `dep` is a dependency management tool for Go. It requires Go 1.9 or newer to compile.
 
-`dep` was initially developed to experiment with a new dependency management system
-for Go; but, as of Go 1.11, **the Go project has officially adopted a different approach, 
-based on the concept of Modules**, which is described in a [series of posts](https://blog.golang.org/using-go-modules) 
-published on [blog.golang.org](https://blog.golang.org).
+**NOTE:** Dep was an official experiment to implement a package manager for Go.
+As of 2020, Dep is deprecated and archived in favor of Go modules, which have
+had official support since Go 1.11. For more details, see https://golang.org/ref/mod.
 
 For guides and reference materials about `dep`, see [the documentation](https://golang.github.io/dep).
 
@@ -58,19 +53,3 @@ install via `go get`:
 ```sh
 go get -u github.com/golang/dep/cmd/dep
 ```
-
-## Feedback
-
-Feedback is greatly appreciated.
-At this stage, the maintainers are most interested in feedback centered on the user experience (UX) of the tool.
-Do you have workflows that the tool supports well, or doesn't support at all?
-Do any of the commands have surprising effects, output, or results?
-Let us know by filing an issue, describing what you did or wanted to do, what you expected to happen, and what actually happened.
-
-## Contributing
-
-Contributions are greatly appreciated.
-The maintainers actively manage the issues list, and try to highlight issues suitable for newcomers.
-The project follows the typical GitHub pull request model.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
-Before starting any work, please either comment on an existing issue, or file a new one.
