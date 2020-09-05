@@ -7,7 +7,7 @@
     <link rel="alternate" href="https://golang.github.io/blog"/>
     <subtitle>The best place to stay up-to-date with the latest dep news and events.</subtitle>
     <logo>https://golang.github.iodocs/assets/DigbyFlat.svg</logo>
-    <rights>Copyright © 2018 The Go Authors</rights>
+    <rights>Copyright © 2020 The Go Authors</rights>
     <entry>
         <title type="html"><![CDATA[Announcing dep v0.5.0]]></title>
         <id>https://golang.github.io/blog/2018/07/25/announce-v0.5.0.html</id>

@@ -12,7 +12,7 @@
 <li>The <a href="/dep/docs/glossary.html#current-project">current project's</a> source code.</li>
 <li>A <a href="/dep/docs/glossary.html#manifest">manifest</a> - a file describing the current project's dependency requirements. In dep, this is the <a href="/dep/docs/Gopkg.toml.html"><code>Gopkg.toml</code></a> file.</li>
 <li>A <a href="/dep/docs/glossary.html#lock">lock</a> - a file containing a transitively-complete, reproducible description of the dependency graph. In dep, this is the <a href="/dep/docs/Gopkg.lock.html"><code>Gopkg.lock</code></a> file.</li>
-<li>The source code of the dependences themselves. In dep's current design, this is the <code>vendor/</code> directory.</li>
+<li>The source code of the dependencies themselves. In dep's current design, this is the <code>vendor/</code> directory.</li>
 </ol>
 <p>We can visually represent these four states as follows:</p>
 <p><img src="/dep/docs/assets/four-states.png" alt="dep's four states"></p>
@@ -117,7 +117,7 @@ If you run <span class="hljs-string">"dep ensure"</span> again before actually i
 </code></pre>
 <p>Ordinarily, when the solver encounters a project name for which there's an entry in <code>Gopkg.lock</code>, it pulls that version out and puts it at the head of the queue of possible versions for that project. When a specific dependency is passed to <code>dep ensure -update</code>, however, it is added to the <code>ToChange</code> list; when the solver encounters a project listed in <code>ToChange</code>, it simply skips pulling the version from the lock.</p>
 <p>&quot;Skips pulling the version from the lock&quot; would imply that <code>dep ensure -update github.com/foo/bar</code> is equivalent to removing the <code>[[project]]</code> stanza for <code>github.com/foo/bar</code> from your <code>Gopkg.lock</code>, then running <code>dep ensure</code>. And indeed it is - however, that approach is not recommended, and subtle changes may be introduced in the future that complicate the equivalency.</p>
-<p>If <code>-update</code> is passed with no arguments, then <code>ChangeAll</code> is set to <code>true</code>, resulting in the solver ignoring <code>Gopkg.lock</code> for all newly-encountered project names. This is equivalent to explicitly passing all of your dependences as arguments to <code>dep ensure -update</code>, as well as <code>rm Gopkg.lock &amp;&amp; dep ensure</code>. Again, however, neither of these approaches are recommended, and future changes may introduce subtle differences.</p>
+<p>If <code>-update</code> is passed with no arguments, then <code>ChangeAll</code> is set to <code>true</code>, resulting in the solver ignoring <code>Gopkg.lock</code> for all newly-encountered project names. This is equivalent to explicitly passing all of your dependencies as arguments to <code>dep ensure -update</code>, as well as <code>rm Gopkg.lock &amp;&amp; dep ensure</code>. Again, however, neither of these approaches are recommended, and future changes may introduce subtle differences.</p>
 <p>When a version hint from <code>Gopkg.lock</code> is not placed at the head of the version queue, it means that dep will explore the set of possible versions for a particular dependency. This exploration is performed according to a <a href="https://godoc.org/github.com/golang/dep/gps#SortForUpgrade">fixed sort order</a>, where newer versions are tried first, resulting in an update.</p>
 <p>For example, say there is a project, <code>github.com/foo/bar</code>, with the following versions:</p>
 <pre><code class="hljs css bash">v1.2.0, v1.1.1, v1.1.0, v1.0.0, master
@@ -153,7 +153,7 @@ If you run <span class="hljs-string">"dep ensure"</span> again before actually i
 <tr><td>(none)</td><td>(none)</td><td>The first version that works, according to <a href="https://godoc.org/github.com/golang/dep/gps#SortForUpgrade">the sort order</a></td></tr>
 </tbody>
 </table>
-</span></div></article></div><div class="docs-prevnext"><a class="docs-prev button" href="uninstalling.html">← Uninstalling Dep</a><a class="docs-next button" href="failure-modes.html">Failure Modes →</a></div></div></div></div><footer class="nav-footer" id="footer"><section class="copyright">Copyright © 2018 The Go Authors</section><section class="footer-logo"><a href="/dep/" class="nav-home"><img src="/dep/docs/assets/DigbyShadowsScene2.svg" alt="dep" width="75"/></a></section></footer></div><script type="text/javascript" src="https://cdn.jsdelivr.net/docsearch.js/1/docsearch.min.js"></script><script>
+</span></div></article></div><div class="docs-prevnext"><a class="docs-prev button" href="uninstalling.html">← Uninstalling Dep</a><a class="docs-next button" href="failure-modes.html">Failure Modes →</a></div></div></div></div><footer class="nav-footer" id="footer"><section class="copyright">Copyright © 2020 The Go Authors</section><section class="footer-logo"><a href="/dep/" class="nav-home"><img src="/dep/docs/assets/DigbyShadowsScene2.svg" alt="dep" width="75"/></a></section></footer></div><script type="text/javascript" src="https://cdn.jsdelivr.net/docsearch.js/1/docsearch.min.js"></script><script>
               var search = docsearch({
                 apiKey: '0b4cdbc6bb41efe17ed7176afcb23441',
                 indexName: 'golang_dep',

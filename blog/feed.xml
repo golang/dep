@@ -12,7 +12,7 @@
             <url>https://golang.github.iodocs/assets/DigbyFlat.svg</url>
             <link>https://golang.github.io/blog</link>
         </image>
-        <copyright>Copyright © 2018 The Go Authors</copyright>
+        <copyright>Copyright © 2020 The Go Authors</copyright>
         <item>
             <title><![CDATA[Announcing dep v0.5.0]]></title>
             <link>https://golang.github.io/blog/2018/07/25/announce-v0.5.0.html</link>

@@ -159,17 +159,18 @@ go install .
 </code></pre>
 <p>It is usually safe to set <code>non-go = true</code>, as well. However, as dep only has a clear model for the role played by Go files, and non-Go files necessarily fall outside that model, there can be no comparable general definition of safety.</p>
 <h2><a class="anchor" aria-hidden="true" name="noverify"></a><a href="#noverify" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a><code>noverify</code></h2>
-<p>The <code>noverify</code> field is a list of <a href="/dep/docs/glossary.html#project-root">project roots</a> to exclude from <a href="/dep/docs/glossary.html#vendor-verification">vendor verification</a>.</p>
+<p>The <code>noverify</code> field is a list of paths, typically <a href="/dep/docs/glossary.html#project-root">project roots</a>, to exclude from <a href="/dep/docs/glossary.html#vendor-verification">vendor verification</a>.</p>
 <p>Dep uses per-project hash digests, computed after pruning and recorded in <a href="/dep/docs/Gopkg.lock.html#digest">Gopkg.lock</a>, to determine if the contents of <code>vendor/</code> are as expected. If the recorded digest and the hash of the corresponding tree in <code>vendor/</code> differ, that project is considered to be out of sync:</p>
 <ul>
 <li><code>dep ensure</code> will regenerate it</li>
 <li><code>dep check</code> will complain of a hash mismatch and exit 1</li>
 </ul>
-<p>It is strongly preferable for almost all workflows that you leave <code>vendor/</code> unmodified, in whatever state dep puts it in. However, this isn't always an option. If you have no choice but to modify <code>vendor/</code> for a particular project, then add the project root for that project to <code>noverify</code>. This will have the following effects:</p>
+<p>It is strongly recommended that you leave <code>vendor/</code> unmodified, in whatever state dep puts it in. However, this isn't always feasible. If you have no choice but to modify <code>vendor/</code> for a particular project, then add the project root for that project to <code>noverify</code>. This will have the following effects:</p>
 <ul>
 <li><code>dep ensure</code> will ignore hash mismatches for the project, and only regenerate it in <code>vendor/</code> if absolutely necessary (prune options change, package list changes, version changes)</li>
 <li><code>dep check</code> will continue to report hash mismatches (albeit with an annotation about <code>noverify</code>) for the project, but will no longer exit 1.</li>
 </ul>
+<p><code>noverify</code> can also be used to preserve certain excess paths that would otherwise be removed; for example, adding <code>WORKSPACE</code> to the <code>noverify</code> list would allow you to preserve <code>vendor/WORKSPACE</code>, which can help with some Bazel-based workflows.</p>
 <h2><a class="anchor" aria-hidden="true" name="scope"></a><a href="#scope" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Scope</h2>
 <p><code>dep</code> evaluates</p>
 <ul>
@@ -192,7 +193,7 @@ go install .
 <p>✔ : Evaluated
 ✖ : Not evaluated</p>
 <h1><a class="anchor" aria-hidden="true" name="example"></a><a href="#example" aria-hidden="true" class="hash-link" ><svg aria-hidden="true" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Example</h1>
-<p>A sample <code>Gopkg.toml</code> with most elements present:</p>
+<p>Here's a sample <code>Gopkg.toml</code> with most elements present.</p>
 <pre><code class="hljs css toml">required = ["github.com/user/thing/cmd/thing"]
 
 ignored = [
@@ -217,7 +218,7 @@ codename = "foo"
   name = "github.com/user/project"
   version = "1.0.0"
 
-  [metadata]
+  [constraint.metadata]
   property1 = "value1"
   property2 = 10
 
@@ -230,10 +231,10 @@ codename = "foo"
   name = "github.com/x/y"
   version = "2.4.0"
 
-  [metadata]
+  [override.metadata]
   propertyX = "valueX"
 </code></pre>
-</span></div></article></div><div class="docs-prevnext"><a class="docs-prev button" href="deduction.html">← Import Path Deduction</a><a class="docs-next button" href="Gopkg.lock.html">Gopkg.lock →</a></div></div></div></div><footer class="nav-footer" id="footer"><section class="copyright">Copyright © 2018 The Go Authors</section><section class="footer-logo"><a href="/dep/" class="nav-home"><img src="/dep/docs/assets/DigbyShadowsScene2.svg" alt="dep" width="75"/></a></section></footer></div><script type="text/javascript" src="https://cdn.jsdelivr.net/docsearch.js/1/docsearch.min.js"></script><script>
+</span></div></article></div><div class="docs-prevnext"><a class="docs-prev button" href="deduction.html">← Import Path Deduction</a><a class="docs-next button" href="Gopkg.lock.html">Gopkg.lock →</a></div></div></div></div><footer class="nav-footer" id="footer"><section class="copyright">Copyright © 2020 The Go Authors</section><section class="footer-logo"><a href="/dep/" class="nav-home"><img src="/dep/docs/assets/DigbyShadowsScene2.svg" alt="dep" width="75"/></a></section></footer></div><script type="text/javascript" src="https://cdn.jsdelivr.net/docsearch.js/1/docsearch.min.js"></script><script>
               var search = docsearch({
                 apiKey: '0b4cdbc6bb41efe17ed7176afcb23441',
                 indexName: 'golang_dep',
